@@ -9,128 +9,66 @@ render_with_liquid: false
 
 ## Installation
 
-### Option 1: Plugin install (recommended)
+This is an [Agent Skills](https://agentskills.io/specification) package, not a
+host-specific plugin. A clone of this repo is enough for Claude and Grok:
+`.claude/skills/code-review-lenses` and `.grok/skills/code-review-lenses` are
+relative links to the shipped skill, so `/code-review-lenses` is discovered.
 
-First, add the Tag1 Consulting marketplace (one-time setup, run in your terminal):
+Other hosts: copy or symlink:
 
-```bash
-claude plugin marketplace add tag1consulting/claude-plugins
-```
+- `skills/code-review-lenses/` → the host's skills directory
+- `agents/*.md` → the host's agents directory
 
-Then inside Claude Code, install the plugin and its required dependency:
-
-```
-/plugins install comprehensive-review@tag1consulting
-/plugins install pr-review-toolkit@claude-plugins-official
-```
-
-Optionally, install the security-guidance companion plugin for ambient hook-based security review:
-
-```
-/plugins install security-guidance@claude-plugins-official
-```
-
-### Option 2: Manual installation
-
-> **Note:** Agents must be installed under the `comprehensive-review:` plugin namespace. For manual installs, lay down the full plugin tree shown below, then update `~/.claude/plugins/installed_plugins.json` to register it.
-
-```bash
-PLUGIN_DIR=~/.claude/plugins/cache/tag1consulting/comprehensive-review/<version>
-
-mkdir -p "$PLUGIN_DIR/.claude-plugin"
-cp .claude-plugin/plugin.json "$PLUGIN_DIR/.claude-plugin/"
-
-mkdir -p "$PLUGIN_DIR/skills/comprehensive-review"
-cp skills/comprehensive-review/SKILL.md "$PLUGIN_DIR/skills/comprehensive-review/"
-cp skills/comprehensive-review/HELP.md "$PLUGIN_DIR/skills/comprehensive-review/"
-cp skills/comprehensive-review/SEVERITY.md "$PLUGIN_DIR/skills/comprehensive-review/"
-cp skills/comprehensive-review/suppressions.json "$PLUGIN_DIR/skills/comprehensive-review/"
-cp -r skills/comprehensive-review/language-profiles "$PLUGIN_DIR/skills/comprehensive-review/"
-
-mkdir -p "$PLUGIN_DIR/agents"
-cp agents/pr-summarizer.md "$PLUGIN_DIR/agents/"
-cp agents/issue-linker.md "$PLUGIN_DIR/agents/"
-cp agents/security-reviewer.md "$PLUGIN_DIR/agents/"
-cp agents/architecture-reviewer.md "$PLUGIN_DIR/agents/"
-cp agents/blind-hunter.md "$PLUGIN_DIR/agents/"
-cp agents/edge-case-hunter.md "$PLUGIN_DIR/agents/"
-cp agents/adversarial-general.md "$PLUGIN_DIR/agents/"
-
-mkdir -p "$PLUGIN_DIR/skills/comprehensive-review/scripts"
-for s in skills/comprehensive-review/scripts/*.sh; do
-  cp "$s" "$PLUGIN_DIR/skills/comprehensive-review/scripts/"
-  chmod +x "$PLUGIN_DIR/skills/comprehensive-review/scripts/$(basename "$s")"
-done
-```
-
-Then register the plugin in `~/.claude/plugins/installed_plugins.json` and install the dependency:
-
-```
-/plugins install pr-review-toolkit@claude-plugins-official
-```
+The orchestrator finds its own files via `scripts/resolve-skill-root.sh`.
 
 ## Requirements
 
 | Requirement | Notes |
 |-------------|-------|
-| [Claude Code](https://claude.ai/code) | CLI or desktop app |
-| `git` | Required for diff analysis |
-| [gh CLI](https://cli.github.com/) | Required for GitHub / GitHub Enterprise |
-| [glab CLI](https://gitlab.com/gitlab-org/cli) | Required for GitLab |
-| `BITBUCKET_EMAIL` env var | Required for Bitbucket — your Atlassian account email address |
-| `BITBUCKET_TOKEN` env var | Required for Bitbucket — Atlassian API token from `id.atlassian.com` |
-| `jq` | Required for GitLab and Bitbucket (JSON parsing) |
-| `pr-review-toolkit@claude-plugins-official` | Required — provides code-reviewer, silent-failure-hunter, pr-test-analyzer, comment-analyzer, type-design-analyzer |
-| `security-guidance@claude-plugins-official` | Recommended — ambient hook-based security review; also wires up the shared org security policy |
+| Agent Skills host | Claude, Codex, Grok, Cursor, Copilot, … |
+| `git` | Diff analysis |
+| `jq` | Findings pipeline |
+| [gh CLI](https://cli.github.com/) | GitHub PR URL only |
+| [glab CLI](https://gitlab.com/gitlab-org/cli) | GitLab MR URL only; any authenticated host |
+| `BITBUCKET_EMAIL` + `BITBUCKET_TOKEN` | Bitbucket PR URL only |
 
-## Running your first review
-
-Run from any git repository on the branch you want to review:
+## First review
 
 ```
-/comprehensive-review
+/code-review-lenses
 ```
 
-By default, everything runs locally — no PR is created, no remote posting occurs. This is intentional: posting to your hosting provider requires explicit opt-in flags.
+Use `--profile quick` for a cheaper pass, `--profile security` for the security
+axis only, `--profile deep` for extended specialist reasoning plus CVE
+reachability, or pass a PR/MR URL to analyze that change locally.
 
-**Model tip:** Run this skill on **Sonnet** (not Opus). The orchestrator does structured workflow coordination, not deep reasoning. Opus is reserved for the internally-spawned `architecture-reviewer` and `security-reviewer` agents. Running on Opus costs ~$60–80 for a medium PR; Sonnet costs ~$30–45.
+## GitLab
 
-## Updating
-
-```
-/plugins update comprehensive-review@tag1consulting
-```
-
-## Uninstalling
-
-```
-/plugins uninstall comprehensive-review@tag1consulting
+```bash
+glab auth login --hostname git.example.com
+/code-review-lenses https://git.example.com/g/p/-/merge_requests/7
 ```
 
-For manual installs, remove `~/.claude/plugins/cache/tag1consulting/comprehensive-review`, then remove the `comprehensive-review@tag1consulting` entry from `~/.claude/plugins/installed_plugins.json` and `enabledPlugins` in `~/.claude/settings.json`.
+Self-hosted and dedicated hosts work as long as `glab auth status` lists them
+(or `GITLAB_HOST` matches the remote hostname).
 
-## Org security policy
+## Workflow wrappers
 
-Both `comprehensive-review` and the `security-guidance` plugin read the same
-`claude-security-guidance.md` policy file. Drop one in any of these locations to have
-both tools apply the same codebase-specific security rules automatically:
+On Claude or Grok you can run the review as a host workflow instead of
+walking the skill turn-by-turn. The skill remains the source of truth; the
+wrappers launch the shipped parsers and `agents/*.md` (Phase 0–1b, 2, 3, 5).
+Phase 0c and Phase 1c run only on the skill path.
 
-| Path | Scope |
-|------|-------|
-| `~/.claude/claude-security-guidance.md` | User-wide (all repos) |
-| `<repo>/.claude/claude-security-guidance.md` | Project-wide (commit this) |
-| `<repo>/.claude/claude-security-guidance.local.md` | Local overrides (gitignore this) |
-
-All three are loaded and concatenated (user → project → project-local) into the security-reviewer's task description. The combined budget is capped at 8 KB — if files exceed this, the tail is truncated first, preserving user-wide rules.
-
-Example:
-
-```markdown
-# Org security rules
-
-- All SELECTs against the `customers` or `orders` tables MUST go through `db.replica`.
-- Background jobs must not use the user-context auth token; use service-account creds.
-- Calls to `requests.get(url)` with user-controlled input need the SSRF-allowlist wrapper.
+```
+/code-review-lenses-workflow
+/code-review-lenses-workflow --profile quick
+/code-review-lenses-workflow review <pr-or-mr-url> focus on auth
 ```
 
-For a fuller annotated starting point, copy [`examples/claude-security-guidance.example.md`](https://github.com/tag1consulting/claude-comprehensive-review/blob/main/examples/claude-security-guidance.example.md) into your repo's `.claude/` directory and rename it to `claude-security-guidance.md`.
+Same argv as the skill (flags plus optional free-form). JSON
+`{ "arguments": "--profile deep https://github.com/acme/app/pull/42" }` is that same string.
+
+| Host | Wrapper |
+|------|---------|
+| Claude | `.claude/workflows/code-review-lenses-workflow.js` |
+| Grok | `.grok/workflows/code-review-lenses-workflow.rhai` |

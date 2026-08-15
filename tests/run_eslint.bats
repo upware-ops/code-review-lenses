@@ -53,7 +53,7 @@ teardown() {
 @test "eslint: malformed output falls through safely" {
   touch "$WORK/Button.tsx"
   ESLINT_MOCK_FILE="$ESLINT_FIX/eslint-malformed.json" run --separate-stderr "$SCRIPT" "$WORK/Button.tsx"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
 
@@ -153,6 +153,27 @@ teardown() {
 # ---------------------------------------------------------------------------
 # stdin input contract
 # ---------------------------------------------------------------------------
+
+@test "eslint: live run with no --no-warn-ignored does not unbound-abort" {
+  mkdir -p "$WORK/node_modules/.bin"
+  cat > "$WORK/node_modules/.bin/eslint" << 'EOF'
+#!/bin/sh
+if echo "$*" | grep -q -- --help; then
+  echo "eslint"
+  exit 0
+fi
+printf '%s\n' '[{"filePath":"x.js","messages":[{"ruleId":"no-undef","severity":2,"message":"x","line":1}]}]'
+exit 1
+EOF
+  chmod +x "$WORK/node_modules/.bin/eslint"
+  echo 'var x' > "$WORK/x.js"
+  unset ESLINT_MOCK_FILE
+  cd "$WORK"
+  GITHUB_WORKSPACE="$WORK" run --separate-stderr bash "$SCRIPT" "$WORK/x.js"
+  [[ "${stderr:-}" != *"unbound variable"* ]]
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.[0].finding | test("no-undef")' >/dev/null
+}
 
 @test "eslint: accepts file list via stdin" {
   touch "$WORK/Button.tsx"

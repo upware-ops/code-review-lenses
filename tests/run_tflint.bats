@@ -48,7 +48,7 @@ teardown() {
 @test "tflint: malformed output falls through safely" {
   touch "$WORK/main.tf"
   TFLINT_MOCK_FILE="$TF_FIX/tflint-malformed.json" run --separate-stderr "$SCRIPT" "$WORK/main.tf"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
 

@@ -10,84 +10,67 @@ render_with_liquid: false
 ## File layout
 
 ```
-.claude-plugin/plugin.json                                   ← plugin manifest (name, version, author, keywords)
-skills/comprehensive-review/SKILL.md                         ← orchestrator: phases 0–5, all workflow logic
-skills/comprehensive-review/HELP.md                          ← usage reference
-skills/comprehensive-review/SEVERITY.md                      ← severity normalization + confidence scale
-skills/comprehensive-review/GOVERNANCE.md                    ← shared governance directives (inlined into every custom agent)
-skills/comprehensive-review/suppressions.json                ← global suppression rules
-skills/comprehensive-review/language-profiles/               ← per-language context profiles (19 languages)
-skills/comprehensive-review/scripts/run-cve-check.sh         ← deterministic CVE check via OSV.dev (Phase 1b)
-skills/comprehensive-review/scripts/run-shellcheck.sh        ← ShellCheck (Phase 1b)
-skills/comprehensive-review/scripts/run-semgrep.sh           ← Semgrep SAST (Phase 1b)
-skills/comprehensive-review/scripts/run-trufflehog.sh        ← TruffleHog secret scanning (Phase 1b)
-skills/comprehensive-review/scripts/run-ruff.sh              ← Ruff Python linting (Phase 1b)
-skills/comprehensive-review/scripts/run-golangci-lint.sh     ← golangci-lint Go analysis (Phase 1b)
-skills/comprehensive-review/scripts/run-checkov.sh           ← checkov IaC security scanning (Phase 1b)
-skills/comprehensive-review/scripts/run-eslint.sh            ← ESLint (Phase 1b)
-skills/comprehensive-review/scripts/run-hadolint.sh          ← Hadolint (Phase 1b)
-skills/comprehensive-review/scripts/run-kube-linter.sh       ← kube-linter (Phase 1b)
-skills/comprehensive-review/scripts/run-phpcs.sh             ← PHP CodeSniffer (Phase 1b)
-skills/comprehensive-review/scripts/run-phpstan.sh           ← PHPStan (Phase 1b)
-skills/comprehensive-review/scripts/run-tflint.sh            ← tflint (Phase 1b)
-agents/pr-summarizer.md                                      ← Block A generation
-agents/issue-linker.md                                       ← issue cross-referencing (GitHub only)
-agents/security-reviewer.md                                  ← security analysis
-agents/architecture-reviewer.md                              ← architectural analysis
-agents/blind-hunter.md                                       ← context-free "fresh eyes" review
-agents/edge-case-hunter.md                                   ← boundary-condition path tracing
-agents/adversarial-general.md                                ← holistic completeness/operational review
-tests/                                                       ← bats test suite (150 tests)
+AGENTS.md                                                    ← host-agnostic project instructions
+skills/code-review-lenses/SKILL.md                         ← orchestrator: phases 0–3 and 5 (local only)
+skills/code-review-lenses/models.conf                      ← optional model routing (default: inherit)
+skills/code-review-lenses/scripts/resolve-profile.sh       ← --profile / flag parser
+skills/code-review-lenses/scripts/parse-pr-url.sh          ← PR/MR URL → host + number
+skills/code-review-lenses/scripts/review-diff.sh           ← committed vs dirty vs empty range
+skills/code-review-lenses/scripts/apply-roster-overlays.sh ← TIER / docs-only / gate overlays
+skills/code-review-lenses/scripts/detect-provider.sh       ← GitHub / GitLab (any glab host) / Bitbucket
+skills/code-review-lenses/HELP.md                          ← usage reference
+skills/code-review-lenses/SEVERITY.md                      ← severity normalization + confidence scale
+skills/code-review-lenses/GOVERNANCE.md                    ← shared governance directives (inlined into every custom agent)
+skills/code-review-lenses/suppressions.json                ← global suppression rules
+skills/code-review-lenses/language-profiles/               ← per-language context profiles (19 languages)
+skills/code-review-lenses/scripts/run-cve-check.sh         ← deterministic CVE check via OSV.dev (Phase 1b)
+skills/code-review-lenses/scripts/run-shellcheck.sh        ← ShellCheck (Phase 1b)
+skills/code-review-lenses/scripts/run-semgrep.sh           ← Semgrep SAST (Phase 1b)
+skills/code-review-lenses/scripts/run-trufflehog.sh        ← TruffleHog secret scanning (Phase 1b)
+skills/code-review-lenses/scripts/run-ruff.sh              ← Ruff Python linting (Phase 1b)
+skills/code-review-lenses/scripts/run-golangci-lint.sh     ← golangci-lint Go analysis (Phase 1b)
+skills/code-review-lenses/scripts/run-checkov.sh           ← checkov IaC security scanning (Phase 1b)
+skills/code-review-lenses/scripts/run-eslint.sh            ← ESLint (Phase 1b)
+skills/code-review-lenses/scripts/run-hadolint.sh          ← Hadolint (Phase 1b)
+skills/code-review-lenses/scripts/run-kube-linter.sh       ← kube-linter (Phase 1b)
+skills/code-review-lenses/scripts/run-phpcs.sh             ← PHP CodeSniffer (Phase 1b)
+skills/code-review-lenses/scripts/run-phpstan.sh           ← PHPStan (Phase 1b)
+skills/code-review-lenses/scripts/run-tflint.sh            ← tflint (Phase 1b)
+agents/*.md                                                  ← 12 review agents (self-contained)
+.claude/workflows/code-review-lenses-workflow.js             ← Claude dynamic-workflow wrapper (optional)
+.claude/skills/code-review-lenses                            ← symlink → skills/code-review-lenses
+.grok/workflows/code-review-lenses-workflow.rhai             ← Grok workflow wrapper (optional)
+.grok/skills/code-review-lenses                              ← symlink → skills/code-review-lenses
+tests/                                                       ← bats suite (shipped-script + analyzer tests)
 ```
 
 ## Phase overview
 
-The skill executes in five phases:
+There is no Phase 4. Output is local.
 
-**Phase 0 — Setup and context gathering**
-- Provider detection from git remote URL
-- claude-mem health check (optional)
-- Diff computation and TIER classification (tiny/small/medium)
-- Language detection from changed file extensions
-- Commit log and CLAUDE.md loading
-- Symbol context enrichment (Phase 0c) — Grep-based cross-file definition lookup
-- `GOVERNANCE_BLOCK` loading (inlined into every agent)
-- Org security policy loading (Phase 0 step 10)
-- Auto-cheap mode detection (DOCS_ONLY, LOW_RISK_CONFIG)
+**Phase 0 — Setup**
+- `resolve-profile.sh` parses `--profile` / flags
+- `parse-pr-url.sh` extracts host + number from a PR/MR URL
+- `detect-provider.sh` for local remotes only (GitLab via `glab` on any authenticated host)
+- Diff, TIER, language profiles, commit log, `AGENTS.md`
+- Symbol context (Phase 0c) unless the profile/tier disables it
+- GOVERNANCE + optional security-guidance.md
+- `apply-roster-overlays.sh` applies TIER / docs-only / gates
 
-**Phase 1 — Agent and analyzer launch**
-- Per-agent conditional gates (GATE_ERROR_PATTERNS, GATE_CONTROL_FLOW, GATE_SECURITY_PATTERNS, GATE_CODE_OR_INFRA) evaluated against diff
-- Custom agents and toolkit agents launched in parallel
-- Static analyzer scripts run in parallel (Phase 1b)
+**Phase 1 — Agents**
+- Spawn by bare agent name; model only if `models.conf` is not `inherit`
+- Phase 1b deterministic CVE + static analyzers
+- Phase 1c CVE reachability when `--profile deep`
 
-**Phase 2 — Normalization and deduplication**
-- Findings collected from all agents and analyzers
-- Confidence threshold filtering (`--min-confidence`)
-- Suppression rules applied
-- Deduplication by `file:line`
-- Severity normalization to unified Critical/High/Medium/Low scale
-- Secret redaction pass (defense-in-depth)
+**Phase 2 — Normalize**
+- json-findings extract, confidence filter, suppressions, proximity dedup, secret redaction
 
-**Phase 3 — Block assembly**
-- Block A (summary, walkthrough table, related issues) assembled from pr-summarizer output
-- Block B (findings) assembled from normalized findings
+**Phase 3 — Blocks**
+- Block A + Block B
 
-**Phase 4 — Remote operations** (when posting flags are present)
-- PR/MR creation, summary posting
-- Provider-specific API calls
-
-**Phase 4b — Findings posting** (when `--post-findings` is present)
-- Stages findings as an editable draft (GitHub pending review, GitLab draft notes) by default — the human edits and submits it themselves
-- `--publish` opts into immediate publishing (GitHub `REQUEST_CHANGES`/`COMMENT` review, GitLab discussion threads) instead of drafting
-- `--read-back` reads an existing draft back and reports kept/edited/removed findings (GitHub and GitLab only)
-
-**Phase 5 — Output and cleanup**
-- Terminal output of Block A + Block B
-- Per-agent token utilization table
-- Auto-cheap mode reason reported if active
-- Opus agent tool-call count warnings if budget exceeded
-- claude-mem summary stored (if enabled)
-- Temporary worktree cleanup (for `--pr <N>` mode)
+**Phase 5 — Output**
+- Terminal (and optional `--output-file`)
+- Worktree cleanup for a PR/MR URL checkout
 
 ## Two-block output design
 
@@ -96,7 +79,7 @@ The skill executes in five phases:
 | **Block A** | Summary, walkthrough table, effort estimate, related issues/PRs | PR authors, reviewers — informational |
 | **Block B** | Severity-ranked findings from all agents and analyzers | PR authors, reviewers — actionable |
 
-Both blocks are always shown locally in the terminal. What gets posted remotely depends on the flags used — see [Usage & Flags](usage#posting-behavior) for the full posting matrix.
+Both blocks are always shown locally in the terminal (and optionally `--output-file`). Nothing is posted to a hosting provider.
 
 ## Severity normalization
 
@@ -108,16 +91,16 @@ CVE findings whose CVSS vector cannot be parsed (CVSS v4.0/v2 vectors, or no sev
 
 Before launching agents, Phase 1 evaluates grep-based bash gates against the diff:
 
-| Gate | Skips agent when... |
-|------|---------------------|
-| `GATE_ERROR_PATTERNS` | No error-handling patterns in added lines — skip `silent-failure-hunter` |
-| `GATE_CONTROL_FLOW` | No control-flow constructs in added lines — skip `edge-case-hunter` |
-| `GATE_SECURITY_PATTERNS` | No security-relevant patterns or paths — skip `security-reviewer` (TIER=tiny only) |
-| `GATE_CODE_OR_INFRA` | No code or infra files — skip `architecture-reviewer` (TIER=tiny only) |
+| Gate | Actual effect |
+|------|----------------|
+| `GATE_ERROR_PATTERNS=false` | Skip `silent-failure-hunter` (whole-`DIFF_FILE` grep, any profile) |
+| `GATE_CONTROL_FLOW=false` | Skip `edge-case-hunter` (added `+` lines only) |
+| `GATE_SECURITY_PATTERNS=false` | May set `LOW_RISK_CONFIG` on `PROFILE=full` (config extensions). Does **not** skip `security-reviewer`. Tiny-tier security uses `SECURITY_PROMOTED`. |
+| `GATE_CODE_OR_INFRA=false` | Sets `DOCS_ONLY`. On `PROFILE=full` only, skip `architecture-reviewer` unless `ARCH_PROMOTED`. `--profile deep` keeps architecture. |
 
 ## Contributing
 
-The deterministic bash helpers in `skills/comprehensive-review/scripts/` and `tests/` have a [bats](https://github.com/bats-core/bats-core) test suite:
+The deterministic bash helpers in `skills/code-review-lenses/scripts/` and `tests/` have a [bats](https://github.com/bats-core/bats-core) test suite:
 
 ```bash
 # Install bats (macOS)
@@ -127,7 +110,7 @@ brew install bats-core
 bats tests/*.bats
 ```
 
-150 tests cover: `parse_go_mod` replace-directive ordering, TruffleHog invocation modes, gate evaluation logic, golden orchestration contracts (SKILL.md structural integrity, PROVIDERS.md correctness, SEVERITY.md contract), and all static analyzer scripts. All tests are offline (no network, no Claude invocation).
+The `tests/*.bats` suite covers parser contracts (`parse-pr-url`, `detect-provider`, `resolve-profile`, `review-diff`), analyzer fail-closed paths, gate evaluation, and wrapper text contracts. All tests are offline (no network, no host invocation).
 
 ## Acknowledgments
 

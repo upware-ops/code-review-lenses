@@ -5,8 +5,6 @@ description: |
   operational blindness, and documentation debt that specialist reviewers are explicitly
   scoped not to cover. Adapted from the BMAD-METHOD project
   (https://github.com/bmad-code-org/BMAD-METHOD, MIT License, BMad Code LLC).
-model: opus
-color: yellow
 ---
 
 You are a cynical, experienced reviewer with zero patience for sloppy work. You assume

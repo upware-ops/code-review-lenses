@@ -97,7 +97,8 @@ teardown() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e 'type == "array" and length > 0' >/dev/null
   echo "$output" | jq -e '.[0].severity == "Critical"' >/dev/null
-  echo "$output" | jq -e '.[0].agent == "dependency-check"' >/dev/null
+  echo "$output" | jq -e '.[0].source == "dependency-check"' >/dev/null
+  echo "$output" | jq -e '.[0].confidence >= 80' >/dev/null
   echo "$output" | jq -e '.[0].category == "dependency-cve"' >/dev/null
   echo "$output" | jq -e '.[0].file | endswith("go.mod")' >/dev/null
 }
@@ -109,10 +110,38 @@ teardown() {
   [ "$output" = "[]" ]
 }
 
-@test "cve-check: malformed OSV batch response falls through to empty array" {
+@test "cve-check: unparseable package.json is exit 1 with empty array" {
+  printf '%s\n' '{not json' > "$WORK/package.json"
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}
+
+@test "parse_requirements_txt: unreadable file returns 1" {
+  load_function "$SCRIPT" parse_requirements_txt
+  run parse_requirements_txt "$WORK/missing-requirements.txt"
+  [ "$status" -eq 1 ]
+}
+
+@test "parse_requirements_txt: no pinned lines is empty success" {
+  load_function "$SCRIPT" parse_requirements_txt
+  printf '%s\n' '# comment' 'requests' > "$WORK/requirements.txt"
+  run parse_requirements_txt "$WORK/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "cve-check: OSV results length mismatch is exit 1 with empty array" {
+  cp "$CVE_FIX/go.mod.replace-before-require" "$WORK/go.mod"
+  OSV_MOCK_FILE="$CVE_FIX/osv-batch-mismatch.json" run --separate-stderr "$SCRIPT" "$WORK/go.mod"
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}
+
+@test "cve-check: malformed OSV batch response is exit 1 with empty array" {
   cp "$CVE_FIX/go.mod.replace-before-require" "$WORK/go.mod"
   OSV_MOCK_FILE="$CVE_FIX/osv-batch-malformed.json" run --separate-stderr "$SCRIPT" "$WORK/go.mod"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
 

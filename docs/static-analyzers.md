@@ -11,7 +11,7 @@ In addition to LLM agents, the skill runs deterministic checks when relevant fil
 
 ## Analyzer table
 
-| Check | Trigger | Runs in `--quick`? | Binary required |
+| Check | Trigger | Profiles | Binary required |
 |-------|---------|-------------------|----------------|
 | **dependency-check** — queries [OSV.dev](https://osv.dev/) for known CVEs in declared dependency versions | `go.mod`, `package.json`, `requirements*.txt`, or `composer.json` changed | Yes | `curl` + `jq` (built-in) |
 | **shellcheck** — shell script linting | `.sh` or `.bash` files changed | Yes | `shellcheck` |
@@ -65,11 +65,11 @@ Supported manifest files:
 
 CVE findings include severity (CVSS-mapped to Critical/High/Medium/Low), CVE ID, affected package and version, and a remediation note with the fixed version. Findings below CVSS threshold are emitted as `"High"` as a conservative fallback.
 
-The `dependency-check` runs in both full and `--quick` mode when manifest files are present. It also runs in `--security-only` mode (CVE checks are security checks).
+The `dependency-check` runs in `quick`, `security`, `full`, and `deep` when manifest files changed. It is skipped only for `--summary-only`.
 
 ## Static analyzer scripts
 
-Each analyzer has a dedicated script in `skills/comprehensive-review/scripts/`:
+Each analyzer has a dedicated script in `skills/code-review-lenses/scripts/`:
 
 | Script | Analyzer |
 |--------|---------|

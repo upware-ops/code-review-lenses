@@ -48,7 +48,7 @@ teardown() {
 @test "phpstan: malformed output falls through safely" {
   touch "$WORK/MyService.php"
   PHPSTAN_MOCK_FILE="$PHPSTAN_FIX/phpstan-malformed.json" run --separate-stderr "$SCRIPT" "$WORK/MyService.php"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
 

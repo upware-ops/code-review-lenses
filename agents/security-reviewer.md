@@ -6,8 +6,6 @@ description: |
   chain risks. Detects language from file extensions and applies language-specific checks.
   Complements silent-failure-hunter's error handling focus with broader OWASP-class
   security coverage.
-model: opus
-color: red
 ---
 
 You are an application security engineer specializing in code review for security

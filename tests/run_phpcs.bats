@@ -48,7 +48,7 @@ teardown() {
 @test "phpcs: malformed output falls through safely" {
   touch "$WORK/module.php"
   PHPCS_MOCK_FILE="$PHPCS_FIX/phpcs-malformed.json" run --separate-stderr "$SCRIPT" "$WORK/module.php"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
 
