@@ -37,6 +37,8 @@ tests/*.bats                             bats + jq; run: bats tests/*.bats
 - Models are never hardcoded. Change `models.conf` or leave `inherit`.
 - Do not add posting, PR-creation, or host-plugin install paths.
 - Vendored toolkit agents are Apache-2.0; see `agents/THIRD_PARTY.md`.
+  Nightly refresh: `scripts/vendor-sync.sh` + `.github/workflows/vendor-sync.yml`.
+  Do not hand-edit those five files except through that transform.
 - `blind-hunter` must receive only the diff (plus GOVERNANCE). No project context.
 - Language guidance belongs in `language-profiles/`, not in agent prompts.
 - `json-findings` contract: `severity`, `confidence`, `file`, `line`, `finding`,

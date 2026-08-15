@@ -1,0 +1,110 @@
+name: vendor-sync
+
+on:
+  schedule:
+    # Nightly 06:17 UTC. Scheduled workflows only run from the default branch.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: vendor-sync
+  cancel-in-progress: false
+
+jobs:
+  pr-review-toolkit:
+    name: Update vendored pr-review-toolkit agents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch, transform, and write agents
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/vendor-sync.sh toolkit
+
+      - name: Open or update PR on this repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- agents .github/vendor-pins.json; then
+            echo "No toolkit file changes."
+            exit 0
+          fi
+          branch=chore/vendor-pr-review-toolkit
+          git checkout -B "$branch"
+          git add -- agents/*.md .github/vendor-pins.json
+          git commit -m "chore(vendor): refresh pr-review-toolkit agents from upstream;"
+          git push -u origin "$branch" --force-with-lease
+          if gh pr view "$branch" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "Updated existing PR for $branch"
+            exit 0
+          fi
+          gh pr create --repo "$GH_REPO" --base "${{ github.event.repository.default_branch }}" --head "$branch" \
+            --title "chore: refresh vendored pr-review-toolkit agents" \
+            --body "$(cat <<'EOF'
+          Nightly vendor sync from `anthropics/claude-plugins-official`.
+
+          Local patches re-applied (see `agents/THIRD_PARTY.md`):
+
+          - drop `model:` / `color:` frontmatter
+          - `CLAUDE.md` → `AGENTS.md`
+          - vendor banner
+
+          `code-simplifier` is not in the pin allowlist and is not added.
+
+          This PR targets **this repository only**. Review the agent diffs before merge.
+          EOF
+          )"
+
+  tag1-digest:
+    name: Digest tag1consulting commits (no merge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: List commits since fork pin
+        id: digest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          body=$(bash scripts/vendor-sync.sh digest)
+          echo "$body"
+          ahead=$(printf '%s\n' "$body" | sed -n 's/^TAG1_AHEAD=//p')
+          if [[ -z "$ahead" || "$ahead" == "0" ]]; then
+            echo "has_new=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "has_new=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "DIGEST<<VENDOR_EOF"
+            printf '%s\n' "$body"
+            echo "VENDOR_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open or comment on digest issue
+        if: steps.digest.outputs.has_new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DIGEST: ${{ steps.digest.outputs.DIGEST }}
+        run: |
+          set -euo pipefail
+          title="Upstream tag1consulting digest (not auto-merged)"
+          num=$(gh issue list --repo "$GH_REPO" --search "$title in:title" --state open --json number --jq '.[0].number // empty')
+          if [[ -z "$num" ]]; then
+            gh issue create --repo "$GH_REPO" --title "$title" --body "$DIGEST"
+          else
+            gh issue comment "$num" --repo "$GH_REPO" --body "$DIGEST"
+          fi
