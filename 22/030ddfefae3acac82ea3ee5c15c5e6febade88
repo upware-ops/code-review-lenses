@@ -1,0 +1,42 @@
+skills/code-review-lenses/HELP.md
+  s_22d2264024e6d9::t_d42db50151ffb2 88
+tests/evaluate_gates.bats
+  s_22d2264024e6d9::t_2d0776bd1c0fa2 154-156
+skills/code-review-lenses/scripts/resolve-profile.sh
+  s_22d2264024e6d9::t_40c8f9ca08b91f 106-116,118-134
+  s_22d2264024e6d9::t_ab8cccd674f0e0 148
+  s_22d2264024e6d9::t_a0c244610482b6 245,248
+  s_22d2264024e6d9::t_ca7694d4f4b138 163
+  s_22d2264024e6d9::t_943a35323b16c2 173
+  s_22d2264024e6d9::t_8668808c68da8f 117
+tests/classify_diff.bats
+  s_22d2264024e6d9::t_ad0dd1a41858df 19-20,29-30,38-40,47-49,56-58
+  s_22d2264024e6d9::t_c19d396e284f48 67-94
+  s_22d2264024e6d9::t_7a1168c053b3f5 95
+tests/resolve_profile.bats
+  s_22d2264024e6d9::t_4a4a77213f8367 155-165
+  s_22d2264024e6d9::t_4b13d3b2391195 332-340
+  s_22d2264024e6d9::t_1321b21c243da7 226-232,341
+  s_22d2264024e6d9::t_86eec1a8376502 144-154,166-182
+skills/code-review-lenses/scripts/apply-roster-overlays.sh
+  s_22d2264024e6d9::t_2e263153783983 73
+skills/code-review-lenses/scripts/classify-diff.sh
+  s_22d2264024e6d9::t_99e2b946091d5f 17,23-24,29
+  s_22d2264024e6d9::t_495bd721053002 42-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "22030ddfefae3acac82ea3ee5c15c5e6febade88",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
