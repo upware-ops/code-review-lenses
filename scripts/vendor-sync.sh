@@ -33,7 +33,7 @@ api_get() {
   elif [[ -n "${GH_TOKEN:-}" ]]; then
     args+=(-H "Authorization: Bearer ${GH_TOKEN}")
   fi
-  curl "${args[@]}" "$url"
+  curl "${args[@]}" "$url" || die "fetch failed: $url"
 }
 
 # Strip model:/color: from YAML frontmatter; CLAUDE.md → AGENTS.md; upsert banner.
@@ -79,12 +79,12 @@ cmd_transform() {
 
 latest_sha() {
   local repo=$1 ref=$2
-  api_get "https://api.github.com/repos/${repo}/commits/${ref}" | jq -er '.sha'
+  api_get "https://api.github.com/repos/${repo}/commits/${ref}" | jq -er '.sha' || die "could not resolve ${repo}@${ref}"
 }
 
 fetch_raw() {
   local repo=$1 sha=$2 path=$3
-  curl -fsSL "https://raw.githubusercontent.com/${repo}/${sha}/${path}"
+  curl -fsSL "https://raw.githubusercontent.com/${repo}/${sha}/${path}" || die "fetch failed: ${repo}@${sha}:${path}"
 }
 
 cmd_toolkit() {
@@ -94,8 +94,8 @@ cmd_toolkit() {
   local sha="" from_dir="" dry=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --sha) sha=${2:-}; shift 2 ;;
-      --from-dir) from_dir=${2:-}; shift 2 ;;
+      --sha) sha=${2:-}; shift 2 || die "missing value for $1" ;;
+      --from-dir) from_dir=${2:-}; shift 2 || die "missing value for $1" ;;
       --dry-run) dry=true; shift ;;
       *) die "unknown toolkit flag: $1" ;;
     esac
@@ -113,6 +113,7 @@ cmd_toolkit() {
     sha=$(latest_sha "$repo" "$(jq -er '.["pr-review-toolkit"].ref' "$PINS_FILE")")
   fi
   [[ -n "$from_dir" || -n "$sha" ]] || die "need --sha or a resolvable upstream ref"
+  [[ -z "$sha" || "$sha" =~ ^[0-9a-f]{40}$ ]] || die "not a full commit SHA: $sha"
 
   local tmp changed=0
   tmp=$(mktemp -d)
@@ -120,7 +121,6 @@ cmd_toolkit() {
 
   local agent src dest
   for agent in "${agents[@]}"; do
-    dest="${REPO_ROOT}/agents/${agent}"
     [[ "$agent" == *.md && "$agent" != */* ]] || die "refusing agent path: $agent"
     if [[ -n "$from_dir" ]]; then
       src="${from_dir}/${agent}"
@@ -130,6 +130,10 @@ cmd_toolkit() {
       fetch_raw "$repo" "$sha" "${prefix}/${agent}" | transform_agent > "${tmp}/${agent}"
     fi
     [[ -s "${tmp}/${agent}" ]] || die "empty transform for $agent"
+  done
+
+  for agent in "${agents[@]}"; do
+    dest="${REPO_ROOT}/agents/${agent}"
     if ! cmp -s "${tmp}/${agent}" "$dest" 2>/dev/null; then
       changed=1
       if [[ "$dry" == true ]]; then
@@ -141,11 +145,10 @@ cmd_toolkit() {
     fi
   done
 
-  if [[ -n "$sha" ]]; then
+  if [[ -n "$sha" && "$changed" -eq 1 ]]; then
     local old
     old=$(jq -er '.["pr-review-toolkit"].sha' "$PINS_FILE")
     if [[ "$old" != "$sha" ]]; then
-      changed=1
       if [[ "$dry" == true ]]; then
         echo "would pin pr-review-toolkit $old -> $sha"
       else
@@ -170,7 +173,7 @@ cmd_digest() {
   local since=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --since) since=${2:-}; shift 2 ;;
+      --since) since=${2:-}; shift 2 || die "missing value for $1" ;;
       *) die "unknown digest flag: $1" ;;
     esac
   done

@@ -47,3 +47,42 @@ setup() {
   ! jq -e '.["pr-review-toolkit"].agents[] | select(. == "code-simplifier.md")' \
     "${REPO_ROOT}/.github/vendor-pins.json" >/dev/null
 }
+
+@test "toolkit: missing or non-SHA --sha is a usage error (exit 2)" {
+  work=$(mktemp -d)
+  cp "${REPO_ROOT}"/agents/{code-reviewer,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md "$work/"
+  run --separate-stderr bash "$VENDOR" toolkit --sha
+  [ "$status" -eq 2 ]
+  run --separate-stderr bash "$VENDOR" toolkit --from-dir "$work" --sha main --dry-run
+  [ "$status" -eq 2 ]
+  rm -rf "$work"
+}
+
+@test "toolkit: a failing later agent aborts before any agent update" {
+  work=$(mktemp -d)
+  cp "$UPSTREAM" "$work/code-reviewer.md"
+  run --separate-stderr bash "$VENDOR" toolkit --from-dir "$work" --dry-run
+  [ "$status" -eq 2 ]
+  [[ "$output" != *"would update"* ]]
+  rm -rf "$work"
+}
+
+@test "toolkit: unchanged agents do not bump the pin" {
+  work=$(mktemp -d)
+  cp "${REPO_ROOT}"/agents/{code-reviewer,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md "$work/"
+  run --separate-stderr bash "$VENDOR" toolkit --from-dir "$work" --sha 0123456789abcdef0123456789abcdef01234567 --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"would pin"* ]]
+  rm -rf "$work"
+}
+
+@test "fetch failures exit 2" {
+  stub=$(mktemp -d)
+  printf '%s\n' '#!/bin/sh' 'exit 22' > "$stub/curl"
+  chmod +x "$stub/curl"
+  PATH="$stub:$PATH" run --separate-stderr bash "$VENDOR" digest
+  [ "$status" -eq 2 ]
+  PATH="$stub:$PATH" run --separate-stderr bash "$VENDOR" toolkit --sha 0123456789abcdef0123456789abcdef01234567 --dry-run
+  [ "$status" -eq 2 ]
+  rm -rf "$stub"
+}
