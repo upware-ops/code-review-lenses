@@ -49,6 +49,7 @@ if [[ ${#TARGET_FILES[@]} -eq 0 ]]; then
 fi
 
 # Run semgrep (or read mock) — --json --config=auto scans with default ruleset
+SEMGREP_EC=0
 if [[ -n "${SEMGREP_MOCK_FILE:-}" ]]; then
   if [[ ! -r "$SEMGREP_MOCK_FILE" ]]; then
     echo "WARNING: SEMGREP_MOCK_FILE '${SEMGREP_MOCK_FILE}' is not readable." >&2
@@ -59,7 +60,6 @@ if [[ -n "${SEMGREP_MOCK_FILE:-}" ]]; then
 else
   SEMGREP_STDERR=$(mktemp)
   trap 'rm -f "$SEMGREP_STDERR"' EXIT
-  SEMGREP_EC=0
   SEMGREP_OUTPUT=$(semgrep --json --config=auto --quiet "${TARGET_FILES[@]}" 2>"$SEMGREP_STDERR") || SEMGREP_EC=$?
   if [[ -z "$SEMGREP_OUTPUT" ]]; then
     echo "WARNING: semgrep produced no output (exit ${SEMGREP_EC}) — possible network failure or config error. stderr: $(cat "$SEMGREP_STDERR")" >&2
@@ -71,12 +71,6 @@ fi
 if [[ -z "$SEMGREP_OUTPUT" ]]; then
   echo "[]"
   exit 0
-fi
-
-if echo "$SEMGREP_OUTPUT" | jq -e '((.errors // []) | length) > 0' >/dev/null 2>&1; then
-  echo "WARNING: semgrep reported errors; not treating as zero findings." >&2
-  echo "[]"
-  exit 1
 fi
 
 # Convert semgrep JSON results to the findings schema
@@ -109,5 +103,11 @@ FINDINGS=$(echo "$SEMGREP_OUTPUT" | jq -r '
   echo "[]"
   exit 1
 }
+
+if [[ "$SEMGREP_EC" -ne 0 ]] || echo "$SEMGREP_OUTPUT" | jq -e '((.errors // []) | length) > 0' >/dev/null 2>&1; then
+  echo "WARNING: semgrep exited ${SEMGREP_EC} or reported errors; findings may be incomplete." >&2
+  echo "${FINDINGS:-[]}"
+  exit 1
+fi
 
 echo "${FINDINGS:-[]}"

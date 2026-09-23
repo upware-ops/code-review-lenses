@@ -1,0 +1,12 @@
+{
+  "Issues": [
+    {
+      "FromLinter": "errcheck",
+      "Text": "Error return value of `f.Close` is not checked",
+      "Severity": "",
+      "SourceLines": ["\tf.Close()"],
+      "Pos": {"Filename": "main.go", "Offset": 120, "Line": 10, "Column": 9}
+    }
+  ],
+  "Report": {"Linters": [{"Name": "errcheck", "Enabled": true}]}
+}

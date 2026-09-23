@@ -69,7 +69,7 @@ else
     PHPCS_STANDARD="Drupal,DrupalPractice"
   fi
 
-  # phpcs exits 0 (clean), 1 (violations found), or 2 (config/processing error).
+  # phpcs 3.x exits 0-2 after a scan and 3 on error (text on stdout); 4.x exits 0-3 after a scan, 16/64 on error.
   PHPCS_EC=0
   PHPCS_OUTPUT=$(phpcs \
     --report=json \
@@ -78,7 +78,7 @@ else
     -q \
     "${PHP_FILES[@]}" \
     2>/dev/null) || PHPCS_EC=$?
-  if [[ "$PHPCS_EC" -ne 0 && "$PHPCS_EC" -ne 1 ]] || { [[ "$PHPCS_EC" -eq 1 ]] && [[ -z "$PHPCS_OUTPUT" ]]; }; then
+  if [[ "$PHPCS_EC" -gt 3 ]] || { [[ "$PHPCS_EC" -ne 0 ]] && [[ -z "$PHPCS_OUTPUT" ]]; }; then
     echo "WARNING: phpcs failed (exit ${PHPCS_EC}); not treating as zero findings." >&2
     echo "[]"
     exit 1

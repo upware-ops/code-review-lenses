@@ -141,3 +141,29 @@ teardown() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e 'length > 0' >/dev/null
 }
+
+# ---------------------------------------------------------------------------
+# Live exit codes (stub phpcs on PATH)
+# ---------------------------------------------------------------------------
+
+@test "phpcs: live exit 2 with a JSON report yields findings" {
+  unset PHPCS_MOCK_FILE
+  mkdir -p "$WORK/bin"
+  printf '%s\n' '#!/bin/sh' '[ "$1" = "-i" ] && exit 0' "cat '$PHPCS_FIX/phpcs-error.json'" 'exit 2' > "$WORK/bin/phpcs"
+  chmod +x "$WORK/bin/phpcs"
+  touch "$WORK/module.php"
+  PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/module.php"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length > 0' >/dev/null
+}
+
+@test "phpcs: live exit 3 with error text fails closed" {
+  unset PHPCS_MOCK_FILE
+  mkdir -p "$WORK/bin"
+  printf '%s\n' '#!/bin/sh' '[ "$1" = "-i" ] && exit 0' 'echo "ERROR: the \"PSR12\" coding standard is not installed."' 'exit 3' > "$WORK/bin/phpcs"
+  chmod +x "$WORK/bin/phpcs"
+  touch "$WORK/module.php"
+  PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/module.php"
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}

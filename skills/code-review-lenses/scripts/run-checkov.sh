@@ -137,15 +137,6 @@ if [[ -z "$CHECKOV_OUTPUT" ]]; then
   exit 0
 fi
 
-if echo "$CHECKOV_OUTPUT" | jq -e '
-  (if type == "array" then . else [.] end)
-  | any(.[]; ((.results.parsing_errors // []) | length) > 0)
-' >/dev/null 2>&1; then
-  echo "WARNING: checkov reported parsing_errors; not treating as zero findings." >&2
-  echo "[]"
-  exit 1
-fi
-
 # checkov JSON can be a single object or an array of objects (one per framework).
 # Normalise to an array, extract failed_checks, project to findings schema.
 # Severity mapping: CKV2_* (v2 rules) and CKV_SECRET_* (secret detection) -> High
@@ -177,5 +168,15 @@ FINDINGS=$(echo "$CHECKOV_OUTPUT" | jq -r '
   echo "[]"
   exit 1
 }
+
+# With --quiet, checkov omits results.parsing_errors and reports only the summary.parsing_errors count.
+if echo "$CHECKOV_OUTPUT" | jq -e '
+  (if type == "array" then . else [.] end)
+  | any(.[]; (.summary.parsing_errors // 0) > 0)
+' >/dev/null 2>&1; then
+  echo "WARNING: checkov reported parsing errors; findings may be incomplete." >&2
+  echo "${FINDINGS:-[]}"
+  exit 1
+fi
 
 echo "${FINDINGS:-[]}"
