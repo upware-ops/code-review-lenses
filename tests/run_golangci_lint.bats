@@ -49,8 +49,8 @@ teardown() {
   ln -s "$(command -v jq)" "$WORK/pathbin/jq"
   _bash=$(command -v bash)
   unset GOLANGCI_MOCK_FILE
-  PATH="$WORK/pathbin" run "$_bash" "$SCRIPT" "$WORK/main.go"
+  run --separate-stderr env PATH="$WORK/pathbin" "$_bash" "$SCRIPT" "$WORK/main.go"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"golangci-lint not installed"* ]]
-  [[ "$output" == *"[]" ]]
+  [ "$output" = "[]" ]
+  [[ "$stderr" == *"golangci-lint not installed"* ]]
 }
