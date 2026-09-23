@@ -83,6 +83,12 @@ teardown() {
   [[ "$output" == *"not in the history fetched from origin/release/x"* ]]
 }
 
+@test "resolve-pr-base: shallow clone is exit 2 with an unshallow hint" {
+  git clone -q --depth 1 -b release/x "file://$WORK/origin.git" "$WORK/shallow"
+  run -2 bash -c "cd '$WORK/shallow' && bash '$RESOLVE' --ref release/x"
+  [[ "$output" == *"git fetch --unshallow"* ]]
+}
+
 @test "resolve-pr-base: refspec-shaped or missing target and non-SHA provider base are exit 2" {
   run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref 'feature:refs/heads/release/x'"
   [[ "$output" == *"Invalid target branch"* ]]

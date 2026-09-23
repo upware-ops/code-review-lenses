@@ -9,8 +9,8 @@
 # the check). merge-base(<sha>, HEAD) must equal merge-base(BASE, HEAD).
 #
 # Output (exit 0): BASE=<sha>
-# Exit 2: missing/invalid --ref or --provider-base, fetch failed, or merge-base
-#         mismatch. Never invents main/master/dev.
+# Exit 2: missing/invalid --ref or --provider-base, shallow clone, fetch failed,
+#         or merge-base mismatch. Never invents main/master/dev.
 
 set -euo pipefail
 
@@ -60,6 +60,7 @@ git check-ref-format "refs/heads/$REF" || die "Invalid target branch '$REF'."
 if [[ -n "$PROVIDER_BASE" && ! "$PROVIDER_BASE" =~ ^[0-9a-f]{7,64}$ ]]; then
   die "--provider-base must be a commit SHA: $PROVIDER_BASE"
 fi
+[[ "$(git rev-parse --is-shallow-repository)" != true ]] || die "Shallow clone: the merge-base of origin/$REF and HEAD may be missing. Run: git fetch --unshallow origin"
 
 git fetch --no-tags origin "refs/heads/$REF" || die "git fetch origin $REF failed. Pass --base <ref> to choose the compare base."
 BASE=$(git rev-parse --verify 'FETCH_HEAD^{commit}') || die "Fetched origin/$REF is not a commit."

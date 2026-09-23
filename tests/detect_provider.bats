@@ -206,6 +206,32 @@ EOF
   [[ "$REPO_SLUG" == "acme/app" ]]
 }
 
+@test "detect-provider: scp-like remote with a non-git SSH user" {
+  eval "$(bash "$DETECT" --remote-url org-123@github.com:acme/app.git)"
+  [[ "$PROVIDER" == "github" ]]
+  [[ "$HOST" == "github.com" ]]
+  [[ "$REPO_SLUG" == "acme/app" ]]
+}
+
+@test "detect-provider: *.ghe.com remote is GitHub without gh auth" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/gh" << 'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+  chmod +x "$WORK/bin/gh"
+  cp "$WORK/bin/gh" "$WORK/bin/glab"
+  eval "$(PATH="$WORK/bin:$PATH" bash "$DETECT" --remote-url https://acme.ghe.com/org/app.git)"
+  [[ "$PROVIDER" == "github" ]]
+  [[ "$REPO_SLUG" == "org/app" ]]
+}
+
+@test "detect-provider: GitHub remote path that is not owner/repo is exit 2" {
+  run -2 bash "$DETECT" --remote-url https://github.com/app.git
+  run -2 bash "$DETECT" --remote-url https://github.com/acme/app/extra.git
+  [[ "$output" == *"Could not extract a valid repository slug"* ]]
+}
+
 @test "detect-provider: --check-url-host allows github.com" {
   run bash "$DETECT" --check-url-host --provider github --host github.com
   [ "$status" -eq 0 ]
@@ -368,6 +394,36 @@ EOF
   run -2 env PATH="$WORK/bin:$PATH" bash "$DETECT" \
     --check-url-host --provider github --host broken.corp.example
   [[ "$output" == *"Refusing gh for host 'broken.corp.example'"* ]]
+}
+
+@test "detect-provider: gitlab --check-url-host does not trust glab's configured default host" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/glab" << 'EOF'
+#!/usr/bin/env bash
+if [[ "$*" == "config get host" ]]; then
+  echo "git.dedicated.example"
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "$WORK/bin/glab"
+  run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GL_HOST= bash "$DETECT" \
+    --check-url-host --provider gitlab --host git.dedicated.example
+  [[ "$output" == *"Refusing glab for host 'git.dedicated.example'"* ]]
+}
+
+@test "detect-provider: gitlab --check-url-host follows glab's env host precedence" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/glab" << 'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+  chmod +x "$WORK/bin/glab"
+  run env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI=https://git.corp.example GL_HOST=git.other.example \
+    bash "$DETECT" --check-url-host --provider gitlab --host git.corp.example
+  [ "$status" -eq 0 ]
+  run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI=https://git.corp.example GL_HOST=git.other.example \
+    bash "$DETECT" --check-url-host --provider gitlab --host git.other.example
 }
 
 @test "detect-provider: gitlab --check-url-host allows GITLAB_HOST" {

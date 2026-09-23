@@ -103,6 +103,7 @@ source_url() {
 @test "parse-pr-url: strips query fragment and userinfo from PR_URL" {
   source_url "https://oauth2:s3cret-token@github.com/acme/app/pull/42?foo=1#discussion"
   [[ "$PR_NUMBER" == "42" ]]
+  [[ "$PR_URL" == "https://github.com/acme/app/pull/42" ]]
   [[ "$PR_URL" != *s3cret-token* ]]
   [[ "$PR_URL" != *oauth2:* ]]
   [[ "$HOST" == "github.com" ]]
@@ -142,14 +143,29 @@ source_url() {
   [ "$status" -eq 2 ]
 }
 
-@test "parse-pr-url then detect-provider must not clobber URL identity" {
-  eval "$(bash "$PARSE" "https://git.example.com/group/sub/proj/-/merge_requests/7")"
-  [[ "$PR_NUMBER" == "7" ]]
-  if [[ -z "${PR_NUMBER:-}" ]]; then
-    eval "$(bash "${SCRIPTS_DIR}/detect-provider.sh" --remote-url https://github.com/acme/app.git --fallback unknown)"
-  fi
-  [[ "$PROVIDER" == "gitlab" ]]
-  [[ "$HOST" == "git.example.com" ]]
-  [[ "$REPO_SLUG" == "group/sub/proj" ]]
-  [[ "$PR_NUMBER" == "7" ]]
+@test "parse-pr-url: non-http(s) scheme with userinfo is refused" {
+  run -2 bash "$PARSE" "ssh://git@github.com/acme/app/pull/42"
+  [[ "$output" == *"refused non-http(s) scheme"* ]]
+}
+
+@test "parse-pr-url: surrounding prose or Markdown punctuation is not part of the host" {
+  source_url "review (https://github.com/acme/app/pull/42)"
+  [[ "$HOST" == "github.com" ]]
+  [[ "$REPO_SLUG" == "acme/app" ]]
+  source_url "review [PR](https://github.com/acme/app/pull/42)"
+  [[ "$HOST" == "github.com" ]]
+  [[ "$REPO_SLUG" == "acme/app" ]]
+}
+
+@test "parse-pr-url: a repos/ namespace is a review URL" {
+  source_url "https://git.example.com/repos/proj/-/merge_requests/7"
+  [[ "$REPO_SLUG" == "repos/proj" ]]
+  source_url "https://github.com/repos/app/pull/42"
+  [[ "$REPO_SLUG" == "repos/app" ]]
+}
+
+@test "parse-pr-url: GitHub slug that is not owner/repo is exit 2 (gh reads HOST/OWNER/REPO)" {
+  run -2 bash "$PARSE" "https://github.com/acme/pull/42"
+  run -2 bash "$PARSE" "https://github.com/evil.example/acme/app/pull/42"
+  [[ "$output" == *"owner/repo"* ]]
 }

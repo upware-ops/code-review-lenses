@@ -19,7 +19,7 @@ analysis. Nothing is posted.
 | Feature | GitHub / GHE | GitLab | Bitbucket |
 |---------|:---:|:---:|:---:|
 | Auto-detection | Yes | Yes (any `glab` host) | Yes |
-| PR/MR URL checkout | Yes (`gh`) | Yes (`glab`) | Yes (`curl`) |
+| PR/MR URL checkout | Yes (`gh`) | Yes (`glab`) | Yes (`git` + `curl` metadata) |
 | Issue cross-reference | Yes | No | No |
 | Create / comment / review post | No | No | No |
 
@@ -34,7 +34,7 @@ glab auth login --hostname git.example.com
 A remote is treated as GitLab when:
 
 1. The hostname is `gitlab.com` or contains `gitlab`
-2. `GITLAB_HOST` equals the hostname
+2. glab's env host (first set of `GITLAB_HOST`, `GITLAB_URI`, `GL_HOST`) equals the hostname
 3. `glab config get host` equals the hostname
 4. `glab auth status --hostname <hostname>` succeeds (other hosts' auth state is ignored)
 

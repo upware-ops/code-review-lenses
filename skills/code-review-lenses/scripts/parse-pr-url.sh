@@ -10,8 +10,9 @@
 #   PR_URL PROVIDER HOST REPO_SLUG PR_NUMBER PR_TERM PR_TERM_LONG CLI_TOOL
 #   GUIDANCE_REST (invoke text with the matched URL removed; userinfo stripped)
 # Exit 1: no PR/MR URL in the text (local branch review).
-# Exit 2: invalid / refused URL (scheme, api.github.com, non-Cloud Bitbucket,
-#         or grep failure). A bare number is never a complete identity.
+# Exit 2: invalid / refused URL (scheme, api.github.com, non-owner/repo path,
+#         non-Cloud Bitbucket, or grep failure). A bare number is never a
+#         complete identity.
 #
 # This is the shipped URL parser. Orchestrator SKILL.md must invoke it
 # rather than re-implement host/number extraction.
@@ -41,7 +42,7 @@ sanitize_url() {
 
 # First matching URL-shaped token. Scheme optional so pasted host/path works.
 _grep_rc=0
-urls=$(printf '%s\n' "$TEXT" | grep -oE 'https?://[^[:space:]<>"'\'']+|[^[:space:]<>"'\'']+/(pulls?|pull-requests|(-/)?merge_requests)/[0-9]+') || _grep_rc=$?
+urls=$(printf '%s\n' "$TEXT" | grep -oE 'https?://[^[:space:]<>"'\'']+|[[:alnum:]][^][:space:]<>"'\'']*/(pulls?|pull-requests|(-/)?merge_requests)/[0-9]+') || _grep_rc=$?
 if [[ "$_grep_rc" -ne 0 && "$_grep_rc" -ne 1 ]]; then
   echo "Error: parse-pr-url.sh: grep failed (exit ${_grep_rc})." >&2
   exit 2
@@ -52,11 +53,11 @@ while IFS= read -r raw; do
   [[ -z "$raw" ]] && continue
   url="$raw"
   case "$url" in
-    javascript:*|data:*|file:*|vbscript:*)
+    http://*|https://*) ;;
+    *://*|javascript:*|data:*|file:*|vbscript:*)
       echo "Error: parse-pr-url.sh: refused non-http(s) scheme." >&2
       exit 2
       ;;
-    http://*|https://*) ;;
     *) url="https://${url}" ;;
   esac
 
@@ -109,8 +110,12 @@ while IFS= read -r raw; do
   if [[ -z "$host" || -z "$slug" || -z "$number" ]]; then
     continue
   fi
-  if [[ "$host" == "api.github.com" || "$slug" == repos/* ]]; then
+  if [[ "$host" == "api.github.com" ]]; then
     echo "Error: parse-pr-url.sh: api.github.com /repos/…/pulls/N is not a review URL." >&2
+    exit 2
+  fi
+  if [[ ! "$slug" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+$ || ( "$provider" != gitlab && "$slug" == */*/* ) ]]; then
+    echo "Error: parse-pr-url.sh: repository path must be owner/repo (GitLab: group/…/project)." >&2
     exit 2
   fi
   if [[ "$provider" == bitbucket && "$host" != bitbucket.org && "$host" != *.bitbucket.org ]]; then
@@ -148,7 +153,7 @@ while IFS= read -r raw; do
   done
   set +f
 
-  emit PR_URL "$(sanitize_url "$url")"
+  emit PR_URL "$(sanitize_url "$clean")"
   emit PROVIDER "$provider"
   emit HOST "$host"
   emit REPO_SLUG "$slug"

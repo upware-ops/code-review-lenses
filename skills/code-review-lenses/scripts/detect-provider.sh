@@ -12,14 +12,16 @@
 # is missing or the host cannot be classified (local branch review).
 # --check-url-host: after parse-pr-url only. GitHub: github.com / *.github.com /
 # *.ghe.com, or `gh auth status --hostname HOST --active` succeeds (origin match
-# is not enough). GitLab: GITLAB_HOST / GL_HOST or `glab auth status --hostname
-# HOST` succeeds (origin match is not enough). Bitbucket: Cloud hosts only.
+# is not enough). GitLab: glab's env host (first set of GITLAB_HOST, GITLAB_URI,
+# GL_HOST) or `glab auth status --hostname HOST` succeeds (origin or
+# `glab config get host` match is not enough). Bitbucket: Cloud hosts only.
 # Exit 0 if allowed, 2 if refused.
 # Does not emit a roster. Never run on local PROVIDER=unknown.
 #
 # GitLab self-hosted / dedicated hosts are detected when ANY of:
 #   - the hostname is gitlab.com or contains "gitlab"
-#   - GITLAB_HOST / GL_HOST equals the remote hostname (URL form is stripped)
+#   - glab's env host (first set of GITLAB_HOST, GITLAB_URI, GL_HOST) equals
+#     the remote hostname (URL form is stripped)
 #   - `glab config get host` equals the remote hostname
 #   - `glab auth status --hostname <remote hostname>` exits 0
 #
@@ -143,7 +145,7 @@ if [[ "$CHECK_URL_HOST" != true && -z "$REMOTE_URL" ]]; then
   fi
 fi
 
-# Normalize scp-like URLs (git@host:path) to a host + path pair.
+# Normalize scp-like URLs ([user@]host:path) to a host + path pair.
 extract_host_path() {
   local url="$1"
   local rest host path
@@ -153,17 +155,19 @@ extract_host_path() {
   url="${url%/}"
 
   case "$url" in
-    git@*:* )
-      rest="${url#git@}"
-      host="${rest%%:*}"
-      path="${rest#*:}"
-      ;;
     ssh://*|http://*|https://*|git://* )
       rest="${url#*://}"
       rest="${rest#*@}"          # drop userinfo
       host="${rest%%/*}"
       host="${host%%:*}"         # drop :port
       path="${rest#*/}"
+      ;;
+    *:* )
+      # git: scp-like syntax only when no slash precedes the first colon.
+      rest="${url%%:*}"
+      [[ "$rest" != */* && "$url" != *://* ]] || die "Unrecognized remote URL '$(sanitize_url "$url")'."
+      host="${rest##*@}"
+      path="${url#*:}"
       ;;
     *)
       die "Unrecognized remote URL '$(sanitize_url "$url")'."
@@ -176,10 +180,8 @@ extract_host_path() {
 
 slug_two_segment() {
   local path="$1"
-  local owner repo
-  owner=$(printf '%s' "$path" | awk -F/ '{print $(NF-1)}')
-  repo=$(printf '%s' "$path" | awk -F/ '{print $NF}')
-  printf '%s/%s\n' "$owner" "$repo"
+  [[ "$path" =~ ^[^/]+/[^/]+$ ]] || die "Could not extract a valid repository slug from remote URL '$(sanitize_url "$REMOTE_URL")'."
+  printf '%s\n' "$path"
 }
 
 # Per host: bare `glab|gh auth status` exits 1 (report on stderr) when any configured host fails.
@@ -210,22 +212,6 @@ if [[ "$CHECK_URL_HOST" == true ]]; then
   [[ -n "$PROVIDER_OVERRIDE" ]] || die "--check-url-host requires --provider."
   [[ -n "$CHECK_HOST" ]] || die "--check-url-host requires --host."
   HOST_LC=$(printf '%s' "$CHECK_HOST" | tr '[:upper:]' '[:lower:]')
-  origin_host=""
-  if origin_url=$(git remote get-url origin 2>/dev/null); then
-    case "$origin_url" in
-      git@*:*)
-        rest="${origin_url#git@}"
-        origin_host="${rest%%:*}"
-        ;;
-      *://*)
-        rest="${origin_url#*://}"
-        rest="${rest#*@}"
-        origin_host="${rest%%/*}"
-        origin_host="${origin_host%%:*}"
-        ;;
-    esac
-    origin_host=$(printf '%s' "$origin_host" | tr '[:upper:]' '[:lower:]')
-  fi
   case "$PROVIDER_OVERRIDE" in
     github)
       case "$HOST_LC" in
@@ -239,11 +225,11 @@ if [[ "$CHECK_URL_HOST" == true ]]; then
       die "Refusing gh for host '$CHECK_HOST' (not github.com / *.github.com / *.ghe.com and not on gh auth status). Run: gh auth login --hostname $CHECK_HOST"
       ;;
     gitlab)
-      _gl_cfg=$(gitlab_host_name "${GITLAB_HOST:-${GL_HOST:-}}")
+      _gl_cfg=$(gitlab_host_name "${GITLAB_HOST:-${GITLAB_URI:-${GL_HOST:-}}}")
       if [[ -n "$_gl_cfg" && "$_gl_cfg" == "$HOST_LC" ]]; then
         exit 0
       fi
-      if glab_lists_host "$HOST_LC"; then
+      if glab auth status --hostname "$HOST_LC" >/dev/null 2>&1; then
         exit 0
       fi
       die "Refusing glab for host '$CHECK_HOST' (not GITLAB_HOST/GL_HOST and not on glab auth status). Run: glab auth login --hostname $CHECK_HOST"
@@ -277,7 +263,7 @@ if [[ -n "$PROVIDER_OVERRIDE" ]]; then
   PROVIDER="$PROVIDER_OVERRIDE"
 else
   case "$HOST_LC" in
-    github.com|*.github.com)
+    github.com|*.github.com|*.ghe.com)
       PROVIDER=github
       ;;
     gitlab.com|*.gitlab.com|*gitlab*)
@@ -287,7 +273,7 @@ else
       PROVIDER=bitbucket
       ;;
     *)
-      _gl_env=$(gitlab_host_name "${GITLAB_HOST:-${GL_HOST:-}}")
+      _gl_env=$(gitlab_host_name "${GITLAB_HOST:-${GITLAB_URI:-${GL_HOST:-}}}")
       if [[ -n "$_gl_env" && "$_gl_env" == "$HOST_LC" ]]; then
         PROVIDER=gitlab
       elif glab_lists_host "$HOST_LC"; then
@@ -327,7 +313,7 @@ case "$PROVIDER" in
     PR_TERM=PR
     PR_TERM_LONG="pull request"
     CLI_TOOL=""
-    REPO_SLUG=$(slug_two_segment "$REPO_PATH")
+    REPO_SLUG="$REPO_PATH"
     ;;
 esac
 
