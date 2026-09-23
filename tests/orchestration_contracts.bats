@@ -50,6 +50,7 @@ teardown() {
   grep -q 'classify-diff.sh' "$SKILL_MD"
   grep -q 'parse-pr-url.sh' "$SKILL_MD"
   grep -q 'review-diff.sh' "$SKILL_MD"
+  grep -q 'resolve-pr-base.sh' "$SKILL_MD"
   grep -q 'git diff --no-index' "$SKILL_MD"
   grep -q -- '--check-url-host' "$SKILL_MD"
   grep -q 'origin match is not enough' "$SKILL_MD"
@@ -226,6 +227,7 @@ teardown() {
   grep -q 'GH_HOST="$HOST" gh pr view' "$PROVIDERS_MD"
   grep -q 'GH_HOST="$HOST" gh pr checkout' "$PROVIDERS_MD"
   grep -q -- '--repo "$REPO_SLUG"' "$PROVIDERS_MD"
+  grep -q 'baseRefName,baseRefOid' "$PROVIDERS_MD"
 }
 
 @test "PROVIDERS.md: GitLab works via glab on any authenticated host" {
@@ -233,11 +235,16 @@ teardown() {
   grep -q "glab auth login --hostname" "$PROVIDERS_MD"
 }
 
-@test "PROVIDERS.md: GitLab OPs pin --hostname and -R to the detected host/slug" {
-  grep -q 'glab --hostname "$HOST" -R "$REPO_SLUG" mr view' "$PROVIDERS_MD"
-  grep -q 'glab --hostname "$HOST" -R "$REPO_SLUG" mr checkout' "$PROVIDERS_MD"
+@test "PROVIDERS.md: GitLab OPs pin GITLAB_HOST and a full-URL -R to the detected host/slug" {
+  grep -q 'GITLAB_HOST="$HOST" glab mr view <N> -R "https://$HOST/$REPO_SLUG"' "$PROVIDERS_MD"
+  grep -q 'GITLAB_HOST="$HOST" glab mr checkout <N> -R "https://$HOST/$REPO_SLUG"' "$PROVIDERS_MD"
+  grep -q 'diff_refs.base_sha→baseRefOid' "$PROVIDERS_MD"
+  if grep -q 'glab --hostname' "$PROVIDERS_MD"; then
+    echo "REGRESSION: glab has no global --hostname flag (Unknown flag: --hostname)" >&2
+    return 1
+  fi
   if grep -E '^\s*- \*\*gitlab:\*\* `glab mr (view|checkout|list)' "$PROVIDERS_MD"; then
-    echo "REGRESSION: unqualified glab mr OP (no --hostname / -R)" >&2
+    echo "REGRESSION: unqualified glab mr OP (no GITLAB_HOST / -R)" >&2
     return 1
   fi
 }

@@ -11,16 +11,17 @@
 # --fallback unknown: emit PROVIDER=unknown instead of dying when the remote
 # is missing or the host cannot be classified (local branch review).
 # --check-url-host: after parse-pr-url only. GitHub: github.com / *.github.com /
-# *.ghe.com, or a host on `gh auth status` (origin match is not enough).
-# GitLab: GITLAB_HOST / GL_HOST or `glab auth status` (origin match is not
-# enough). Bitbucket: Cloud hosts only. Exit 0 if allowed, 2 if refused.
+# *.ghe.com, or `gh auth status --hostname HOST --active` succeeds (origin match
+# is not enough). GitLab: GITLAB_HOST / GL_HOST or `glab auth status --hostname
+# HOST` succeeds (origin match is not enough). Bitbucket: Cloud hosts only.
+# Exit 0 if allowed, 2 if refused.
 # Does not emit a roster. Never run on local PROVIDER=unknown.
 #
 # GitLab self-hosted / dedicated hosts are detected when ANY of:
 #   - the hostname is gitlab.com or contains "gitlab"
 #   - GITLAB_HOST / GL_HOST equals the remote hostname (URL form is stripped)
 #   - `glab config get host` equals the remote hostname
-#   - `glab auth status` stdout (exit 0) lists the remote hostname
+#   - `glab auth status --hostname <remote hostname>` exits 0
 #
 # Output: KEY=value lines (PROVIDER, HOST, PR_TERM, PR_TERM_LONG, CLI_TOOL, REPO_SLUG).
 # Never emits REMOTE_URL. Userinfo is stripped from any error text.
@@ -181,9 +182,10 @@ slug_two_segment() {
   printf '%s/%s\n' "$owner" "$repo"
 }
 
+# Per host: bare `glab|gh auth status` exits 1 (report on stderr) when any configured host fails.
 glab_lists_host() {
   local host="$1"
-  local status cfg
+  local cfg
   if ! command -v glab >/dev/null 2>&1; then
     return 1
   fi
@@ -193,23 +195,15 @@ glab_lists_host() {
       return 0
     fi
   fi
-  # stdout only; non-zero means not authenticated — do not grep stderr.
-  if ! status=$(glab auth status 2>/dev/null); then
-    return 1
-  fi
-  printf '%s\n' "$status" | grep -qiE "(^|[[:space:]])$(printf '%s' "$host" | sed 's/[.[\*^$()+?{|]/\\&/g')([[:space:]/:_]|$)"
+  glab auth status --hostname "$host" >/dev/null 2>&1
 }
 
 gh_lists_host() {
   local host="$1"
-  local status
   if ! command -v gh >/dev/null 2>&1; then
     return 1
   fi
-  if ! status=$(gh auth status 2>/dev/null); then
-    return 1
-  fi
-  printf '%s\n' "$status" | grep -qiE "(^|[[:space:]])$(printf '%s' "$host" | sed 's/[.[\*^$()+?{|]/\\&/g')([[:space:]/:_]|$)"
+  gh auth status --hostname "$host" --active >/dev/null 2>&1
 }
 
 if [[ "$CHECK_URL_HOST" == true ]]; then

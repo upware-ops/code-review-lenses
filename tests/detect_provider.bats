@@ -295,8 +295,7 @@ EOF
   mkdir -p "$WORK/bin"
   cat > "$WORK/bin/glab" << 'EOF'
 #!/usr/bin/env bash
-if [[ "${1-}" == "auth" ]]; then
-  echo "git.internal.corp"
+if [[ "$*" == "auth status --hostname git.internal.corp" ]]; then
   exit 0
 fi
 exit 1
@@ -306,6 +305,69 @@ EOF
     --check-url-host --provider gitlab --host evil.gitlab.example
   [ "$status" -eq 2 ]
   [[ "$output" == *"Refusing glab"* ]]
+}
+
+@test "detect-provider: glab host check ignores other hosts' auth failures (glab 1.117)" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/glab" << 'EOF'
+#!/usr/bin/env bash
+# glab 1.117: report on stderr only; bare `auth status` exits 1 if any host fails.
+case "$*" in
+  "auth status --hostname git.internal.corp")
+    echo "  ✓ Logged in to git.internal.corp as ci-user" >&2
+    exit 0
+    ;;
+  "auth status")
+    echo "gitlab.com" >&2
+    echo "  x gitlab.com: API call failed: 401 {message: 401 Unauthorized}" >&2
+    echo "git.internal.corp" >&2
+    echo "  ✓ Logged in to git.internal.corp as ci-user" >&2
+    exit 1
+    ;;
+esac
+echo "  X not authenticated with glab" >&2
+exit 1
+EOF
+  chmod +x "$WORK/bin/glab"
+  run env PATH="$WORK/bin:$PATH" GITLAB_HOST= GL_HOST= bash "$DETECT" \
+    --check-url-host --provider gitlab --host git.internal.corp
+  [ "$status" -eq 0 ]
+  run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GL_HOST= bash "$DETECT" \
+    --check-url-host --provider gitlab --host gitlab.com
+  [[ "$output" == *"Refusing glab for host 'gitlab.com'"* ]]
+  eval "$(PATH="$WORK/bin:$PATH" GITLAB_HOST= GL_HOST= bash "$DETECT" \
+    --remote-url git@git.internal.corp:group/app.git)"
+  [[ "$PROVIDER" == "gitlab" ]]
+}
+
+@test "detect-provider: gh host check ignores other hosts' auth failures" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/gh" << 'EOF'
+#!/usr/bin/env bash
+# gh: a failing account on any host makes bare `auth status` exit 1, report on stderr.
+case "$*" in
+  "auth status --hostname ghe.corp.example --active")
+    echo "  ✓ Logged in to ghe.corp.example account ci-user"
+    exit 0
+    ;;
+  "auth status")
+    echo "ghe.corp.example" >&2
+    echo "  ✓ Logged in to ghe.corp.example account ci-user" >&2
+    echo "broken.corp.example" >&2
+    echo "  X Failed to log in to broken.corp.example account nobody" >&2
+    exit 1
+    ;;
+esac
+echo "You are not logged into any accounts on that host" >&2
+exit 1
+EOF
+  chmod +x "$WORK/bin/gh"
+  run env PATH="$WORK/bin:$PATH" bash "$DETECT" \
+    --check-url-host --provider github --host ghe.corp.example
+  [ "$status" -eq 0 ]
+  run -2 env PATH="$WORK/bin:$PATH" bash "$DETECT" \
+    --check-url-host --provider github --host broken.corp.example
+  [[ "$output" == *"Refusing gh for host 'broken.corp.example'"* ]]
 }
 
 @test "detect-provider: gitlab --check-url-host allows GITLAB_HOST" {

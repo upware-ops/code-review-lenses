@@ -36,7 +36,7 @@ A remote is treated as GitLab when:
 1. The hostname is `gitlab.com` or contains `gitlab`
 2. `GITLAB_HOST` equals the hostname
 3. `glab config get host` equals the hostname
-4. `glab auth status` lists the hostname
+4. `glab auth status --hostname <hostname>` succeeds (other hosts' auth state is ignored)
 
 Nested groups stay in the project slug (`group/sub/project`).
 `glab mr view` / `glab mr checkout` are used for an MR URL.

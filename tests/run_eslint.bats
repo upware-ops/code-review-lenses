@@ -65,6 +65,19 @@ teardown() {
   [ "$output" = "[]" ]
 }
 
+@test "eslint: missing config warns on stderr instead of passing as a clean scan" {
+  mkdir -p "$WORK/noconf/node_modules/.bin"
+  printf '#!/bin/sh\nexit 0\n' > "$WORK/noconf/node_modules/.bin/eslint"
+  chmod +x "$WORK/noconf/node_modules/.bin/eslint"
+  echo 'var x' > "$WORK/noconf/x.js"
+  unset ESLINT_MOCK_FILE
+  cd "$WORK/noconf"
+  GITHUB_WORKSPACE="$WORK/noconf" run --separate-stderr bash "$SCRIPT" "$WORK/noconf/x.js"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  [[ "$stderr" == *"WARNING: no ESLint config in $WORK/noconf"* ]]
+}
+
 # ---------------------------------------------------------------------------
 # File extension matching
 # ---------------------------------------------------------------------------

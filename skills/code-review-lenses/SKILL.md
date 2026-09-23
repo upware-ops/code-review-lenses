@@ -23,7 +23,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
 
 - **Local only.** This skill never posts reviews, comments, or PR/MR descriptions, and never creates a PR/MR. There is no `--post-*`, `--create-pr`, `--publish`, `--draft`, `--read-back`, `--no-post`, or `--local` flag. If the user asks to post, refuse and print the local report.
 - **Profiles, not mode flags.** Roster and depth come from `--profile quick|security|full|deep` (default `full`) or `--summary-only`. Do not invent `--quick`, `--security-only`, or `--depth`.
-- **URL-only external review.** There is no `--pr` or `--provider`. Host and number come from a PR/MR URL in `GUIDANCE` via `parse-pr-url.sh`. A bare number is not a PR/MR identity. Omitted `--base` on a PR/MR is the fetched target branch (`baseRefName`); never assume `main`, `master`, or `dev`.
+- **URL-only external review.** There is no `--pr` or `--provider`. Host and number come from a PR/MR URL in `GUIDANCE` via `parse-pr-url.sh`. A bare number is not a PR/MR identity. Omitted `--base` on a PR/MR is the target branch (`baseRefName`) as fetched from `origin` by `resolve-pr-base.sh`, never the parent clone's local branch of that name; never assume `main`, `master`, or `dev`.
 - **Agent prompts.** Use this package's `agents/<name>.md` files through the Phase 1 spawn protocol. Do not pass a `model:` argument unless `resolve-models.sh` emitted a value other than `inherit`.
 - **Cite observed results.** When reporting that a script ran, cite its exit code and output — not the fact that you invoked it.
 - **Secret redaction.** Phase 2 redacts known-pattern secrets from finding text and Block A before display.
@@ -119,7 +119,17 @@ Run a full local review of all changes on the current branch (or a specified PR/
 
 ### Phase 0b: Pre-flight and manifest
 
-1. **PR/MR URL (external review):** when `PR_NUMBER` is set from `parse-pr-url.sh`, fetch metadata via **OP: Fetch PR/MR metadata**. Map to `number, title, baseRefName, headRefName, state, body`. Stop if fetch fails or state is CLOSED/MERGED. If `--base` was not passed (`BASE` empty), set `BASE` to `baseRefName`. If that target ref is still empty, **stop with an error** — never invent `main`, `master`, or `dev`. Set `PR_BODY` to `body` (or `""`). Create a temporary worktree and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone). All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. Diff is `<BASE>...HEAD` of the checked-out PR/MR. Phase 1b analyzers stay in the reviewer checkout (never `cd` to `$WORKTREE_PATH`); pass worktree files as absolute paths if needed. Do not execute `./node_modules/.bin/*` or load ESLint/PHPStan/trufflehog config from the worktree.
+1. **PR/MR URL (external review):** when `PR_NUMBER` is set from `parse-pr-url.sh`, fetch metadata via **OP: Fetch PR/MR metadata**. Map to `number, title, baseRefName, baseRefOid, headRefName, state, body`. Stop if fetch fails or state is CLOSED/MERGED. If `--base` was not passed (`BASE` empty) and `baseRefName` is empty, **stop with an error** — never invent `main`, `master`, or `dev`. Set `PR_BODY` to `body` (or `""`). Create a temporary worktree and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone). All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. If `BASE` is empty, pin it to the target branch fetched from `origin` — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
+
+   ```bash
+   if [[ -z "$BASE" ]]; then
+     _base_out=$(cd "$WORKTREE_PATH" && bash "$SCRIPTS_DIR/resolve-pr-base.sh" --ref "$baseRefName" --provider-base "$baseRefOid") || exit $?
+     eval "$_base_out"
+     unset _base_out
+   fi
+   ```
+
+   Exit 2 (fetch failed, invalid ref, or merge-base disagrees with the provider's `baseRefOid`) is a hard stop; `--base <ref>` overrides. Diff is `<BASE>...HEAD` of the checked-out PR/MR. Phase 1b analyzers stay in the reviewer checkout (never `cd` to `$WORKTREE_PATH`); pass worktree files as absolute paths if needed. Do not execute `./node_modules/.bin/*` or load ESLint/PHPStan/trufflehog config from the worktree.
 
 2. **Local review (no URL):** if `BASE` is empty, use only `git rev-parse --abbrev-ref HEAD@{upstream}`. If upstream is missing, **stop with an error**. Do not assume `main`, `master`, or `dev`.
 

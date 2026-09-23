@@ -52,6 +52,7 @@ setup() {
     grep -q 'classify-diff.sh' "$f"
     grep -q 'parse-pr-url.sh' "$f"
     grep -q 'review-diff.sh' "$f"
+    grep -q 'resolve-pr-base.sh' "$f"
     grep -q 'resolve-models.sh' "$f"
     grep -q 'PROVIDERS.md' "$f"
     grep -q 'worktree' "$f"

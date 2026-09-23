@@ -69,6 +69,7 @@ if [[ -z "${ESLINT_MOCK_FILE:-}" ]]; then
     done
   done
   if [[ "$ESLINT_CONFIG_FOUND" == "false" ]]; then
+    echo "WARNING: no ESLint config in ${SEARCH_DIRS[*]}; eslint check skipped." >&2
     echo "[]"
     exit 0
   fi
