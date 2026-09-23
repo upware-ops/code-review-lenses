@@ -1,0 +1,35 @@
+.agents/skills/code-review-lenses
+  s_146fa0467b480f::t_b929e1d3e07106 1
+README.md
+  s_9d04dcfaa5862c::t_979c752e0ae217 42,65-68,70-78
+docs/getting-started.md
+  s_9d04dcfaa5862c::t_703bf8f9d776f3 13-15,17-18,20-22,30,39-46
+skills/code-review-lenses/SKILL.md
+  s_9d04dcfaa5862c::t_eb3c6f04030404 6,18-20,27,42,45,49,360-365,404,432,551
+skills/code-review-lenses/scripts/resolve-skill-root.sh
+  s_9d04dcfaa5862c::t_5a69243ab8b389 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "b83929db5d22622c7c1c1feafcd1e164300d6401",
+  "prompts": {},
+  "sessions": {
+    "s_146fa0467b480f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c8b9-49e7-79c2-9468-ea9248e79b3c",
+        "model": "unknown"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    },
+    "s_9d04dcfaa5862c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a0c8b9-e48d-7690-a9a5-789a491d3399",
+        "model": "unknown"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
