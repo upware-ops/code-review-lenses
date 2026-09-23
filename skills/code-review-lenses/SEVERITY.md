@@ -8,8 +8,8 @@ unified Critical/High/Medium/Low scale.
 | code-reviewer | confidence [91,100] / [80,90] / [60,79] / [0,59] | Critical / High / Medium / Low |
 | silent-failure-hunter | CRITICAL/HIGH/MEDIUM | pass through |
 | comment-analyzer | Critical/High/Medium/Low | pass through |
-| pr-test-analyzer | gap [8,10] / [5,7] / [3,4] / [1,2] | Critical / High / Medium / Low |
-| type-design-analyzer | rating [1,2] / [3,5] / [6,10] | High / Medium / Low |
+| pr-test-analyzer | gap [9,10] / [7,8] / [5,6] / [1,4] | Critical / High / Medium / Low |
+| type-design-analyzer | lowest of its four ratings: [1,2] / [3,5] / [6,10] | High / Medium / Low |
 | architecture-reviewer, security-reviewer, adversarial-general | Critical/High/Medium/Low via json-findings | pass through |
 | blind-hunter, edge-case-hunter | Critical/High/Medium/Low via json-findings | pass through |
 | dependency-check (parsed CVSS) | Critical/High/Medium/Low | pass through (identity mapping) |
@@ -64,7 +64,7 @@ External pr-review-toolkit agents don't emit a confidence integer. For uniform
 `--min-confidence` filtering, their numeric scores are mapped as follows:
 - `pr-test-analyzer` gap score [1,10]: `confidence = gap_score * 10`
   (gap=8 → confidence=80; gap=3 → confidence=30)
-- `type-design-analyzer` rating [1,10]: `confidence = (11 - rating) * 10`
+- `type-design-analyzer` lowest of its four ratings [1,10]: `confidence = (11 - rating) * 10`
   (low rating=2, meaning high concern → confidence=90; high rating=9, meaning low concern → confidence=20)
 - `code-reviewer` already emits confidence [0,100]; no mapping needed.
 - All other external agents (silent-failure-hunter, comment-analyzer): treat as confidence=80

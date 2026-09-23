@@ -32,11 +32,11 @@ teardown() {
 }
 
 @test "resolve-models: shipped models.conf is inherit for every agent" {
-  eval "$(bash "${SCRIPTS_DIR}/resolve-models.sh")"
-  [[ "$ROLE_SUMMARIZER" == "inherit" ]]
-  [[ "$ROLE_SPECIALIST" == "inherit" ]]
-  [[ "$MODEL_SECURITY_REVIEWER" == "inherit" ]]
-  [[ "$MODEL_PR_SUMMARIZER" == "inherit" ]]
+  out=$(bash "${SCRIPTS_DIR}/resolve-models.sh")
+  [[ $(grep -cE '^(ROLE|MODEL)_[A-Z_]+=' <<<"$out") -eq 17 ]]
+  if grep -vE '^(ROLE|MODEL)_[A-Z_]+=inherit$' <<<"$out"; then
+    return 1
+  fi
 }
 
 @test "resolve-models: missing file defaults every agent to inherit" {

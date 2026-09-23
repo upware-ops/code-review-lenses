@@ -115,6 +115,11 @@ teardown() {
   fi
 }
 
+@test "SKILL.md: local provider detection never overrides a URL-derived identity" {
+  grep -qF 'if [[ -z "${PR_NUMBER:-}" ]]; then' "$SKILL_MD"
+  grep -qF '_detect_out=$(bash "$SCRIPTS_DIR/detect-provider.sh" --fallback unknown)' "$SKILL_MD"
+}
+
 @test "classify-diff.sh: defines TIER=tiny with 50-line / 3-file threshold" {
   grep -q "TIER=tiny" "$SCRIPTS_DIR/classify-diff.sh"
   grep -q 'LINES_CHANGED" -lt 50' "$SCRIPTS_DIR/classify-diff.sh"
@@ -133,14 +138,44 @@ teardown() {
 }
 
 @test "SKILL.md: local-only — no posting or PR-create operations" {
-  if grep -qE -- '--post-findings|--post-summary|--create-pr|--publish|--read-back|--no-post|--local' "$SKILL_MD"; then
-    # Mentions inside the "removed flags" list are required. Live ops are not.
-    if grep -q 'OP: Post\|OP: Create PR\|OP: Stage draft\|POST_MODE=' "$SKILL_MD"; then
-      echo "REGRESSION: posting operation found in SKILL.md" >&2
-      return 1
-    fi
+  # Mentions inside the "removed flags" list are required. Live ops are not.
+  grep -qE -- '--post-findings|--post-summary|--create-pr|--publish|--read-back|--no-post|--local' "$SKILL_MD"
+  if grep -q 'OP: Post\|OP: Create PR\|OP: Stage draft\|POST_MODE=' "$SKILL_MD"; then
+    echo "REGRESSION: posting operation found in SKILL.md" >&2
+    return 1
   fi
   grep -qi "never posts\|Do not create, comment" "$SKILL_MD"
+}
+
+@test "SKILL.md: PR/MR-URL checks read worktree paths and report repo-relative files" {
+  grep -qF '"$WORKTREE_PATH/$_p"' "$SKILL_MD"
+  grep -qF '<<<"$CHECK_PATHS"' "$SKILL_MD"
+  grep -qF '(.[].file | strings) |= ltrimstr($p)' "$SKILL_MD"
+  if grep -qF '<<<"$MANIFEST_FILES"' "$SKILL_MD"; then
+    echo "REGRESSION: CVE check resolves manifest paths against the reviewer checkout" >&2
+    return 1
+  fi
+}
+
+@test "SKILL.md: dirty DIFF_PATHS stops on ls-files failure and adds no blank line" {
+  grep -qF 'if ! _untracked=$("${_git[@]}" ls-files --others --exclude-standard); then' "$SKILL_MD"
+  grep -qF '[[ -n "$DIFF_PATHS" && -n "$_untracked" ]]' "$SKILL_MD"
+}
+
+@test "SKILL.md: redact_secrets redacts JWTs with any payload, unsecured JWTs, and JWE" {
+  command -v perl >/dev/null 2>&1 || skip "perl not available"
+  load_function "$SKILL_MD" redact_secrets
+  out=$(printf '%s\n' \
+    'eyJhbGciOiJIUzI1NiJ9.aGVsbG8gd29ybGQ.c2lnbmF0dXJl' \
+    'eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.' \
+    'eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..aXZpdml2aXZp.Y2lwaGVy.dGFn' \
+    'lodash 4.17.21 in src/a.test.ts' | redact_secrets)
+  [[ "$out" != *eyJ* ]]
+  [[ "$out" == *'lodash 4.17.21 in src/a.test.ts'* ]]
+}
+
+@test "SKILL.md: code-reviewer is told the supplied diff is its review scope" {
+  grep -q 'code-reviewer\*\* — full diff, stated as its review scope' "$SKILL_MD"
 }
 
 @test "SKILL.md: spawn is bare agent name, model only when not inherit" {
@@ -274,6 +309,12 @@ teardown() {
   grep -q "secret" "$SEVERITY_MD"
   grep -q "architecture-coupling" "$SEVERITY_MD"
   grep -q "edge-case" "$SEVERITY_MD"
+}
+
+@test "SEVERITY.md: toolkit scales follow the vendored rating guidelines" {
+  grep -qF 'gap [9,10] / [7,8] / [5,6] / [1,4]' "$SEVERITY_MD"
+  grep -qF '9-10: Critical functionality' "$REPO_ROOT/agents/pr-test-analyzer.md"
+  grep -q 'lowest of its four ratings' "$SEVERITY_MD"
 }
 
 # ---------------------------------------------------------------------------

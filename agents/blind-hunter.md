@@ -23,7 +23,7 @@ findings. Fabricating issues is worse than missing them.
 ## Your Task
 
 You will receive either:
-- **Small diff or PR/MR-URL worktree with large diff:** The full diff content inline — analyze it directly.
+- **Small diff, or PR/MR-URL review with large diff:** The full diff is provided — inline, or as a `DIFF_FILE` temp path to read — analyze it directly.
 - **Medium/large diff (normal mode):** A base and a plain list of changed file paths.
   Use the range the orchestrator gave you: `git diff <base>...HEAD -- <file>` when
   committed; `git diff <base> -- <file>` when dirty (`REVIEW_MODE=dirty` /

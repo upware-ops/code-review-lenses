@@ -108,7 +108,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
      bash "$SCRIPTS_DIR/detect-provider.sh" --check-url-host --provider "$PROVIDER" --host "$HOST" || exit $?
      ```
 
-     GitHub: allow `github.com` / `*.github.com` / `*.ghe.com`, or `gh auth status` (origin match is not enough). GitLab: `GITLAB_HOST` / `GL_HOST` or `glab auth status` (origin match is not enough). Bitbucket: Cloud hosts only. Stop rather than send env tokens to an unknown host.
+     GitHub: allow `github.com` / `*.github.com` / `*.ghe.com`, or `gh auth status` (origin match is not enough). GitLab: glab's env host (first set of `GITLAB_HOST`, `GITLAB_URI`, `GL_HOST`) or `glab auth status --hostname "$HOST"` (origin match is not enough, nor is `glab config get host`). Bitbucket: Cloud hosts only. Stop rather than send env tokens to an unknown host.
    - URL review + `PROVIDER=github`: `gh --version` must succeed.
    - URL review + `PROVIDER=gitlab`: `glab --version` must succeed. `glab` must already be authenticated to `HOST` (`glab auth login --hostname <HOST>` for self-hosted / dedicated).
    - URL review + `PROVIDER=bitbucket`: `curl` plus `BITBUCKET_EMAIL` and `BITBUCKET_TOKEN` (map `BITBUCKET_APP_PASSWORD` → `BITBUCKET_TOKEN` if only the former is set).
@@ -129,7 +129,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
    fi
    ```
 
-   Exit 2 (fetch failed, invalid ref, or merge-base disagrees with the provider's `baseRefOid`) is a hard stop; `--base <ref>` overrides. Diff is `<BASE>...HEAD` of the checked-out PR/MR. Phase 1b analyzers stay in the reviewer checkout (never `cd` to `$WORKTREE_PATH`); pass worktree files as absolute paths if needed. Do not execute `./node_modules/.bin/*` or load ESLint/PHPStan/trufflehog config from the worktree.
+   Exit 2 (fetch failed, invalid ref, or merge-base disagrees with the provider's `baseRefOid`) is a hard stop; `--base <ref>` overrides. Diff is `<BASE>...HEAD` of the checked-out PR/MR. Phase 1b analyzers stay in the reviewer checkout (never `cd` to `$WORKTREE_PATH`) and read `$WORKTREE_PATH/`-prefixed paths (`CHECK_PATHS`). Do not execute `./node_modules/.bin/*` or load ESLint/PHPStan/trufflehog config from the worktree.
 
 2. **Local review (no URL):** if `BASE` is empty, use only `git rev-parse --abbrev-ref HEAD@{upstream}`. If upstream is missing, **stop with an error**. Do not assume `main`, `master`, or `dev`.
 
@@ -187,8 +187,12 @@ Run a full local review of all changes on the current branch (or a specified PR/
        echo "Error: git diff --name-only $BASE failed." >&2
        exit 2
      fi
-     DIFF_PATHS+=$'\n'
-     DIFF_PATHS+=$("${_git[@]}" ls-files --others --exclude-standard)
+     if ! _untracked=$("${_git[@]}" ls-files --others --exclude-standard); then
+       echo "Error: git ls-files --others --exclude-standard failed." >&2
+       exit 2
+     fi
+     [[ -n "$DIFF_PATHS" && -n "$_untracked" ]] && DIFF_PATHS+=$'\n'
+     DIFF_PATHS+="$_untracked"
    else
      if ! DIFF_PATHS=$("${_git[@]}" diff --name-only "${BASE}...HEAD"); then
        echo "Error: git diff --name-only ${BASE}...HEAD failed." >&2
@@ -365,7 +369,7 @@ Eligible: architecture-reviewer, security-reviewer, adversarial-general, edge-ca
 
 ### Phase 1: Launch agents
 
-**Do not display raw diffs.** Use `$DIFF_FILE`. For `TIER=small`/`tiny`, pass the full diff inline. For `TIER=medium`, custom agents get the manifest and read `git diff` over the same range as Phase 0b (`${BASE}...HEAD` when committed, `"$BASE"` when dirty) `-- <file>`; **untracked files: Read the file — `git diff -- <file>` is empty for them**. Slice-only agents get a temp slice.
+**Do not display raw diffs.** Use `$DIFF_FILE`. For `TIER=small`/`tiny`, pass the full diff inline. For `TIER=medium`, custom agents get the manifest and read `git diff` over the same range as Phase 0b (`${BASE}...HEAD` when committed, `"$BASE"` when dirty) `-- <file>`; **untracked files: Read the file — `git diff -- <file>` is empty for them**.
 
 **Spawn protocol:**
 
@@ -392,7 +396,7 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 **Always-run when `RUN_*=true`:**
 
 - **pr-summarizer** — manifest, commit log, project context; small diffs: full diff. `TIER=tiny`: diff + PR title only (still include GOVERNANCE).
-- **code-reviewer** — full diff. Prefix `PR_NARRATIVE` when set.
+- **code-reviewer** — full diff, stated as its review scope (its prompt otherwise defaults to unstaged `git diff`). Prefix `PR_NARRATIVE` when set.
 
 **Specialists when scheduled:**
 
@@ -415,16 +419,23 @@ Launch scheduled agents in parallel within the host's concurrency limit, collect
 
 ### Phase 1b: Deterministic checks
 
-Skip the whole phase when `RUN_CVE` and `RUN_STATIC_ANALYZERS` are both false (summary profile).
+Skip the whole phase when `RUN_CVE` and `RUN_STATIC_ANALYZERS` are both false (summary profile). Scripts run in the reviewer checkout, so a PR/MR-URL review hands them worktree paths:
 
-**CVE check** when `RUN_CVE=true` and `MANIFEST_FILES` is non-empty:
+```bash
+CHECK_PATHS="$DIFF_PATHS"
+if [[ -n "${WORKTREE_PATH:-}" ]]; then
+  CHECK_PATHS=$(while IFS= read -r _p; do [[ -z "$_p" ]] || printf '%s\n' "$WORKTREE_PATH/$_p"; done <<<"$DIFF_PATHS")
+fi
+```
+
+**CVE check** when `RUN_CVE=true` and `MANIFEST_FILES` is non-empty (the script picks the manifests out of `CHECK_PATHS`):
 
 ```bash
 CVE_SCRIPT="$SCRIPTS_DIR/run-cve-check.sh"
 CVE_JSON="[]"
 CVE_CHECK_FAILED=false
 if [[ -x "$CVE_SCRIPT" ]]; then
-  CVE_JSON=$(bash "$CVE_SCRIPT" <<<"$MANIFEST_FILES") || {
+  CVE_JSON=$(bash "$CVE_SCRIPT" <<<"$CHECK_PATHS") || {
     echo "WARNING: run-cve-check.sh failed; CVE findings skipped." >&2
     CVE_JSON="[]"
     CVE_CHECK_FAILED=true
@@ -435,7 +446,7 @@ else
 fi
 ```
 
-**Static analyzers** when `RUN_STATIC_ANALYZERS=true`. Each script reads paths on stdin and emits json-findings. Missing binary → silent skip. Run matching tools in background, `wait`, then read the temp JSON files. Tools: shellcheck, semgrep, trufflehog, ruff, golangci-lint, checkov, eslint, hadolint, kube-linter, phpcs, phpstan, tflint. Same path/binary gates as the `run-*.sh` scripts in `$SCRIPTS_DIR`. If a script is present and exits non-zero, set `ANALYZER_FAILED=true` (do not treat `[]` after a crash as a clean scan).
+**Static analyzers** when `RUN_STATIC_ANALYZERS=true`. Each script reads `CHECK_PATHS` on stdin and emits json-findings. Missing binary → silent skip. Run matching tools in background, `wait`, then read the temp JSON files. Tools: shellcheck, semgrep, trufflehog, ruff, golangci-lint, checkov, eslint, hadolint, kube-linter, phpcs, phpstan, tflint. Same path/binary gates as the `run-*.sh` scripts in `$SCRIPTS_DIR`. If a script is present and exits non-zero, set `ANALYZER_FAILED=true` (do not treat `[]` after a crash as a clean scan) and still merge the findings it printed (semgrep and checkov emit partial results with exit 1).
 
 ### Phase 1c: CVE reachability (`PROFILE=deep` only)
 
@@ -449,7 +460,7 @@ Wait for agents.
 - Empty / missing headers (and not NONE) → `WARNING: <agent> returned no results.`
 - Tool error/timeout → `ERROR: <agent> failed. Reason: <error>.`
 
-**2a — extract json-findings** from architecture-reviewer, security-reviewer, blind-hunter, edge-case-hunter, adversarial-general. Salvage truncated arrays. Validate `severity` ∈ Critical|High|Medium|Low. Normalize `category` to `authz|injection|dependency-cve|secret|architecture-coupling|test-gap|edge-case|observability|docs|lint|other`. Merge with `CVE_JSON` and analyzer JSON. Toolkit agents without json-findings: map via [SEVERITY.md](SEVERITY.md).
+**2a — extract json-findings** from architecture-reviewer, security-reviewer, blind-hunter, edge-case-hunter, adversarial-general. Salvage truncated arrays. Validate `severity` ∈ Critical|High|Medium|Low. Normalize `category` to `authz|injection|dependency-cve|secret|architecture-coupling|test-gap|edge-case|observability|docs|lint|other`. Merge with `CVE_JSON` and analyzer JSON; in PR/MR-URL mode first make their `file` repo-relative with `jq --arg p "$WORKTREE_PATH/" '(.[].file | strings) |= ltrimstr($p)'`. Toolkit agents without json-findings: map via [SEVERITY.md](SEVERITY.md).
 
 **2b — severity** per SEVERITY.md. Unparseable CVSS → High.
 
@@ -478,7 +489,7 @@ redact_secrets() {
     s/\b(sk|rk|pk)_(live|test)_[A-Za-z0-9]{20,}/<secret-redacted>/g;
     s/\bnpm_[A-Za-z0-9]{30,}/<secret-redacted>/g;
     s/\bAKIA[0-9A-Z]{16}\b/<secret-redacted>/g;
-    s/\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/<secret-redacted>/g;
+    s/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/<secret-redacted>/g;
     s/-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----/<secret-redacted>/gs;
     s/("?)(password|passwd|pwd|token|api[_-]?key|secret|access[_-]?key|aws[_-]?secret[_-]?access[_-]?key)\1?(\s*[:=]\s*)("[^"]{8,}"|'\''[^'\'']{8,}'\''|[^\s,;]{8,})/\1\2\1\3<secret-redacted>/gi;
     s/(^|[\s:])(Bearer|Basic)\s+([A-Za-z0-9._~+\/=-]{20,})/\1\2 <secret-redacted>/g;
@@ -547,13 +558,13 @@ If `GOVERNANCE_DEGRADED=true`, prepend a banner that `GOVERNANCE.md` was missing
 
 There is no Phase 4. Nothing is written to a hosting provider.
 
-**Cleanup:** remove temp diff/slice files and the redaction sentinel. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
+**Cleanup:** remove temp diff files and the redaction sentinel. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
 
 **`--output-file`:** write Block A, `---`, Block B via the Write tool.
 
 **Terminal:**
 
-1. Always print Block A then Block B.
+1. Always print Block A then Block B (Block A only when `PROFILE=summary`).
 2. PR/MR-URL worktree: cite `WORKTREE_REMOVED` or the cleanup error.
 3. Skipped agents from `SKIP_REASONS` and from conditional triggers that did not fire. If `DOCS_ONLY=true` and `PROFILE=full`: `Auto-cheap: DOCS_ONLY`. If `LOW_RISK_CONFIG=true` and `PROFILE=full`: `Auto-cheap: LOW_RISK_CONFIG`.
 4. `Diff tier: <tiny|small|medium>  (<N> lines, <M> files)` plus tiny-tier promotions. If `REVIEW_MODE=dirty`, say so (working tree vs `$BASE`, committed range was empty).
