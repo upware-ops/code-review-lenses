@@ -70,6 +70,7 @@ SKIP_REASONS=()
 skip() {
   local var="$1"
   local reason="$2"
+  [[ "${!var}" == "false" ]] && return 0
   printf -v "$var" '%s' "false"
   SKIP_REASONS+=("$reason")
 }

@@ -141,6 +141,45 @@ source_profile() {
   [[ "$GUIDANCE" == '$(echo pwned)' ]]
 }
 
+@test "resolve-profile: --from-file keeps quoted values whole and expands nothing" {
+  cat > "$WORK/args" <<'EOF'
+--output-file "review report.md" $(echo pwned) `id` * "a 'b' c"
+EOF
+  cd "$WORK"
+  _out=$(bash "$PROFILE_SCRIPT" --from-file args)
+  eval "$_out"
+  [[ "$OUTPUT_FILE" == "review report.md" ]]
+  [[ "$GUIDANCE" == "\$(echo pwned) \`id\` * a 'b' c" ]]
+}
+
+@test "resolve-profile: --from-file keeps stray quotes literal" {
+  printf '%s\n' "--profile quick focus on the user's session" > "$WORK/args"
+  _out=$(bash "$PROFILE_SCRIPT" --from-file "$WORK/args")
+  eval "$_out"
+  [[ "$PROFILE" == "quick" ]]
+  [[ "$GUIDANCE" == "focus on the user's session" ]]
+  printf '%s\n' "'unterminated focus --profile quick" > "$WORK/args"
+  _out=$(bash "$PROFILE_SCRIPT" --from-file "$WORK/args")
+  eval "$_out"
+  [[ "$PROFILE" == "quick" ]]
+  [[ "$GUIDANCE" == "'unterminated focus" ]]
+}
+
+@test "resolve-profile: empty --from-file is the default full profile" {
+  : > "$WORK/args"
+  _out=$(bash "$PROFILE_SCRIPT" --from-file "$WORK/args")
+  eval "$_out"
+  [[ "$PROFILE" == "full" ]]
+  [[ -z "$GUIDANCE" ]]
+}
+
+@test "resolve-profile: empty inline flag values are rejected" {
+  run -2 bash "$PROFILE_SCRIPT" --profile=
+  [[ "$output" == *"--profile requires a value"* ]]
+  run -2 bash "$PROFILE_SCRIPT" --base=
+  run -2 bash "$PROFILE_SCRIPT" --output-file=
+}
+
 @test "resolve-profile: --base and --min-confidence still parse" {
   source_profile --profile full --base develop --min-confidence 80
   [[ "$BASE" == "develop" ]]
@@ -182,6 +221,13 @@ source_profile() {
 @test "resolve-profile: invalid --min-confidence is rejected" {
   run -2 bash "$PROFILE_SCRIPT" --min-confidence 140
   [[ "$output" == *"min-confidence"* ]]
+}
+
+@test "resolve-profile: --min-confidence with leading zeros is decimal" {
+  _out=$(bash "$PROFILE_SCRIPT" --min-confidence 08)
+  eval "$_out"
+  [[ "$MIN_CONFIDENCE" == "8" ]]
+  run -2 bash "$PROFILE_SCRIPT" --min-confidence 0144
 }
 
 @test "overlay: TIER=tiny skips hunters unless architecture/security promoted" {
@@ -282,4 +328,14 @@ source_profile() {
   eval "$(DOCS_ONLY=false LOW_RISK_CONFIG=true ARCH_PROMOTED=true \
     GATE_CODE_OR_INFRA=true bash "$OVERLAY_SCRIPT" --profile full)"
   [[ "$RUN_ARCHITECTURE_REVIEWER" == "true" ]]
+}
+
+@test "overlay: SKIP_REASONS names only scheduled agents, once each" {
+  _out=$(TIER=tiny bash "$OVERLAY_SCRIPT" --profile quick)
+  eval "$_out"
+  [[ -z "$SKIP_REASONS" ]]
+  _out=$(TIER=tiny DOCS_ONLY=true bash "$OVERLAY_SCRIPT" --profile full)
+  eval "$_out"
+  [[ "$SKIP_REASONS" == *"blind-hunter (DOCS_ONLY)"* ]]
+  [[ "$SKIP_REASONS" != *"TIER=tiny"* ]]
 }

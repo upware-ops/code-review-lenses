@@ -85,6 +85,7 @@ GitLab
 Free-form (GUIDANCE)
   A PR/MR URL starts external review (host + number from the URL). Remaining
   prose is review focus. A bare number is not a PR/MR identity.
+  Quote a value that contains spaces: --output-file "review report.md".
 
 Examples
   /code-review-lenses

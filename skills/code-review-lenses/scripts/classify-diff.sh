@@ -14,22 +14,19 @@
 # invent docs-only cheapening):
 #   GATE_CODE_OR_INFRA GATE_SECURITY_PATTERNS
 #
-# Exit 0 on success. Exit 1 if DIFF_FILE is set but unreadable.
+# Exit 0 on success. Exit 1 if DIFF_FILE is unset or unreadable.
 
 set -euo pipefail
 
 emit() { printf '%s=%q\n' "$1" "$2"; }
 
-if [[ -n "${DIFF_FILE:-}" && ! -r "$DIFF_FILE" ]]; then
-  echo "Error: classify-diff.sh: DIFF_FILE '${DIFF_FILE}' is not readable." >&2
+if [[ -z "${DIFF_FILE:-}" || ! -r "$DIFF_FILE" ]]; then
+  echo "Error: classify-diff.sh: DIFF_FILE '${DIFF_FILE:-}' is not readable." >&2
   exit 1
 fi
 
 FILES_CHANGED=$(printf '%s\n' "${DIFF_PATHS-}" | sed '/^$/d' | wc -l | tr -d ' ')
-LINES_CHANGED=0
-if [[ -n "${DIFF_FILE:-}" && -r "$DIFF_FILE" ]]; then
-  LINES_CHANGED=$(grep -cE '^[+-]' "$DIFF_FILE" || true)
-fi
+LINES_CHANGED=$(awk '/^diff /{h=1} /^@@/{h=0} !h && /^[+-]/{n++} END{print n+0}' "$DIFF_FILE")
 
 TIER=medium
 if [[ "$LINES_CHANGED" -lt 50 && "$FILES_CHANGED" -le 3 ]]; then
@@ -42,8 +39,8 @@ ARCH_PROMOTED=false
 SECURITY_PROMOTED=false
 if [[ "$TIER" == "tiny" ]]; then
   TINY_DIFF_NAMES="${DIFF_PATHS-}"
-  if echo "$TINY_DIFF_NAMES" | grep -qE '(auth|passwords?|routes?/|/api/|credentials?|token|secret)' \
-    || echo "$TINY_DIFF_NAMES" | grep -qE '(^|/)(package\.json|go\.mod|composer\.json|requirements.*\.txt|pyproject\.toml|Gemfile|Pipfile|[Cc]argo\.toml)$' \
+  if echo "$TINY_DIFF_NAMES" | grep -qE '(auth|passwords?|routes?/|(^|/)api/|credentials?|token|secret)' \
+    || echo "$TINY_DIFF_NAMES" | grep -qE '(^|/)(package(-lock)?\.json|go\.(mod|sum)|composer\.(json|lock)|requirements.*\.txt|pyproject\.toml|Gemfile(\.lock)?|Pipfile(\.lock)?|[Cc]argo\.(toml|lock)|yarn\.lock|pnpm-lock\.yaml)$' \
     || echo "$TINY_DIFF_NAMES" | grep -qE '(^|/)\.env' \
     || echo "$TINY_DIFF_NAMES" | grep -qE 'settings\.(py|ya?ml|json|toml)$'; then
     SECURITY_PROMOTED=true

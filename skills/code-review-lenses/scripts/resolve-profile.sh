@@ -103,12 +103,35 @@ if [[ "${1:-}" == --from-file || "${1:-}" == --from-file=* ]]; then
   fi
   [[ -n "$_args_file" && -f "$_args_file" ]] || die "--from-file requires an existing file."
   _line=$(cat "$_args_file")
-  set -f
-  # noglob word-split only — not eval, so $(...) stays literal.
-  # shellcheck disable=SC2086
-  set -- ${_line}
-  set +f
-  unset _args_file _line
+  _tok=""
+  _in_tok=false
+  _quote=""
+  for (( _i = 0; _i < ${#_line}; _i++ )); do
+    _c="${_line:_i:1}"
+    if [[ -n "$_quote" ]]; then
+      if [[ "$_c" == "$_quote" ]]; then
+        _quote=""
+      else
+        _tok+="$_c"
+      fi
+    elif [[ "$_in_tok" == false && ( "$_c" == "'" || "$_c" == '"' ) && "${_line:_i+1}" == *"$_c"* ]]; then
+      _quote="$_c"
+      _in_tok=true
+    elif [[ "$_c" == [[:space:]] ]]; then
+      if [[ "$_in_tok" == true ]]; then
+        set -- "$@" "$_tok"
+      fi
+      _tok=""
+      _in_tok=false
+    else
+      _tok+="$_c"
+      _in_tok=true
+    fi
+  done
+  if [[ "$_in_tok" == true ]]; then
+    set -- "$@" "$_tok"
+  fi
+  unset _args_file _line _tok _in_tok _quote _i _c
 fi
 
 while [[ $# -gt 0 ]]; do
@@ -122,6 +145,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --profile=*)
       PROFILE="${arg#--profile=}"
+      need_value --profile "$PROFILE"
       PROFILE_SET=true
       shift
       ;;
@@ -136,6 +160,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --base=*)
       BASE="${arg#--base=}"
+      need_value --base "$BASE"
       shift
       ;;
     --output-file)
@@ -145,6 +170,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --output-file=*)
       OUTPUT_FILE="${arg#--output-file=}"
+      need_value --output-file "$OUTPUT_FILE"
       shift
       ;;
     --min-confidence)
@@ -216,9 +242,10 @@ case "$PROFILE" in
     ;;
 esac
 
-if [[ ! "$MIN_CONFIDENCE" =~ ^[0-9]+$ ]] || (( MIN_CONFIDENCE < 0 || MIN_CONFIDENCE > 100 )); then
+if [[ ! "$MIN_CONFIDENCE" =~ ^[0-9]+$ ]] || (( 10#$MIN_CONFIDENCE < 0 || 10#$MIN_CONFIDENCE > 100 )); then
   die "Invalid --min-confidence value '$MIN_CONFIDENCE'. Must be an integer 0–100."
 fi
+MIN_CONFIDENCE=$((10#$MIN_CONFIDENCE))
 
 # Roster defaults: everything off.
 RUN_PR_SUMMARIZER=false

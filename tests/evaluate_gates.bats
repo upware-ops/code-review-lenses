@@ -151,6 +151,9 @@ gate_value() {
 }
 
 @test "gates: unreadable DIFF_FILE is grep rc 2 abort, not no-match" {
+  if [[ "$EUID" -eq 0 ]]; then
+    skip "root reads chmod 000 files"
+  fi
   printf '%s\n' "+token" > "$WORK/locked.diff"
   chmod 000 "$WORK/locked.diff"
   DIFF_FILE="$WORK/locked.diff" DIFF_PATHS="src/auth.go" run bash "$SCRIPT"
