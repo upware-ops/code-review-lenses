@@ -1,0 +1,27 @@
+scripts/vendor-sync.sh
+  s_22d2264024e6d9::t_22cfa8e9ec41fd 116
+  s_22d2264024e6d9::t_3dd3cf22cbda70 148
+  s_22d2264024e6d9::t_656c3a5a23d0da 97-98
+  s_22d2264024e6d9::t_09d1a6bb82dfe1 133-136
+  s_22d2264024e6d9::t_4df740918a6e95 36
+  s_22d2264024e6d9::t_4b92a093177940 82,87
+  s_22d2264024e6d9::t_4890df9fbfbbc0 176
+tests/vendor_sync.bats
+  s_22d2264024e6d9::t_99a942730072a0 50-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "4403981b95c05fc727c322b346f5a2460d296559",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
