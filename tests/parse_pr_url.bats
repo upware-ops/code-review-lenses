@@ -152,9 +152,13 @@ source_url() {
   source_url "review (https://github.com/acme/app/pull/42)"
   [[ "$HOST" == "github.com" ]]
   [[ "$REPO_SLUG" == "acme/app" ]]
+  [[ "$PR_URL" == "https://github.com/acme/app/pull/42" ]]
   source_url "review [PR](https://github.com/acme/app/pull/42)"
   [[ "$HOST" == "github.com" ]]
   [[ "$REPO_SLUG" == "acme/app" ]]
+  [[ "$PR_URL" == "https://github.com/acme/app/pull/42" ]]
+  source_url "see **https://github.com/acme/app/pull/42**."
+  [[ "$PR_URL" == "https://github.com/acme/app/pull/42" ]]
 }
 
 @test "parse-pr-url: a repos/ namespace is a review URL" {

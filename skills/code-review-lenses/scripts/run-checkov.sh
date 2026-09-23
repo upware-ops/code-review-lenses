@@ -155,7 +155,7 @@ FINDINGS=$(echo "$CHECKOV_OUTPUT" | jq -r '
       source: "checkov",
       file: (.repo_file_path | ltrimstr("/")),
       line: (.file_line_range[0] // 1),
-      finding: ("\(.check_id): \(.check_id_name // .resource // "policy violation")"),
+      finding: ("\(.check_id): \(.check_name // .resource // "policy violation")"),
       remediation: (
         if .guideline and (.guideline | length > 0) then .guideline
         else "See https://docs.prismacloud.io/en/enterprise-edition/policy-reference"

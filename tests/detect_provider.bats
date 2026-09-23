@@ -424,6 +424,11 @@ EOF
   [ "$status" -eq 0 ]
   run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI=https://git.corp.example GL_HOST=git.other.example \
     bash "$DETECT" --check-url-host --provider gitlab --host git.other.example
+  run env PATH="$WORK/bin:$PATH" GITLAB_HOST=git.first.example GITLAB_URI=https://git.corp.example GL_HOST= \
+    bash "$DETECT" --check-url-host --provider gitlab --host git.first.example
+  [ "$status" -eq 0 ]
+  run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST=git.first.example GITLAB_URI=https://git.corp.example GL_HOST= \
+    bash "$DETECT" --check-url-host --provider gitlab --host git.corp.example
 }
 
 @test "detect-provider: gitlab --check-url-host allows GITLAB_HOST" {

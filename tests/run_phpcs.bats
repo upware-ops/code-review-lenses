@@ -167,3 +167,19 @@ teardown() {
   [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
+
+@test "phpcs: live exit above 3, or non-zero with empty stdout, hits the failure branch" {
+  unset PHPCS_MOCK_FILE
+  mkdir -p "$WORK/bin"
+  touch "$WORK/module.php"
+  printf '%s\n' '#!/bin/sh' '[ "$1" = "-i" ] && exit 0' "cat '$PHPCS_FIX/phpcs-error.json'" 'exit 16' > "$WORK/bin/phpcs"
+  chmod +x "$WORK/bin/phpcs"
+  PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/module.php"
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+  [[ "$stderr" == *"phpcs failed (exit 16)"* ]]
+  printf '%s\n' '#!/bin/sh' '[ "$1" = "-i" ] && exit 0' 'exit 2' > "$WORK/bin/phpcs"
+  PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/module.php"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"phpcs failed (exit 2)"* ]]
+}

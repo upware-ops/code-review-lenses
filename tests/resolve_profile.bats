@@ -150,6 +150,12 @@ EOF
   eval "$_out"
   [[ "$OUTPUT_FILE" == "review report.md" ]]
   [[ "$GUIDANCE" == "\$(echo pwned) \`id\` * a 'b' c" ]]
+  printf '%s\n' '--output-file="review report.md" --base='"'"'release/x y'"'"' focus' > "$WORK/args"
+  _out=$(bash "$PROFILE_SCRIPT" --from-file "$WORK/args")
+  eval "$_out"
+  [[ "$OUTPUT_FILE" == "review report.md" ]]
+  [[ "$BASE" == "release/x y" ]]
+  [[ "$GUIDANCE" == "focus" ]]
 }
 
 @test "resolve-profile: --from-file keeps stray quotes literal" {

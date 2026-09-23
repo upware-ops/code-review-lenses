@@ -52,6 +52,10 @@ unset _grep_rc
 while IFS= read -r raw; do
   [[ -z "$raw" ]] && continue
   url="$raw"
+  _trail='[].,;:!?)*]$'
+  while [[ "$url" =~ $_trail ]]; do
+    url="${url%?}"
+  done
   case "$url" in
     http://*|https://*) ;;
     *://*|javascript:*|data:*|file:*|vbscript:*)

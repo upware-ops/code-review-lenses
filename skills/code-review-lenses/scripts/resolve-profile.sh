@@ -114,7 +114,7 @@ if [[ "${1:-}" == --from-file || "${1:-}" == --from-file=* ]]; then
       else
         _tok+="$_c"
       fi
-    elif [[ "$_in_tok" == false && ( "$_c" == "'" || "$_c" == '"' ) && "${_line:_i+1}" == *"$_c"* ]]; then
+    elif [[ ( "$_in_tok" == false || "$_tok" == --*= ) && ( "$_c" == "'" || "$_c" == '"' ) && "${_line:_i+1}" == *"$_c"* ]]; then
       _quote="$_c"
       _in_tok=true
     elif [[ "$_c" == [[:space:]] ]]; then

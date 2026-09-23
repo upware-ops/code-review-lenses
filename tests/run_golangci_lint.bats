@@ -29,3 +29,28 @@ teardown() {
   [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
+
+@test "golangci-lint: linters other than errcheck/govet/staticcheck map to Medium" {
+  jq '.Issues[0].FromLinter = "gocritic"' "$GOLANGCI_FIX/golangci-findings.json" > "$WORK/medium.json"
+  GOLANGCI_MOCK_FILE="$WORK/medium.json" run --separate-stderr "$SCRIPT" "$WORK/main.go"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.[0].severity == "Medium"' >/dev/null
+}
+
+@test "golangci-lint: no Go files, unreadable mock, or missing binary return [] with exit 0" {
+  touch "$WORK/app.py"
+  GOLANGCI_MOCK_FILE="$GOLANGCI_FIX/golangci-findings.json" run --separate-stderr "$SCRIPT" "$WORK/app.py"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  GOLANGCI_MOCK_FILE="$WORK/missing.json" run --separate-stderr "$SCRIPT" "$WORK/main.go"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  mkdir -p "$WORK/pathbin"
+  ln -s "$(command -v jq)" "$WORK/pathbin/jq"
+  _bash=$(command -v bash)
+  unset GOLANGCI_MOCK_FILE
+  PATH="$WORK/pathbin" run "$_bash" "$SCRIPT" "$WORK/main.go"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"golangci-lint not installed"* ]]
+  [[ "$output" == *"[]" ]]
+}
