@@ -10,14 +10,16 @@ render_with_liquid: false
 ## Installation
 
 This is an [Agent Skills](https://agentskills.io/specification) package, not a
-host-specific plugin. A clone of this repo is enough for Claude and Grok:
-`.claude/skills/code-review-lenses` and `.grok/skills/code-review-lenses` are
-relative links to the shipped skill, so `/code-review-lenses` is discovered.
+host-specific plugin. A clone of this repo is enough for Codex, Claude, and Grok:
+`.agents/skills/code-review-lenses`, `.claude/skills/code-review-lenses`, and
+`.grok/skills/code-review-lenses` are relative links to the shipped skill.
 
-Other hosts: copy or symlink:
+Codex invokes `$code-review-lenses` and loads the Markdown agent prompts into
+native subagents. No custom-agent registration is needed.
 
-- `skills/code-review-lenses/` → the host's skills directory
-- `agents/*.md` → the host's agents directory
+For use from other repositories, symlink `skills/code-review-lenses/` into
+the host's user skill directory (`~/.agents/skills/` for Codex). Keep the full
+checkout available so the skill can resolve its sibling `agents/` directory.
 
 The orchestrator finds its own files via `scripts/resolve-skill-root.sh`.
 
@@ -25,7 +27,7 @@ The orchestrator finds its own files via `scripts/resolve-skill-root.sh`.
 
 | Requirement | Notes |
 |-------------|-------|
-| Agent Skills host | Claude, Codex, Grok, Cursor, Copilot, … |
+| Agent Skills host with subagent tools | Claude, Codex, Grok, Cursor, Copilot, … |
 | `git` | Diff analysis |
 | `jq` | Findings pipeline |
 | [gh CLI](https://cli.github.com/) | GitHub PR URL only |
@@ -33,6 +35,14 @@ The orchestrator finds its own files via `scripts/resolve-skill-root.sh`.
 | `BITBUCKET_EMAIL` + `BITBUCKET_TOKEN` | Bitbucket PR URL only |
 
 ## First review
+
+In Codex:
+
+```text
+$code-review-lenses --profile quick
+```
+
+In Claude or Grok:
 
 ```
 /code-review-lenses

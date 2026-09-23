@@ -3,7 +3,7 @@ name: code-review-lenses
 description: "Run a local PR/MR review using specialized agents. Supports GitHub, GitLab (any glab-authenticated host), and Bitbucket. Profiles: quick, security, full, deep. Use --summary-only for Block A only. External review: pass a PR/MR URL (not --pr / --provider). Remaining free-form is focus. Never posts to or creates PRs/MRs."
 argument-hint: "[--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--output-file <path>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]"
 license: MIT
-compatibility: "Requires git and jq. gh CLI for a GitHub PR URL. glab CLI for a GitLab MR URL (any authenticated host). Works in any Agent Skills host."
+compatibility: "Requires git, jq, and native subagent tools. gh CLI for a GitHub PR URL. glab CLI for a GitLab MR URL (any authenticated host)."
 metadata:
   author: upware
   version: "2.0.0"
@@ -15,14 +15,16 @@ allowed-tools: Bash Read Write Grep Glob Agent
 
 Run a full local review of all changes on the current branch (or a specified PR/MR). Produce Block A (summary) and Block B (findings) in the terminal. **Do not create, comment on, or update any PR/MR.**
 
-**Arguments:** `$ARGUMENTS`
+**Arguments:** The flags, PR/MR URL, and focus after the skill name in the user's invocation (`$code-review-lenses` in Codex). Hosts that expand `$ARGUMENTS` may supply that text directly.
+
+`Bash`, `Read`, `Write`, `Grep`, and `Glob` below mean the host's native shell, file, and search tools.
 
 ## Orchestrator Governance
 
 - **Local only.** This skill never posts reviews, comments, or PR/MR descriptions, and never creates a PR/MR. There is no `--post-*`, `--create-pr`, `--publish`, `--draft`, `--read-back`, `--no-post`, or `--local` flag. If the user asks to post, refuse and print the local report.
 - **Profiles, not mode flags.** Roster and depth come from `--profile quick|security|full|deep` (default `full`) or `--summary-only`. Do not invent `--quick`, `--security-only`, or `--depth`.
 - **URL-only external review.** There is no `--pr` or `--provider`. Host and number come from a PR/MR URL in `GUIDANCE` via `parse-pr-url.sh`. A bare number is not a PR/MR identity. Omitted `--base` on a PR/MR is the fetched target branch (`baseRefName`); never assume `main`, `master`, or `dev`.
-- **Spawn by agent file name.** Agents live in this repository's `agents/` directory. Spawn `pr-summarizer`, `code-reviewer`, etc. — never a plugin-namespace prefix. Do not pass a `model:` argument unless `resolve-models.sh` emitted a value other than `inherit`.
+- **Agent prompts.** Use this package's `agents/<name>.md` files through the Phase 1 spawn protocol. Do not pass a `model:` argument unless `resolve-models.sh` emitted a value other than `inherit`.
 - **Cite observed results.** When reporting that a script ran, cite its exit code and output — not the fact that you invoked it.
 - **Secret redaction.** Phase 2 redacts known-pattern secrets from finding text and Block A before display.
 - **Subagent rules** live in `GOVERNANCE.md` (same directory as this file). Load once and inline into every custom-agent task.
@@ -37,17 +39,14 @@ Run a full local review of all changes on the current branch (or a specified PR/
    # Invoke resolve-skill-root.sh by the path of this skill's scripts/ directory.
    SKILL_ROOT=$(bash "<skill-dir>/scripts/resolve-skill-root.sh")
    SCRIPTS_DIR="$SKILL_ROOT/scripts"
+   AGENTS_DIR="$SKILL_ROOT/../../agents"
    ```
 
-   All subsequent scripts are `$SCRIPTS_DIR/<name>.sh`.
+   The resolver follows directory symlinks to the package checkout. All subsequent scripts are `$SCRIPTS_DIR/<name>.sh`; agent prompts are `$AGENTS_DIR/<name>.md`, independent of the repository being reviewed.
 
 2. **Parse arguments** with the shipped parser — do not re-implement flag handling:
 
-   Write the invoke text as **data** (not a bash command line). Use the Write tool to put the following line — and only that line — into a temp file. The `$ARGUMENTS` placeholder is substituted by the skill host before you run anything; do not interpolate it into `$(...)` or an unquoted command.
-
-   ```
-   $ARGUMENTS
-   ```
+   Write the actual argument text as **data** into a temp file using a native file-writing tool. In Codex, take it from the user's invocation; do not assume `$ARGUMENTS` substitution or write that literal placeholder. No arguments means an empty file. Preserve quoting and pass the file to the parser; never interpolate invocation text into shell code.
 
    ```bash
    # _args_file is the temp path you just wrote (the invoke line is data).
@@ -358,7 +357,12 @@ Eligible: architecture-reviewer, security-reviewer, adversarial-general, edge-ca
 
 **Do not display raw diffs.** Use `$DIFF_FILE`. For `TIER=small`/`tiny`, pass the full diff inline. For `TIER=medium`, custom agents get the manifest and read `git diff` over the same range as Phase 0b (`${BASE}...HEAD` when committed, `"$BASE"` when dirty) `-- <file>`; **untracked files: Read the file — `git diff -- <file>` is empty for them**. Slice-only agents get a temp slice.
 
-**Spawn protocol:** `subagent_type` is the bare agent name matching `agents/<name>.md`. Pass `model:` only when the corresponding `MODEL_*` is not `inherit`.
+**Spawn protocol:**
+
+- **Codex:** Read `$AGENTS_DIR/<name>.md` and embed its body (without YAML frontmatter), the required directives below, and only the permitted review inputs in the native `spawn_agent` message. Use the name as a task label (`task_name` uses underscores), not as a registered agent type. Start with no inherited conversation history (`fork_turns="none"` when exposed by the tool), especially for blind-hunter. No custom-agent registration is required.
+- **Hosts with registered Markdown agents:** `subagent_type` is the bare agent name matching `agents/<name>.md`.
+
+Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a scheduled prompt or native subagent tool is unavailable, report the review incomplete. Keep each agent's handle associated with its name for collection.
 
 **Directives** (own line at the top of the task, `KEY=value` or a heading block). Ignore unknown directives.
 
@@ -397,7 +401,7 @@ Eligible: architecture-reviewer, security-reviewer, adversarial-general, edge-ca
 
 **issue-linker** when `RUN_ISSUE_LINKER=true` (GitHub only after overlay). Pass commit log, branch, manifest, repo slug, PROVIDER.
 
-Launch all scheduled agents in one batch. Track skips for Phase 5.
+Launch scheduled agents in parallel within the host's concurrency limit, collecting completed results before launching the remaining agents. Track skips for Phase 5.
 
 ### Phase 1b: Deterministic checks
 
@@ -425,7 +429,7 @@ fi
 
 ### Phase 1c: CVE reachability (`PROFILE=deep` only)
 
-Run only when `CVE_REACHABILITY=true` **and** `CVE_JSON` is a non-empty array. Spawn `security-reviewer` (model from `MODEL_SECURITY_REVIEWER`) to add `reachability` (`reachable|dev-only|transitive-only|unknown`) without changing other fields. Validate length and untouched fields with `jq`; on any failure, keep the original `CVE_JSON`. In Block B, prefix `reachable` with `[REACHABLE]`; suffix `dev-only` / `transitive-only`.
+Run only when `CVE_REACHABILITY=true` **and** `CVE_JSON` is a non-empty array. Spawn `security-reviewer` using the Phase 1 protocol (model from `MODEL_SECURITY_REVIEWER`) to add `reachability` (`reachable|dev-only|transitive-only|unknown`) without changing other fields. Validate length and untouched fields with `jq`; on any failure, keep the original `CVE_JSON`. In Block B, prefix `reachable` with `[REACHABLE]`; suffix `dev-only` / `transitive-only`.
 
 ### Phase 2: Collect and normalize
 
@@ -544,7 +548,7 @@ There is no Phase 4. Nothing is written to a hosting provider.
 3. Skipped agents from `SKIP_REASONS` and from conditional triggers that did not fire. If `DOCS_ONLY=true` and `PROFILE=full`: `Auto-cheap: DOCS_ONLY`. If `LOW_RISK_CONFIG=true` and `PROFILE=full`: `Auto-cheap: LOW_RISK_CONFIG`.
 4. `Diff tier: <tiny|small|medium>  (<N> lines, <M> files)` plus tiny-tier promotions. If `REVIEW_MODE=dirty`, say so (working tree vs `$BASE`, committed range was empty).
 5. Agent tool-call counts for architecture-reviewer and security-reviewer (budget 25).
-6. Token table: Agent, Model (or `inherit`), Tokens, Tools. No host-specific price column.
+6. Token table: Agent, Model (or `inherit`), Tokens, Tools. Use `unavailable` for counts the host does not expose. No host-specific price column.
 7. Critical/High → "Address Critical/High findings before requesting review."
 8. Agent failures → "Review incomplete — <N> agent(s) failed."
 9. `CVE_CHECK_FAILED=true` → CVE check did not run. `ANALYZER_FAILED=true` → a static analyzer crashed or exited non-zero (not a silent clean scan).

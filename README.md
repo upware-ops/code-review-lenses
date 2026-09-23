@@ -39,7 +39,7 @@ at tiny tier.
 
 | Requirement | Notes |
 |-------------|-------|
-| An Agent Skills–compatible host | Loads `skills/code-review-lenses/SKILL.md` and `agents/*.md` |
+| An Agent Skills–compatible host with subagent tools | Loads `skills/code-review-lenses/SKILL.md` and `agents/*.md` |
 | `git` | Diff analysis |
 | `jq` | Findings pipeline |
 | [gh CLI](https://cli.github.com/) | Only for a GitHub PR URL |
@@ -62,13 +62,20 @@ Detection uses, in order: hostname `gitlab.com` / contains `gitlab`,
 
 ## Install
 
-Clone this repository. A checkout is enough for Claude and Grok: relative
-links at `.claude/skills/code-review-lenses` and `.grok/skills/code-review-lenses`
-point at the shipped `skills/code-review-lenses/` so `/code-review-lenses`
-shows up next to `/code-review-lenses-workflow`.
+Clone this repository. A checkout is enough for Codex, Claude, and Grok:
+relative links at `.agents/skills/code-review-lenses`,
+`.claude/skills/code-review-lenses`, and `.grok/skills/code-review-lenses`
+point at the shipped `skills/code-review-lenses/`.
 
-Other hosts: copy or symlink `skills/code-review-lenses` and `agents/` into
-that host's skill directory (often `~/.agents/skills/`).
+In Codex, invoke `$code-review-lenses --profile quick`. The orchestrator loads
+the existing Markdown prompts into native subagents; no custom-agent
+registration is needed. Claude and Grok use `/code-review-lenses` or the
+optional `/code-review-lenses-workflow` wrapper.
+
+To use the skill from other repositories, symlink `skills/code-review-lenses`
+into the host's user skill directory (`~/.agents/skills/` for Codex). Keep the
+full checkout available: the skill resolves the sibling `agents/` directory
+from its physical location.
 
 The skill resolves its own directory via `scripts/resolve-skill-root.sh`.
 It does not search `~/.claude` plugin caches.
