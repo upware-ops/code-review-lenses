@@ -60,7 +60,7 @@ Pass `--profile quick|security|full|deep` (default `full`).
 
 | Profile | Roster |
 |---------|--------|
-| `quick` | summarizer + code-reviewer + triggered error/test agents + CVE |
+| `quick` | summarizer + code-reviewer + triggered error/test agents + CVE + static analyzers |
 | `security` | security-reviewer + CVE + static analyzers |
 | `full` | all agents (default) |
 | `deep` | full + extended thinking + CVE reachability |

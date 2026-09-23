@@ -33,7 +33,7 @@ hero_tagline: "Host-agnostic PR/MR review using parallel specialized agents. Loc
 
 ## Quick start
 
-Point your Agent Skills host at this repository (or copy `skills/code-review-lenses` and `agents/` into the host's skill directory). Then:
+Point your Agent Skills host at this repository (or symlink `skills/code-review-lenses` into the host's skill directory and keep the full checkout so the skill can resolve its sibling `agents/` directory). Then:
 
 ```
 /code-review-lenses

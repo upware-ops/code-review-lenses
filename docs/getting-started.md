@@ -36,6 +36,10 @@ The orchestrator finds its own files via `scripts/resolve-skill-root.sh`.
 
 ## First review
 
+Run it inside a clone of the repository you want to review; without `--base`,
+a local review compares the checked-out branch against its upstream
+(`HEAD@{upstream}`) and stops if there is none.
+
 In Codex:
 
 ```text

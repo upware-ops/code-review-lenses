@@ -49,7 +49,7 @@ Copy the old files to the new paths if you still want those rules. 2.0 does **no
 - `GUIDANCE` / `GUIDANCE_REST` strip URL userinfo. `detect-provider.sh --check-url-host` gates `gh`/`glab` after a PR/MR URL. `GATE_CODE_OR_INFRA` cheapens architecture only on `--profile full`.
 - OSV malformed / index-mismatch and unparseable trufflehog NDJSON exit 1 (`CVE_CHECK_FAILED` / `ANALYZER_FAILED`). Wrappers run Phase 0b (worktree, `baseRefName`, `--check-url-host`, `resolve-models.sh`).
 - `--check-url-host` is URL-review only (never local `unknown`); GitHub no longer treats origin-match as enough. `GUIDANCE_REST` is noglob. Analyzer parse/crash and CVE merge/per-package parse fail exit 1. Security-gate grep rc 2 aborts.
-- Nightly `vendor-sync` workflow: refreshes the five vendored `pr-review-toolkit` agents into a PR on this repo (local patches re-applied); posts a digest issue for `tag1consulting/claude-comprehensive-review` (never auto-merged).
+- Nightly `vendor-sync` workflow: refreshes the five vendored `pr-review-toolkit` agents into a PR on this repo (local patches re-applied); posts a digest issue on this repo listing new `tag1consulting/claude-comprehensive-review` commits (never auto-merged).
 
 ## [1.13.0] - 2026-07-16
 

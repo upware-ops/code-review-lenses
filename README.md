@@ -57,7 +57,7 @@ glab auth login --hostname git.example.com
 ```
 
 Detection uses, in order: hostname `gitlab.com` / contains `gitlab`,
-`GITLAB_HOST`, `glab config get host`, then `glab auth status`. Nested groups
+`GITLAB_HOST` (or `GITLAB_URI` / `GL_HOST`), `glab config get host`, then `glab auth status`. Nested groups
 (`group/sub/project`) are kept in the project slug.
 
 ## Install
@@ -65,7 +65,10 @@ Detection uses, in order: hostname `gitlab.com` / contains `gitlab`,
 Clone this repository. A checkout is enough for Codex, Claude, and Grok:
 relative links at `.agents/skills/code-review-lenses`,
 `.claude/skills/code-review-lenses`, and `.grok/skills/code-review-lenses`
-point at the shipped `skills/code-review-lenses/`.
+point at the shipped `skills/code-review-lenses/`. On Windows, clone with
+`git clone -c core.symlinks=true <url>` (needs Developer Mode or administrator
+rights); without symlink support Git checks these links out as plain files
+containing the link text, and hosts do not find the skill.
 
 In Codex, invoke `$code-review-lenses --profile quick`. The orchestrator loads
 the existing Markdown prompts into native subagents; no custom-agent

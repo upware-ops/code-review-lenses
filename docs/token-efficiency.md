@@ -15,15 +15,15 @@ The skill uses a tiered context-passing strategy to keep the agent fleet cheap.
 |-----------|---------|
 | **TIER=tiny** (<50 lines AND ≤3 files) | Full diff inline; hunters and comment/type agents skipped; architecture/security only if promoted |
 | **Small** (<300 lines) | Full diff inline to scheduled agents |
-| **Medium/large** (300+ lines) | Custom agents get a file manifest and read `git diff <base>...HEAD -- <file>`. Conditional agents get specialty slices. Lockfiles and vendor dirs are excluded from the manifest |
+| **Medium/large** (300+ lines) | Custom agents get a file manifest and read `git diff <base>...HEAD -- <file>`. Triggered conditional agents get the full diff. Lockfiles and vendor dirs are excluded from the manifest |
 
 ## Profiles as the cost control
 
 | Profile | Relative cost |
 |---------|----------------|
 | `--summary-only` | Lowest — one agent |
-| `--profile quick` | Cheap — summarizer + code-reviewer + triggered error/test + CVE |
-| `--profile security` | Security-reviewer + CVE only |
+| `--profile quick` | Cheap — summarizer + code-reviewer + triggered error/test + CVE + static analyzers |
+| `--profile security` | Security-reviewer + CVE + static analyzers |
 | `--profile full` | Default roster; auto-cheap still applies |
 | `--profile deep` | Full roster + extended thinking + CVE reachability; no auto-cheap |
 

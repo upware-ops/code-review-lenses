@@ -32,7 +32,7 @@ Every spawned agent receives a shared governance block (`skills/code-review-lens
 
 The orchestrator itself follows a separate set of rules (in the "Orchestrator Governance" section of `SKILL.md`):
 
-- **Local only** — the orchestrator never creates, comments on, or reviews a PR/MR.
+- **Local only** — the orchestrator never creates, comments on, or posts reviews to a PR/MR.
 - **Profiles, not mode flags** — roster comes from `--profile` / `--summary-only`.
 - **Spawn by agent file name** — no plugin-namespace prefixes; no hardcoded model.
 

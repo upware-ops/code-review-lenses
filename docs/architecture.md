@@ -95,8 +95,8 @@ Before launching agents, Phase 1 evaluates grep-based bash gates against the dif
 |------|----------------|
 | `GATE_ERROR_PATTERNS=false` | Skip `silent-failure-hunter` (whole-`DIFF_FILE` grep, any profile) |
 | `GATE_CONTROL_FLOW=false` | Skip `edge-case-hunter` (added `+` lines only) |
-| `GATE_SECURITY_PATTERNS=false` | May set `LOW_RISK_CONFIG` on `PROFILE=full` (config extensions). Does **not** skip `security-reviewer`. Tiny-tier security uses `SECURITY_PROMOTED`. |
-| `GATE_CODE_OR_INFRA=false` | Sets `DOCS_ONLY`. On `PROFILE=full` only, skip `architecture-reviewer` unless `ARCH_PROMOTED`. `--profile deep` keeps architecture. |
+| `GATE_SECURITY_PATTERNS=false` | May set `LOW_RISK_CONFIG` on `PROFILE=full` (config extensions). `LOW_RISK_CONFIG` then skips `security-reviewer` unless `SECURITY_PROMOTED`. Tiny-tier security uses `SECURITY_PROMOTED`. |
+| `GATE_CODE_OR_INFRA=false` | Sets `DOCS_ONLY`. On `PROFILE=full` only, `DOCS_ONLY` skips `architecture-reviewer`, even when `ARCH_PROMOTED`. `--profile deep` keeps architecture. |
 
 ## Contributing
 

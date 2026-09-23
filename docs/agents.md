@@ -24,8 +24,8 @@ All 12 agents ship in `agents/`. Five were adapted from pr-review-toolkit
 | **issue-linker** | Related GitHub issues/PRs | full, deep (GitHub only) |
 | **silent-failure-hunter** | Error-handling adequacy | quick, full, deep (error-pattern gate) |
 | **pr-test-analyzer** | Test coverage gaps | quick, full, deep (test-file gate) |
-| **comment-analyzer** | Comment accuracy / rot | full, deep |
-| **type-design-analyzer** | Type / struct / interface design | full, deep |
+| **comment-analyzer** | Comment accuracy / rot | full, deep (comment-change gate) |
+| **type-design-analyzer** | Type / struct / interface design | full, deep (type-definition gate) |
 
 `deep` adds `EXTENDED_THINKING` for architecture-reviewer and security-reviewer,
 plus CVE reachability. TIER=tiny still skips hunters and comment/type agents.

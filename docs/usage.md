@@ -60,9 +60,10 @@ Same `$ARGUMENTS` as the skill. Files:
 
 - **DOCS_ONLY** — no code/infra in the diff
 - **LOW_RISK_CONFIG** — config-only, no security patterns
-- **TIER=tiny** — <50 lines and ≤3 files: hunters skipped; architecture/security only if promoted
 
 `--profile deep` does not auto-cheap.
+
+**TIER=tiny** (<50 lines and ≤3 files) applies to every profile, deep included: hunters skipped; architecture/security only if promoted (`--profile security` still runs security-reviewer).
 
 ## Examples
 
