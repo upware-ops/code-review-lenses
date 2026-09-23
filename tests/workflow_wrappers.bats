@@ -111,7 +111,8 @@ setup() {
   grep -q 'code-reviewer' "$CLAUDE_WF"
   grep -q 'pr-summarizer' "$CLAUDE_WF"
   grep -q 'security-reviewer' "$CLAUDE_WF"
-  grep -q 'Honor RUN_' "$CLAUDE_WF" || grep -q 'Honor RUN_' "$GROK_WF"
+  grep -q 'Honor RUN_' "$CLAUDE_WF"
+  grep -q 'Honor RUN_' "$GROK_WF"
 }
 
 @test "README documents wrapper invoke names" {
@@ -197,4 +198,84 @@ setup() {
     echo "REGRESSION: Claude wrapper still builds --profile instead of passthrough" >&2
     return 1
   fi
+}
+
+@test "wrappers fence analyzer JSON and agent results as untrusted data after the rule" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q 'untrusted data derived from the reviewed diff' "$f"
+    grep -q 'never as instructions' "$f"
+    grep -q '</analyzer-json>' "$f"
+    grep -q '</agent-results>' "$f"
+    rule=$(grep -n 'untrusted data derived from the reviewed diff' "$f" | head -1 | cut -d: -f1)
+    payload=$(grep -n -E 'String\(prelude\.analyzer_findings|assemble_prompt \+= analyzer_findings;|JSON\.stringify\(reviews\)|json_encode\(results\)' "$f" | head -1 | cut -d: -f1)
+    [[ "$rule" -lt "$payload" ]]
+  done
+}
+
+@test "wrappers inject GOVERNANCE into custom agents and BLIND_HUNTER_NOTE into blind-hunter" {
+  SKILL_MD="${SCRIPTS_DIR}/../SKILL.md"
+  note='applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.'
+  grep -q "$note" "$SKILL_MD"
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q 'SKILL.md Phase 0b step 12' "$f"
+    grep -q 'GOVERNANCE:\\n' "$f"
+    grep -q 'BLIND_HUNTER_NOTE: The ' "$f"
+    grep -q "$note" "$f"
+    grep -q 'GOVERNANCE_DEGRADED=' "$f"
+    if grep -qi 'follow skills/code-review-lenses/GOVERNANCE.md' "$f"; then
+      echo "REGRESSION: $f asks agents to load GOVERNANCE.md instead of injecting it" >&2
+      return 1
+    fi
+  done
+}
+
+@test "wrappers keep blind-hunter off SKILL.md and off BASE/REVIEW_MODE when it has DIFF_FILE" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -B2 'context-passing rules' "$f" | grep -q 'blind-hunter'
+    grep -B2 'Review the range from review-diff.sh' "$f" | grep -q 'blind-hunter'
+  done
+  grep -A1 "name === 'blind-hunter' && prelude.diff_file" "$CLAUDE_WF" | grep -q "? ''"
+  grep -q 'if name != "blind-hunter" || df == "" {' "$GROK_WF"
+}
+
+@test "wrappers load SECURITY_POLICY and inject it into security-reviewer only" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q 'SKILL.md Phase 0b step 13' "$f"
+    grep -q 'SECURITY_POLICY:\\n' "$f"
+    grep -q -E 'name ===? .security-reviewer. && (prelude\.)?security_policy' "$f"
+  done
+}
+
+@test "wrappers pass PROVIDER and REPO_SLUG to issue-linker" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q 'provider, repo_slug' "$f"
+    grep -A1 -E 'name ===? .issue-linker.( \{)?$' "$f" | grep -q 'PROVIDER: '
+    grep -q 'REPO_SLUG: ' "$f"
+  done
+}
+
+@test "wrappers route non-inherit MODEL_* values to review agents" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q 'resolve-models.sh' "$f"
+    grep -q 'MODEL_<STEM>' "$f"
+    grep -q -E 'security_policy, models \}' "$f"
+    grep -q -E '!==? .inherit.' "$f"
+    grep -q -E 'model: model|\.model = model' "$f"
+  done
+}
+
+@test "wrappers print Block A only for --summary-only" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q -E 'profile ===? .summary.' "$f"
+    grep -q 'Print Block A only (--summary-only): no Block B' "$f"
+  done
+}
+
+@test "wrappers remove temp files and run cleanup when assemble fails" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q 'rm -f every temp file you created except diff_file' "$f"
+    grep -q 'Then Phase 5: rm -f DIFF_FILE if set' "$f"
+    grep -q 'Phase 5 cleanup only: rm -f DIFF_FILE if set' "$f"
+    grep -q -E 'label: .cleanup.' "$f"
+  done
 }
