@@ -112,8 +112,9 @@ jobs:
 
           head=$(sed -n 's/^TAG1_HEAD=//p' <<<"$DIGEST")
           since=$(sed -n 's/^TAG1_SINCE=//p' <<<"$DIGEST")
-          last=$(gh issue view "$num" --repo "$GH_REPO" --json body,comments --jq '[.body, .comments[].body] | last')
-          if [[ "$last" == *"TAG1_HEAD=$head"* && "$last" == *"TAG1_SINCE=$since"* ]]; then
+          posted=$(gh issue view "$num" --repo "$GH_REPO" --json body,comments)
+          if jq -e --arg h "TAG1_HEAD=$head" --arg s "TAG1_SINCE=$since" \
+              '[.body, .comments[].body] | map(. // "") | any(contains($h) and contains($s))' <<<"$posted" >/dev/null; then
             echo "Digest ${since:0:8}...${head:0:8} already posted on #$num."
             exit 0
           fi
