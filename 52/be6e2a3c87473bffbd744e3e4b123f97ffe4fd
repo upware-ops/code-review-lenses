@@ -1,0 +1,65 @@
+CHANGELOG.md
+  s_22d2264024e6d9::t_ffe43ccbad734c 47
+  s_22d2264024e6d9::t_0b8b09492e70ec 44
+agents/THIRD_PARTY.md
+  s_22d2264024e6d9::t_d55c60d3afe2e9 23-25
+tests/parse_pr_url.bats
+  s_22d2264024e6d9::t_b3ce54c00ddaa3 164-180
+skills/code-review-lenses/scripts/parse-pr-url.sh
+  s_22d2264024e6d9::t_503010262990df 45,55,85,88,91,93,96,98,101,103,106,108,111,117-119
+  s_22d2264024e6d9::t_158f561ace5e8d 14-15
+  s_2b3ef749fd2c1f::t_0c3e57a661aa57 120-121
+agents/silent-failure-hunter.md
+  s_22d2264024e6d9::t_b4b6a4600b5812 39,122
+skills/code-review-lenses/PROVIDERS.md
+  s_22d2264024e6d9::t_ea9d7213ff23f4 19
+tests/resolve_profile.bats
+  s_22d2264024e6d9::t_ad56797ce7ff2a 327
+tests/vendor_sync.bats
+  s_22d2264024e6d9::t_f4d70c187423af 25-27,30-32
+  s_22d2264024e6d9::t_9c49006b428d5a 28-29
+docs/providers.md
+  s_22d2264024e6d9::t_3016842dc8e83b 53
+tests/orchestration_contracts.bats
+  s_22d2264024e6d9::t_7c830663447130 268-272
+scripts/vendor-sync.sh
+  s_22d2264024e6d9::t_f3b1e490fc01c6 40-41
+  s_22d2264024e6d9::t_2d30a4fcd58bee 11-12
+  s_22d2264024e6d9::t_ece3168ff3549b 63-68
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_ad56797ce7ff2a 328
+tests/fixtures/vendor/upstream-agent.md
+  s_103848fb90dd75::t_9e79ff7f1c43cf 9-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "52be6e2a3c87473bffbd744e3e4b123f97ffe4fd",
+  "prompts": {},
+  "sessions": {
+    "s_103848fb90dd75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a18ca6ac422c21487",
+        "model": "unknown"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    },
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    },
+    "s_2b3ef749fd2c1f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29dc3d4b-eadc-4f65-9a3b-5fa699f6cfc6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
