@@ -60,8 +60,8 @@ transform_agent() {
       print ""
       banner_done = 1
     }
-    fm == 2 && /constants\/errorIds\.ts|Sentry tracking/ { next }
-    fm == 2 && /logForDebugging/ {
+    fm == 2 && /^[-*] .*(constants\/errorIds\.ts|Sentry tracking)/ { next }
+    fm == 2 && /^[-*] .*logForDebugging/ {
       print "- Use the logging functions and error-ID conventions the reviewed project defines, if any"
       next
     }
