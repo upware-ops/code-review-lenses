@@ -6,11 +6,6 @@ on:
     - cron: "17 6 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-
 concurrency:
   group: vendor-sync
   cancel-in-progress: false
@@ -19,6 +14,9 @@ jobs:
   pr-review-toolkit:
     name: Update vendored pr-review-toolkit agents
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,7 +44,7 @@ jobs:
           git add -- agents/*.md .github/vendor-pins.json
           git commit -m "chore(vendor): refresh pr-review-toolkit agents from upstream;"
           git push -u origin "$branch" --force-with-lease
-          if gh pr view "$branch" --repo "$GH_REPO" >/dev/null 2>&1; then
+          if [[ "$(gh pr view "$branch" --repo "$GH_REPO" --json state --jq .state 2>/dev/null)" == "OPEN" ]]; then
             echo "Updated existing PR for $branch"
             exit 0
           fi
@@ -59,6 +57,7 @@ jobs:
 
           - drop `model:` / `color:` frontmatter
           - `CLAUDE.md` → `AGENTS.md`
+          - generic wording for Anthropic-internal logging / error-ID references
           - vendor banner
 
           `code-simplifier` is not in the pin allowlist and is not added.
@@ -70,6 +69,9 @@ jobs:
   tag1-digest:
     name: Digest tag1consulting commits (no merge)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
@@ -105,6 +107,14 @@ jobs:
           num=$(gh issue list --repo "$GH_REPO" --search "$title in:title" --state open --json number --jq '.[0].number // empty')
           if [[ -z "$num" ]]; then
             gh issue create --repo "$GH_REPO" --title "$title" --body "$DIGEST"
-          else
-            gh issue comment "$num" --repo "$GH_REPO" --body "$DIGEST"
+            exit 0
           fi
+
+          head=$(sed -n 's/^TAG1_HEAD=//p' <<<"$DIGEST")
+          since=$(sed -n 's/^TAG1_SINCE=//p' <<<"$DIGEST")
+          last=$(gh issue view "$num" --repo "$GH_REPO" --json body,comments --jq '[.body, .comments[].body] | last')
+          if [[ "$last" == *"TAG1_HEAD=$head"* && "$last" == *"TAG1_SINCE=$since"* ]]; then
+            echo "Digest ${since:0:8}...${head:0:8} already posted on #$num."
+            exit 0
+          fi
+          gh issue comment "$num" --repo "$GH_REPO" --body "$DIGEST"
