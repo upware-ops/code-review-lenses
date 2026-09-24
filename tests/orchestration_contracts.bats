@@ -265,6 +265,11 @@ teardown() {
   grep -q 'baseRefName,baseRefOid' "$PROVIDERS_MD"
 }
 
+@test "PROVIDERS.md: Bitbucket fork PRs stop before the origin fetch" {
+  grep -q 'Bitbucket fork PRs are not supported.' "$PROVIDERS_MD"
+  grep -q 'source.repository.full_name` differs from `destination.repository.full_name' "$PROVIDERS_MD"
+}
+
 @test "PROVIDERS.md: GitLab works via glab on any authenticated host" {
   grep -qi "any host" "$PROVIDERS_MD"
   grep -q "glab auth login --hostname" "$PROVIDERS_MD"

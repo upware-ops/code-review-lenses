@@ -11,8 +11,8 @@
 #   GUIDANCE_REST (invoke text with the matched URL removed; userinfo stripped)
 # Exit 1: no PR/MR URL in the text (local branch review).
 # Exit 2: invalid / refused URL (scheme, api.github.com, non-owner/repo path,
-#         non-Cloud Bitbucket, or grep failure). A bare number is never a
-#         complete identity.
+#         text glued to the number, non-Cloud Bitbucket, or grep failure).
+#         A bare number is never a complete identity.
 #
 # This is the shipped URL parser. Orchestrator SKILL.md must invoke it
 # rather than re-implement host/number extraction.
@@ -42,7 +42,7 @@ sanitize_url() {
 
 # First matching URL-shaped token. Scheme optional so pasted host/path works.
 _grep_rc=0
-urls=$(printf '%s\n' "$TEXT" | grep -oE 'https?://[^[:space:]<>"'\'']+|[[:alnum:]][^][:space:]<>"'\'']*/(pulls?|pull-requests|(-/)?merge_requests)/[0-9]+') || _grep_rc=$?
+urls=$(printf '%s\n' "$TEXT" | grep -oE 'https?://[^[:space:]<>"'\'']+|[[:alnum:]][^][:space:]<>"'\'']*/(pulls?|pull-requests|(-/)?merge_requests)/[0-9]+[^][:space:]<>"'\'']*') || _grep_rc=$?
 if [[ "$_grep_rc" -ne 0 && "$_grep_rc" -ne 1 ]]; then
   echo "Error: parse-pr-url.sh: grep failed (exit ${_grep_rc})." >&2
   exit 2
@@ -52,7 +52,7 @@ unset _grep_rc
 while IFS= read -r raw; do
   [[ -z "$raw" ]] && continue
   url="$raw"
-  _trail='[].,;:!?)*]$'
+  _trail='[].,;:!?)*`_~]$'
   while [[ "$url" =~ $_trail ]]; do
     url="${url%?}"
   done
@@ -82,30 +82,41 @@ while IFS= read -r raw; do
 
   provider=""
   number=""
+  suffix=""
   slug=""
 
-  if [[ "$path" =~ /-/merge_requests/([1-9][0-9]*) ]]; then
+  if [[ "$path" =~ /-/merge_requests/([1-9][0-9]*)([^/]*) ]]; then
     provider=gitlab
     number="${BASH_REMATCH[1]}"
+    suffix="${BASH_REMATCH[2]}"
     slug="${path%%/-/merge_requests/*}"
-  elif [[ "$path" =~ /merge_requests/([1-9][0-9]*) ]]; then
+  elif [[ "$path" =~ /merge_requests/([1-9][0-9]*)([^/]*) ]]; then
     provider=gitlab
     number="${BASH_REMATCH[1]}"
+    suffix="${BASH_REMATCH[2]}"
     slug="${path%%/merge_requests/*}"
-  elif [[ "$path" =~ /pull-requests/([1-9][0-9]*) ]]; then
+  elif [[ "$path" =~ /pull-requests/([1-9][0-9]*)([^/]*) ]]; then
     provider=bitbucket
     number="${BASH_REMATCH[1]}"
+    suffix="${BASH_REMATCH[2]}"
     slug="${path%%/pull-requests/*}"
-  elif [[ "$path" =~ /pulls/([1-9][0-9]*) ]]; then
+  elif [[ "$path" =~ /pulls/([1-9][0-9]*)([^/]*) ]]; then
     provider=github
     number="${BASH_REMATCH[1]}"
+    suffix="${BASH_REMATCH[2]}"
     slug="${path%%/pulls/*}"
-  elif [[ "$path" =~ /pull/([1-9][0-9]*) ]]; then
+  elif [[ "$path" =~ /pull/([1-9][0-9]*)([^/]*) ]]; then
     provider=github
     number="${BASH_REMATCH[1]}"
+    suffix="${BASH_REMATCH[2]}"
     slug="${path%%/pull/*}"
   else
     continue
+  fi
+
+  if [[ -n "$suffix" && "$suffix" != .diff && "$suffix" != .patch ]]; then
+    echo "Error: parse-pr-url.sh: only /, .diff, or .patch may follow the PR/MR number." >&2
+    exit 2
   fi
 
   slug="${slug#/}"

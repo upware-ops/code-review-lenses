@@ -325,7 +325,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
     _overlay_out=$(TIER="$TIER" DOCS_ONLY="$DOCS_ONLY" LOW_RISK_CONFIG="$LOW_RISK_CONFIG" \
       ARCH_PROMOTED="$ARCH_PROMOTED" SECURITY_PROMOTED="$SECURITY_PROMOTED" \
       GATE_CONTROL_FLOW="$GATE_CONTROL_FLOW" GATE_ERROR_PATTERNS="$GATE_ERROR_PATTERNS" \
-      GATE_CODE_OR_INFRA="$GATE_CODE_OR_INFRA" PROVIDER="$PROVIDER" \
+      PROVIDER="$PROVIDER" \
       bash "$SCRIPTS_DIR/apply-roster-overlays.sh" "${OVERLAY_ARGS[@]}") || exit $?
     eval "$_overlay_out"
     unset _overlay_out

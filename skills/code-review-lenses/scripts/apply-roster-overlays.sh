@@ -16,7 +16,6 @@
 #   SECURITY_PROMOTED=false
 #   GATE_CONTROL_FLOW=true
 #   GATE_ERROR_PATTERNS=true
-#   GATE_CODE_OR_INFRA=true
 #   PROVIDER=          (empty keeps issue-linker; any non-github value skips it)
 #
 # Output: the same KEY=value roster, after overlays. Safe to eval.
@@ -62,7 +61,6 @@ ARCH_PROMOTED="${ARCH_PROMOTED:-false}"
 SECURITY_PROMOTED="${SECURITY_PROMOTED:-false}"
 GATE_CONTROL_FLOW="${GATE_CONTROL_FLOW:-true}"
 GATE_ERROR_PATTERNS="${GATE_ERROR_PATTERNS:-true}"
-GATE_CODE_OR_INFRA="${GATE_CODE_OR_INFRA:-true}"
 PROVIDER="${PROVIDER:-}"
 
 SKIP_REASONS=()
@@ -125,11 +123,6 @@ fi
 # Gate overlays (only turn scheduled agents off).
 if [[ "$RUN_EDGE_CASE_HUNTER" == "true" && "$GATE_CONTROL_FLOW" == "false" ]]; then
   skip RUN_EDGE_CASE_HUNTER "edge-case-hunter (GATE_CONTROL_FLOW=false)"
-fi
-# Same contract as DOCS_ONLY: only the default full profile is cheapened.
-# --profile deep must keep architecture-reviewer (HELP / overlay header).
-if [[ "$PROFILE" == "full" && "$RUN_ARCHITECTURE_REVIEWER" == "true" && "$GATE_CODE_OR_INFRA" == "false" && "$ARCH_PROMOTED" != "true" ]]; then
-  skip RUN_ARCHITECTURE_REVIEWER "architecture-reviewer (GATE_CODE_OR_INFRA=false)"
 fi
 if [[ "$RUN_SILENT_FAILURE_HUNTER" != "false" && "$GATE_ERROR_PATTERNS" == "false" ]]; then
   skip RUN_SILENT_FAILURE_HUNTER "silent-failure-hunter (GATE_ERROR_PATTERNS=false)"

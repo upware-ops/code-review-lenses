@@ -41,10 +41,10 @@ Copy the old files to the new paths if you still want those rules. 2.0 does **no
 - Bats coverage that drives those scripts (profiles, overlays, GitLab host detection, model inherit).
 - Optional Claude and Grok workflow wrappers (`.claude/workflows/code-review-lenses-workflow.js`, `.grok/workflows/code-review-lenses-workflow.rhai`) that run the same local review. Roster and flags still come from the shipped parsers. Invoke text is passed through as `$ARGUMENTS`; leftover prose is `GUIDANCE`.
 - `argument-hint` on the skill (and the same text on the workflow wrappers). Non-flag tokens are `GUIDANCE`. A PR/MR URL starts external review; remaining prose is review focus.
-- `parse-pr-url.sh`: first GitHub / GitLab (any host, nested groups) / Bitbucket URL wins. Number-only text is not a PR identity. `PR_URL` is sanitized (no userinfo).
+- `parse-pr-url.sh`: first GitHub / GitLab (any host, nested groups) / Bitbucket URL wins. Number-only text is not a PR identity. `PR_URL` is sanitized (no userinfo). Text glued to the number (other than `.diff` / `.patch`) is refused.
 - `review-diff.sh`: local review uses `<base>...HEAD` when there are unique commits; otherwise a dirty working tree vs `$BASE`. Empty range is an explicit stop. PR/MR-URL worktrees stay on `<base>...HEAD`.
 - Invoke text is written to a file and parsed with `resolve-profile.sh --from-file` (no unquoted `$ARGUMENTS` on a bash command line). Wrappers fence `<invoke-argv>` and run Phase 2 before Phase 3.
-- GitHub provider OPs pin `GH_HOST` and `--repo`. CVE findings emit `source` + `confidence`. `run-trufflehog.sh` no longer expands an empty array under `set -u`.
+- GitHub provider OPs pin `GH_HOST` and `--repo`. Bitbucket fork PRs are refused (the checkout fetches from `origin`). CVE findings emit `source` + `confidence`. `run-trufflehog.sh` no longer expands an empty array under `set -u`.
 - `review-diff.sh` verifies `--base` (`rev-parse`) and refuses option-shaped refs. Dirty `DIFF_FILE` includes untracked via `git diff --no-index`.
 - `GUIDANCE` / `GUIDANCE_REST` strip URL userinfo. `detect-provider.sh --check-url-host` gates `gh`/`glab` after a PR/MR URL. `GATE_CODE_OR_INFRA` cheapens architecture only on `--profile full`.
 - OSV malformed / index-mismatch and unparseable trufflehog NDJSON exit 1 (`CVE_CHECK_FAILED` / `ANALYZER_FAILED`). Wrappers run Phase 0b (worktree, `baseRefName`, `--check-url-host`, `resolve-models.sh`).

@@ -161,6 +161,23 @@ source_url() {
   [[ "$PR_URL" == "https://github.com/acme/app/pull/42" ]]
 }
 
+@test "parse-pr-url: text glued to the number is exit 2; .diff, .patch, and sub-pages are not" {
+  run -2 bash "$PARSE" "https://github.com/acme/app/pull/42abc"
+  [[ "$output" == *"may follow the PR/MR number"* ]]
+  run -2 bash "$PARSE" "github.com/acme/app/pull/42abc"
+  run -2 bash "$PARSE" "https://gitlab.com/g/p/-/merge_requests/7x/diffs"
+  source_url "https://github.com/acme/app/pull/42.diff"
+  [[ "$PR_NUMBER" == "42" ]]
+  source_url "https://gitlab.com/g/p/-/merge_requests/7.patch"
+  [[ "$PR_NUMBER" == "7" ]]
+  source_url "https://gitlab.com/g/p/-/merge_requests/7/diffs"
+  [[ "$PR_NUMBER" == "7" ]]
+  source_url "review \`https://github.com/acme/app/pull/42\` and _github.com/acme/app/pull/43_"
+  [[ "$PR_URL" == "https://github.com/acme/app/pull/42" ]]
+  source_url "_github.com/acme/app/pull/43_"
+  [[ "$PR_NUMBER" == "43" ]]
+}
+
 @test "parse-pr-url: a repos/ namespace is a review URL" {
   source_url "https://git.example.com/repos/proj/-/merge_requests/7"
   [[ "$REPO_SLUG" == "repos/proj" ]]

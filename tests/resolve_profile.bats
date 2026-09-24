@@ -271,14 +271,6 @@ EOF
   [[ "$EXTENDED_THINKING" == "true" ]]
 }
 
-@test "overlay: GATE_CODE_OR_INFRA=false cheapens full only, not deep" {
-  eval "$(GATE_CODE_OR_INFRA=false bash "$OVERLAY_SCRIPT" --profile full)"
-  [[ "$RUN_ARCHITECTURE_REVIEWER" == "false" ]]
-  eval "$(GATE_CODE_OR_INFRA=false bash "$OVERLAY_SCRIPT" --profile deep)"
-  [[ "$RUN_ARCHITECTURE_REVIEWER" == "true" ]]
-  [[ "$EXTENDED_THINKING" == "true" ]]
-}
-
 @test "overlay: issue-linker skipped on GitLab" {
   eval "$(PROVIDER=gitlab bash "$OVERLAY_SCRIPT" --profile full)"
   [[ "$RUN_ISSUE_LINKER" == "false" ]]
@@ -332,7 +324,7 @@ EOF
 
 @test "overlay: LOW_RISK_CONFIG does not skip architecture when ARCH_PROMOTED" {
   eval "$(DOCS_ONLY=false LOW_RISK_CONFIG=true ARCH_PROMOTED=true \
-    GATE_CODE_OR_INFRA=true bash "$OVERLAY_SCRIPT" --profile full)"
+    bash "$OVERLAY_SCRIPT" --profile full)"
   [[ "$RUN_ARCHITECTURE_REVIEWER" == "true" ]]
 }
 

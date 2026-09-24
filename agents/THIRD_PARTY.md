@@ -20,6 +20,9 @@ Modifications in this repository (re-applied on every sync):
 
 - Removed host-specific `model:` and `color:` frontmatter.
 - Replaced project-instruction references (`CLAUDE.md`) with `AGENTS.md`.
+- Replaced Anthropic-internal logging and error-ID references (`logError`,
+  `logForDebugging`, `logEvent`, `constants/errorIds.ts`, Sentry, Statsig)
+  with the reviewed project's own conventions.
 - Inserted the vendor banner immediately after frontmatter.
 
 ## Nightly updates

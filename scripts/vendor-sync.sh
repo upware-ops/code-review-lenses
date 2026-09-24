@@ -8,7 +8,8 @@
 #   bash scripts/vendor-sync.sh transform <infile >outfile
 #
 # toolkit writes agents/<name>.md after applying the local patches in
-# agents/THIRD_PARTY.md (drop model:/color:, CLAUDE.md → AGENTS.md, banner).
+# agents/THIRD_PARTY.md (drop model:/color:, CLAUDE.md → AGENTS.md, generic
+# logging / error-ID wording, banner).
 # It never adds agents that are not in .github/vendor-pins.json.
 # digest prints markdown for commits on tag1 main after the pin (no file writes).
 #
@@ -36,7 +37,8 @@ api_get() {
   curl "${args[@]}" "$url" || die "fetch failed: $url"
 }
 
-# Strip model:/color: from YAML frontmatter; CLAUDE.md → AGENTS.md; upsert banner.
+# Strip model:/color: from YAML frontmatter; CLAUDE.md → AGENTS.md; genericize
+# Anthropic-internal logging / error-ID references; upsert banner.
 transform_agent() {
   awk -v banner="$BANNER" '
     BEGIN { fm = 0; banner_done = 0 }
@@ -58,6 +60,12 @@ transform_agent() {
       print ""
       banner_done = 1
     }
+    fm == 2 && /constants\/errorIds\.ts|Sentry tracking/ { next }
+    fm == 2 && /logForDebugging/ {
+      print "- Use the logging functions and error-ID conventions the reviewed project defines, if any"
+      next
+    }
+    fm == 2 { sub(/ \(logError for production issues\)/, "") }
     {
       if ($0 !~ /Vendored from pr-review-toolkit/) {
         gsub(/CLAUDE\.md/, "AGENTS.md")

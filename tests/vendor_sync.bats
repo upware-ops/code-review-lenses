@@ -22,6 +22,14 @@ setup() {
   grep -q 'AGENTS.md replaces CLAUDE.md' <<<"$banner"
 }
 
+@test "transform: replaces Anthropic-internal logging and error-ID references" {
+  run --separate-stderr bash "$VENDOR" transform < "$UPSTREAM"
+  [ "$status" -eq 0 ]
+  [ "$(grep -cE 'logError|logForDebugging|logEvent|errorIds|Sentry|Statsig' <<<"$output")" -eq 0 ]
+  grep -qxF -- '- Is the error logged with appropriate severity?' <<<"$output"
+  [ "$(grep -c 'error-ID conventions the reviewed project defines' <<<"$output")" -eq 1 ]
+}
+
 @test "transform: is idempotent on a already-vendored agent" {
   first=$(bash "$VENDOR" transform < "$UPSTREAM")
   second=$(printf '%s\n' "$first" | bash "$VENDOR" transform)
