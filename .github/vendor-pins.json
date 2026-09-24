@@ -1,0 +1,21 @@
+{
+  "pr-review-toolkit": {
+    "repo": "anthropics/claude-plugins-official",
+    "ref": "main",
+    "sha": "263bb97c0d28fa15b411af908694964616524396",
+    "prefix": "plugins/pr-review-toolkit/agents",
+    "agents": [
+      "code-reviewer.md",
+      "comment-analyzer.md",
+      "pr-test-analyzer.md",
+      "silent-failure-hunter.md",
+      "type-design-analyzer.md"
+    ]
+  },
+  "tag1-comprehensive-review": {
+    "repo": "tag1consulting/claude-comprehensive-review",
+    "ref": "main",
+    "sha": "8b02f5062c99c629b4ac32e05e3aa188ac478211",
+    "mode": "digest"
+  }
+}

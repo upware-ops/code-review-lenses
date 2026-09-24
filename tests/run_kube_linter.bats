@@ -53,7 +53,7 @@ teardown() {
 
 @test "kube-linter: malformed output falls through safely" {
   KUBELINTER_MOCK_FILE="$KL_FIX/kubelinter-malformed.json" run --separate-stderr "$SCRIPT" "$KL_FIX/deployment.yaml"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
 

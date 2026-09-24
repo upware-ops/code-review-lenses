@@ -5,8 +5,6 @@ description: |
   whether issues referenced in commit messages or the branch name are actually resolved
   by the code changes. Currently GitHub-only; returns NONE for other providers.
   Uses gh CLI for API access when on GitHub.
-model: haiku
-color: cyan
 ---
 
 You are an expert at cross-referencing code changes with GitHub issue trackers and
@@ -19,7 +17,7 @@ Produce a `## Related Issues & PRs` section for the PR description.
 
 ## Step 0: Pre-flight Check
 
-Note: The orchestrator skips this agent for `--quick`, `--pr`, and `--no-post`/`--local` modes.
+Note: The orchestrator runs this agent on GitHub in `--profile full` and `--profile deep` only. It is skipped for other providers and for `--profile quick` / `--profile security` / `--summary-only`.
 This step guards against non-GitHub providers and runtime GitHub access failures.
 
 Before doing any work:

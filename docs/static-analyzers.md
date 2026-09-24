@@ -11,21 +11,21 @@ In addition to LLM agents, the skill runs deterministic checks when relevant fil
 
 ## Analyzer table
 
-| Check | Trigger | Runs in `--quick`? | Binary required |
+| Check | Trigger | Profiles | Binary required |
 |-------|---------|-------------------|----------------|
-| **dependency-check** — queries [OSV.dev](https://osv.dev/) for known CVEs in declared dependency versions | `go.mod`, `package.json`, `requirements*.txt`, or `composer.json` changed | Yes | `curl` + `jq` (built-in) |
-| **shellcheck** — shell script linting | `.sh` or `.bash` files changed | Yes | `shellcheck` |
-| **semgrep** — polyglot SAST | Any source file changed | Yes | `semgrep` |
-| **trufflehog** — secret scanning | Any file changed | Yes | `trufflehog` |
-| **ruff** — Python linting | `.py` files changed | Yes | `ruff` |
-| **golangci-lint** — Go static analysis | `.go` files changed | Yes | `golangci-lint` |
-| **checkov** — IaC security scanning | `*.tf`, `*.tfvars`, `Dockerfile`, k8s YAML, CloudFormation, Azure ARM changed | Yes | `checkov` |
-| **eslint** — JavaScript/TypeScript linting | `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` files changed; only runs when an ESLint config is present | No | `eslint` (via `npx` or `node_modules/.bin`) |
-| **hadolint** — Dockerfile linting | `Dockerfile`, `Dockerfile.*`, or `*.dockerfile` changed | No | `hadolint` |
-| **kube-linter** — Kubernetes manifest linting | `.yaml`, `.yml`, or `.json` files containing `apiVersion` and `kind` fields | No | `kube-linter` |
-| **phpcs** — PHP CodeSniffer | `.php` files changed; uses Drupal/DrupalPractice standard when available, falls back to PSR-12 | No | `phpcs` |
-| **phpstan** — PHP static analysis | `.php`, `.module`, `.inc`, `.install`, `.theme` files changed | No | `phpstan` |
-| **tflint** — Terraform linting | `.tf` or `.tfvars` files changed; runs per-directory | No | `tflint` |
+| **dependency-check** — queries [OSV.dev](https://osv.dev/) for known CVEs in declared dependency versions | `go.mod`, `package.json`, `requirements*.txt`, or `composer.json` changed | quick, security, full, deep | `curl` + `jq` (built-in) |
+| **shellcheck** — shell script linting | `.sh` or `.bash` files changed | quick, security, full, deep | `shellcheck` |
+| **semgrep** — polyglot SAST | Any source file changed | quick, security, full, deep | `semgrep` |
+| **trufflehog** — secret scanning | Any file changed | quick, security, full, deep | `trufflehog` |
+| **ruff** — Python linting | `.py` files changed | quick, security, full, deep | `ruff` |
+| **golangci-lint** — Go static analysis | `.go` files changed | quick, security, full, deep | `golangci-lint` |
+| **checkov** — IaC security scanning | `*.tf`, `*.tfvars`, `Dockerfile`, k8s YAML, CloudFormation, Azure ARM changed | quick, security, full, deep | `checkov` |
+| **eslint** — JavaScript/TypeScript linting | `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` files changed; only runs when an ESLint config is present | quick, security, full, deep | `eslint` (via `npx` or `node_modules/.bin`) |
+| **hadolint** — Dockerfile linting | `Dockerfile`, `Dockerfile.*`, or `*.dockerfile` changed | quick, security, full, deep | `hadolint` |
+| **kube-linter** — Kubernetes manifest linting | `.yaml`, `.yml`, or `.json` files containing `apiVersion` and `kind` fields | quick, security, full, deep | `kube-linter` |
+| **phpcs** — PHP CodeSniffer | `.php` files changed; uses Drupal/DrupalPractice standard when available, falls back to PSR-12 | quick, security, full, deep | `phpcs` |
+| **phpstan** — PHP static analysis | `.php`, `.module`, `.inc`, `.install`, `.theme` files changed | quick, security, full, deep | `phpstan` |
+| **tflint** — Terraform linting | `.tf` or `.tfvars` files changed; runs per-directory | quick, security, full, deep | `tflint` |
 
 Findings appear in Block B with the tool name as source (e.g., `[shellcheck]`, `[eslint]`).
 
@@ -65,11 +65,11 @@ Supported manifest files:
 
 CVE findings include severity (CVSS-mapped to Critical/High/Medium/Low), CVE ID, affected package and version, and a remediation note with the fixed version. Findings below CVSS threshold are emitted as `"High"` as a conservative fallback.
 
-The `dependency-check` runs in both full and `--quick` mode when manifest files are present. It also runs in `--security-only` mode (CVE checks are security checks).
+The `dependency-check` runs in `quick`, `security`, `full`, and `deep` when manifest files changed. It is skipped only for `--summary-only`.
 
 ## Static analyzer scripts
 
-Each analyzer has a dedicated script in `skills/comprehensive-review/scripts/`:
+Each analyzer has a dedicated script in `skills/code-review-lenses/scripts/`:
 
 | Script | Analyzer |
 |--------|---------|

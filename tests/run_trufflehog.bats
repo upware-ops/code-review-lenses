@@ -27,6 +27,15 @@ teardown() {
   echo "$output" | jq -e '.[0].source == "trufflehog"' >/dev/null
 }
 
+@test "trufflehog: verified secret in a test path stays Critical" {
+  TRUFFLEHOG_MOCK_FILE="$TH_FIX/verified-in-tests.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length == 1' >/dev/null
+  echo "$output" | jq -e '.[0].severity == "Critical"' >/dev/null
+  echo "$output" | jq -e '.[0].confidence == 95' >/dev/null
+  echo "$output" | jq -e '.[0].file == "tests/fixtures/leak.env"' >/dev/null
+}
+
 @test "trufflehog: unverified secret in test fixture demoted to Low" {
   TRUFFLEHOG_MOCK_FILE="$TH_FIX/unverified-test-fixture.ndjson" run --separate-stderr "$SCRIPT" ""
   [ "$status" -eq 0 ]
@@ -48,6 +57,39 @@ teardown() {
   TRUFFLEHOG_MOCK_FILE="/dev/null" run --separate-stderr "$SCRIPT" ""
   [ "$status" -eq 0 ]
   [ "$output" = "[]" ]
+}
+
+@test "trufflehog: unreadable mock file is exit 1 with empty array" {
+  TRUFFLEHOG_MOCK_FILE="$WORK/missing.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}
+
+@test "trufflehog: unparseable mock NDJSON is exit 1 with empty array" {
+  echo 'not json' > "$WORK/garbage.ndjson"
+  TRUFFLEHOG_MOCK_FILE="$WORK/garbage.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}
+
+@test "trufflehog: mixed parseable and unparseable NDJSON is exit 1" {
+  printf '%s\n' '{"Verified":false,"SourceMetadata":{"Data":{"Filesystem":{"file":"x.go"}}},"DetectorName":"generic","Raw":"x"}' 'not json' > "$WORK/mixed.ndjson"
+  TRUFFLEHOG_MOCK_FILE="$WORK/mixed.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}
+
+@test "trufflehog: live list-mode without config file does not unbound-abort" {
+  unset TRUFFLEHOG_MOCK_FILE
+  mkdir -p "$WORK/bin"
+  printf '%s\n' '#!/bin/sh' 'exit 0' > "$WORK/bin/trufflehog"
+  chmod +x "$WORK/bin/trufflehog"
+  echo 'package x' > "$WORK/src.go"
+  cd "$WORK"
+  PATH="$WORK/bin:$PATH" run --separate-stderr bash -c "printf '%s\n' src.go | bash '$SCRIPT'"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  [[ "${stderr:-}" != *"unbound variable"* ]]
 }
 
 @test "trufflehog: no changed files returns empty array" {

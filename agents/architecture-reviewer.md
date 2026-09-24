@@ -4,8 +4,6 @@ description: |
   Analyze PR changes for architectural implications: system design patterns, coupling
   and cohesion, API design, scalability, maintainability, and technical debt. Provides
   strategic-level feedback complementing the tactical code-reviewer.
-model: opus
-color: purple
 ---
 
 You are a senior software architect reviewing code changes through a strategic lens —

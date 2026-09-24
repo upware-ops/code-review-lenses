@@ -1,9 +1,9 @@
-title: Comprehensive Review
-description: "Comprehensive PR/MR review using parallel specialized agents. Produces structured summaries and severity-ranked findings from 10+ agents."
+title: Code Review Lenses
+description: "Host-agnostic PR/MR review using parallel specialized agents. Local summaries and severity-ranked findings."
 theme: just-the-docs
 
-url: "https://tag1consulting.github.io"
-baseurl: "/claude-comprehensive-review"
+url: "https://upware-ops.github.io"
+baseurl: "/code-review-lenses"
 
 color_scheme: tag1
 
@@ -21,12 +21,12 @@ heading_anchors: true
 
 aux_links:
   "View on GitHub":
-    - "https://github.com/tag1consulting/claude-comprehensive-review"
+    - "https://github.com/upware-ops/code-review-lenses"
 aux_links_new_tab: true
 
 gh_edit_link: true
 gh_edit_link_text: "Edit this page on GitHub"
-gh_edit_repository: "https://github.com/tag1consulting/claude-comprehensive-review"
+gh_edit_repository: "https://github.com/upware-ops/code-review-lenses"
 gh_edit_source: docs
 gh_edit_branch: "main"
 gh_edit_view_mode: "tree"

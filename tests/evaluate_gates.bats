@@ -123,6 +123,15 @@ gate_value() {
   [ "$(gate_value GATE_CODE_OR_INFRA)" = "true" ]
 }
 
+@test "gates: Claude and Grok workflow wrappers trigger GATE_CODE_OR_INFRA" {
+  run_gates "+export const meta" ".claude/workflows/code-review-lenses-workflow.js"
+  [ "$status" -eq 0 ]
+  [ "$(gate_value GATE_CODE_OR_INFRA)" = "true" ]
+  run_gates "+let meta" ".grok/workflows/code-review-lenses-workflow.rhai"
+  [ "$status" -eq 0 ]
+  [ "$(gate_value GATE_CODE_OR_INFRA)" = "true" ]
+}
+
 @test "gates: GitHub Actions workflow triggers GATE_CODE_OR_INFRA" {
   run_gates "+    runs-on: ubuntu-latest" ".github/workflows/ci.yml"
   [ "$status" -eq 0 ]
@@ -139,4 +148,16 @@ gate_value() {
   run_gates "+## v1.9.0" "CHANGELOG.md"
   [ "$status" -eq 0 ]
   [ "$(gate_value GATE_CODE_OR_INFRA)" = "false" ]
+}
+
+@test "gates: unreadable DIFF_FILE is grep rc 2 abort, not no-match" {
+  if [[ "$EUID" -eq 0 ]]; then
+    skip "root reads chmod 000 files"
+  fi
+  printf '%s\n' "+token" > "$WORK/locked.diff"
+  chmod 000 "$WORK/locked.diff"
+  DIFF_FILE="$WORK/locked.diff" DIFF_PATHS="src/auth.go" run bash "$SCRIPT"
+  chmod u+r "$WORK/locked.diff"
+  [ "$status" -eq 1 ]
+  [[ "$output" != *"GATE_SECURITY_PATTERNS=false"* ]]
 }

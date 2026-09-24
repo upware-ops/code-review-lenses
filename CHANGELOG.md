@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-08-14
+
+### ⚠ Breaking
+
+- **No longer a Claude Code plugin.** Removed `.claude-plugin/`, `CLAUDE.md`, plugin-namespace agent spawns, `CLAUDE_PLUGIN_ROOT` path lookup, and claude-mem. The package is an [Agent Skills](https://agentskills.io/specification) checkout (`SKILL.md` + `agents/`) that any compatible host can load.
+- **Renamed to `code-review-lenses`.** Skill directory is `skills/code-review-lenses/`; frontmatter `name:` and invocations are `/code-review-lenses`. The 1.x product name `comprehensive-review` is historical only.
+- **Models are not hardcoded.** Agent frontmatter no longer sets `model:` / `color:`. Optional `skills/code-review-lenses/models.conf` defaults every role to `inherit`.
+- **No PR/MR posting or creation.** Removed `--post-findings`, `--post-summary`, `--create-pr`, `--publish`, `--draft`, `--read-back`, `--no-post`, `--local`, `--no-findings`. Phase 4/4b are gone.
+- **`--pr` and `--provider` removed.** External review is a PR/MR URL in the invoke text. Host and number come from `parse-pr-url.sh`. A bare number is not a PR/MR identity. Omitted `--base` on a PR/MR is the fetched target branch — never `main`/`master`/`dev`.
+- **Mode flags replaced by `--profile`.** Removed `--quick`, `--security-only`, and `--depth`. Use `--profile quick|security|full|deep`. `--summary-only` remains (mutually exclusive with `--profile`).
+- **Toolkit agents are vendored** (Apache-2.0). `pr-review-toolkit` is no longer an external plugin dependency.
+- **Config paths** moved off `.claude/`. See Migration below.
+- **`--no-mem`** was removed (claude-mem / novelty pass are gone). The parser rejects it.
+
+### Migration (1.13.x → 2.0.0)
+
+| 1.13 path / flag | 2.0 |
+|------------------|-----|
+| `.claude/comprehensive-review/suppressions.json` | `.code-review-lenses/suppressions.json` |
+| `~/.claude/claude-security-guidance.md` | `~/.config/code-review-lenses/security-guidance.md` |
+| `<repo>/.claude/claude-security-guidance.md` | `<repo>/.code-review-lenses/security-guidance.md` |
+| `<repo>/.claude/claude-security-guidance.local.md` | `<repo>/.code-review-lenses/security-guidance.local.md` |
+| `/comprehensive-review` | `/code-review-lenses` |
+| `--quick` / `--security-only` / `--depth deep` | `--profile quick` / `--profile security` / `--profile deep` |
+| `--pr <N>` / `--provider <name>` | PR/MR URL in the invoke text |
+| `--post-findings`, `--create-pr`, `--no-post`, `--no-mem` | removed — local report only |
+
+Copy the old files to the new paths if you still want those rules. 2.0 does **not** auto-load `.claude/` paths. **Rollback:** stay on (or pin) tag `v1.13.0` if you need plugin install, PR posting, or the old flags.
+
+### Added
+
+- Shipped parsers: `resolve-profile.sh`, `apply-roster-overlays.sh`, `detect-provider.sh`, `resolve-models.sh`, `resolve-skill-root.sh`, `parse-pr-url.sh`.
+- GitLab via `glab` on any authenticated host (`GITLAB_HOST`, `glab config get host`, `glab auth status`), including nested groups.
+- Bats coverage that drives those scripts (profiles, overlays, GitLab host detection, model inherit).
+- Optional Claude and Grok workflow wrappers (`.claude/workflows/code-review-lenses-workflow.js`, `.grok/workflows/code-review-lenses-workflow.rhai`) that run the same local review. Roster and flags still come from the shipped parsers. Invoke text is passed through as `$ARGUMENTS`; leftover prose is `GUIDANCE`.
+- `argument-hint` on the skill (and the same text on the workflow wrappers). Non-flag tokens are `GUIDANCE`. A PR/MR URL starts external review; remaining prose is review focus.
+- `parse-pr-url.sh`: first GitHub / GitLab (any host, nested groups) / Bitbucket URL wins. Number-only text is not a PR identity. `PR_URL` is sanitized (no userinfo). Text glued to the number (other than `.diff` / `.patch`) is refused.
+- `review-diff.sh`: local review uses `<base>...HEAD` when there are unique commits; otherwise a dirty working tree vs `$BASE`. Empty range is an explicit stop. PR/MR-URL worktrees stay on `<base>...HEAD`.
+- Invoke text is written to a file and parsed with `resolve-profile.sh --from-file` (no unquoted `$ARGUMENTS` on a bash command line). Wrappers fence `<invoke-argv>` and run Phase 2 before Phase 3.
+- GitHub provider OPs pin `GH_HOST` and `--repo`. Bitbucket fork PRs are refused (the checkout fetches from `origin`). CVE findings emit `source` + `confidence`. `run-trufflehog.sh` no longer expands an empty array under `set -u`.
+- `review-diff.sh` verifies `--base` (`rev-parse`) and refuses option-shaped refs. Dirty `DIFF_FILE` includes untracked via `git diff --no-index`.
+- `GUIDANCE` / `GUIDANCE_REST` strip URL userinfo. `detect-provider.sh --check-url-host` gates `gh`/`glab` after a PR/MR URL. `GATE_CODE_OR_INFRA` cheapens architecture only on `--profile full`.
+- OSV malformed / index-mismatch and unparseable trufflehog NDJSON exit 1 (`CVE_CHECK_FAILED` / `ANALYZER_FAILED`). Wrappers run Phase 0b (worktree, `baseRefName`, `--check-url-host`, `resolve-models.sh`).
+- `--check-url-host` is URL-review only (never local `unknown`); GitHub no longer treats origin-match as enough. `GUIDANCE_REST` is noglob. Analyzer parse/crash and CVE merge/per-package parse fail exit 1. Security-gate grep rc 2 aborts.
+- Nightly `vendor-sync` workflow: refreshes the five vendored `pr-review-toolkit` agents into a PR on this repo (local patches re-applied); posts a digest issue on this repo listing new `tag1consulting/claude-comprehensive-review` commits (never auto-merged).
+
 ## [1.13.0] - 2026-07-16
 
 ### ⚠ Behavior change
