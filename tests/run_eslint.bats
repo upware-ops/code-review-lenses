@@ -122,6 +122,26 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
+# Messages without a ruleId
+# ---------------------------------------------------------------------------
+
+@test "eslint: fatal parse error is kept as a High finding" {
+  touch "$WORK/broken.js"
+  ESLINT_MOCK_FILE="$ESLINT_FIX/eslint-parse-error.json" run --separate-stderr "$SCRIPT" "$WORK/broken.js"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length == 1 and .[0].severity == "High" and .[0].line == 1' >/dev/null
+  echo "$output" | jq -e '.[0].finding | startswith("parse-error: Parsing error")' >/dev/null
+  echo "$output" | jq -e '.[0].remediation | contains("parsing error") and (contains("eslint.org") | not)' >/dev/null
+}
+
+@test "eslint: non-fatal null-rule messages such as ignored-file warnings are dropped" {
+  touch "$WORK/ignored.js"
+  ESLINT_MOCK_FILE="$ESLINT_FIX/eslint-ignored.json" run --separate-stderr "$SCRIPT" "$WORK/ignored.js"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+}
+
+# ---------------------------------------------------------------------------
 # Schema conformance
 # ---------------------------------------------------------------------------
 

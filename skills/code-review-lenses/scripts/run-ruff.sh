@@ -41,7 +41,7 @@ PY_FILES=()
 while IFS= read -r file; do
   [[ -z "$file" ]] && continue
   case "$file" in
-    *.py) [[ -f "$file" ]] && PY_FILES+=("$file") ;;
+    *.py|*.pyw) [[ -f "$file" ]] && PY_FILES+=("$file") ;;
   esac
 done <<< "$CHANGED_FILES"
 

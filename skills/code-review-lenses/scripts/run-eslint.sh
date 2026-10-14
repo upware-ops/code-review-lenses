@@ -142,19 +142,19 @@ FINDINGS=$(echo "$ESLINT_OUTPUT" | jq -r --arg root "$PWD" '
     .[]? |
     . as $file |
     .messages[]? |
-    select(.ruleId != null) |
+    select(.ruleId != null or .fatal == true) |
     {
       severity: (if .severity == 2 then "High" else "Medium" end),
       confidence: 90,
       source: "eslint",
       file: ($file.filePath | ltrimstr($root + "/")),
       line: (.line // 1),
-      finding: ("\(.ruleId): \(.message)"),
+      finding: ("\(.ruleId // "parse-error"): \(.message)"),
       remediation: (
         if .ruleId then
           "See https://eslint.org/docs/rules/\(.ruleId)"
         else
-          "Fix ESLint violation on this line"
+          "Fix the parsing error so ESLint can analyze this file"
         end
       )
     }

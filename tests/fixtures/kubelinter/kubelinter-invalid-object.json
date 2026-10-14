@@ -1,0 +1,22 @@
+{
+  "Reports": [
+    {
+      "Diagnostic": {
+        "Message": "failed to decode: json: cannot unmarshal string into Go struct field DeploymentSpec.spec.replicas of type int32"
+      },
+      "Check": "failed-to-load-object",
+      "Remediation": "Confirm that the file is accessible and is valid k8s yaml.",
+      "Object": {
+        "Metadata": {
+          "FilePath": "/repo/k8s/broken.yaml"
+        },
+        "K8sObject": {
+          "Namespace": "",
+          "Name": "",
+          "GroupVersionKind": {"Group": "", "Version": "", "Kind": ""}
+        }
+      }
+    }
+  ],
+  "Summary": {"ChecksStatus": "Failed", "CheckEndTime": "2026-03-10T13:17:40Z", "KubeLinterVersion": "v0.8.3"}
+}

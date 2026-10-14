@@ -176,3 +176,35 @@ STUB
   [ "$status" -eq 0 ]
   grep -qx -- "--config=/dev/null" "$WORK/argv"
 }
+
+# ---------------------------------------------------------------------------
+# Module-level issues (empty filename, line 0)
+# ---------------------------------------------------------------------------
+
+@test "tflint: mock module-level issue maps to the first changed Terraform file at line 0" {
+  touch "$WORK/main.tf" "$WORK/variables.tf"
+  TFLINT_MOCK_FILE="$TF_FIX/tflint-module-level.json" run --separate-stderr "$SCRIPT" \
+    "$(printf '%s\n' "$WORK/variables.tf" "$WORK/main.tf")"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e --arg f "$WORK/variables.tf" '.[0].file == $f and .[0].line == 0' >/dev/null
+  echo "$output" | jq -e '.[1].file == "main.tf" and .[1].line == 8' >/dev/null
+}
+
+@test "tflint: live module-level issues map to the first changed Terraform file of each directory" {
+  unset TFLINT_MOCK_FILE TFLINT_CONFIG_FILE TFLINT_PLUGIN_DIR
+  mkdir -p "$WORK/bin" "$WORK/infra"
+  cat > "$WORK/bin/tflint" <<'STUB'
+#!/bin/sh
+cat "$ISSUES_FILE"
+exit 2
+STUB
+  chmod +x "$WORK/bin/tflint"
+  touch "$WORK/versions.tf" "$WORK/main.tf" "$WORK/infra/network.tf" "$WORK/infra/main.tf"
+  cd "$WORK"
+  HOME="$WORK/home" ISSUES_FILE="$TF_FIX/tflint-module-level.json" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' versions.tf main.tf infra/network.tf infra/main.tf)"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    map([.file, .line]) == [["versions.tf", 0], ["main.tf", 8], ["infra/network.tf", 0], ["infra/main.tf", 8]]
+  ' >/dev/null
+}

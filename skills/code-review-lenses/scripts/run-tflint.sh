@@ -43,6 +43,7 @@ fi
 # Filter to Terraform files only
 TF_FILES=()
 TF_DIRS=()
+TF_DIR_FIRST=()
 while IFS= read -r file; do
   [[ -z "$file" ]] && continue
   case "$file" in
@@ -56,7 +57,7 @@ while IFS= read -r file; do
       for d in "${TF_DIRS[@]+"${TF_DIRS[@]}"}"; do
         [[ "$d" == "$dir" ]] && { already=true; break; }
       done
-      [[ "$already" == "false" ]] && TF_DIRS+=("$dir")
+      [[ "$already" == "false" ]] && { TF_DIRS+=("$dir"); TF_DIR_FIRST+=("${file##*/}"); }
       ;;
   esac
 done <<< "$CHANGED_FILES"
@@ -91,7 +92,8 @@ else
   export TFLINT_PLUGIN_DIR="${TFLINT_PLUGIN_DIR:-$TRUSTED_PLUGIN_DIR}"
 
   ALL_ISSUES="[]"
-  for dir in "${TF_DIRS[@]}"; do
+  for i in "${!TF_DIRS[@]}"; do
+    dir="${TF_DIRS[$i]}"
     DIR_STDERR=$(mktemp)
     DIR_EC=0
     DIR_OUTPUT=$(tflint --chdir="$dir" "${TFLINT_ARGS[@]}" 2>"$DIR_STDERR") || DIR_EC=$?
@@ -106,11 +108,13 @@ else
     rm -f "$DIR_STDERR"
     if [[ -n "$DIR_OUTPUT" ]]; then
       # Prepend dir/ to each issue's filename, stripping a leading "./" if present
-      DIR_ISSUES=$(echo "$DIR_OUTPUT" | jq --arg dir "$dir" '
+      # Module-level issues (e.g. terraform_required_version) carry filename "" and line 0 (terraform-linters/tflint#1986)
+      DIR_ISSUES=$(echo "$DIR_OUTPUT" | jq --arg dir "$dir" --arg first "${TF_DIR_FIRST[$i]}" '
         [.issues[]? | .range.filename = (
-          if $dir == "." then .range.filename
-          else (($dir | ltrimstr("./")) + "/" + .range.filename)
-          end
+          (if .range.filename == "" then $first else .range.filename end) as $f
+          | if $dir == "." then $f
+            else (($dir | ltrimstr("./")) + "/" + $f)
+            end
         )]
       ' 2>/dev/null) || {
         echo "WARNING: tflint JSON from '${dir}' could not be parsed." >&2
@@ -147,7 +151,7 @@ fi
 #   error   -> High
 #   warning -> Medium
 #   notice  -> Low
-FINDINGS=$(echo "$TFLINT_OUTPUT" | jq -r '
+FINDINGS=$(echo "$TFLINT_OUTPUT" | jq -r --arg first "${TF_FILES[0]}" '
   [
     .issues[]? |
     {
@@ -159,7 +163,7 @@ FINDINGS=$(echo "$TFLINT_OUTPUT" | jq -r '
       ),
       confidence: 90,
       source: "tflint",
-      file: .range.filename,
+      file: (if .range.filename == "" then $first else .range.filename end),
       line: (.range.start.line // 1),
       finding: ("\(.rule.name): \(.message)"),
       remediation: (

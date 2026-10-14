@@ -78,7 +78,8 @@ else
   # distinguish genuine errors from a no-violations run.
   KUBELINTER_STDERR=$(mktemp)
   KUBELINTER_EC=0
-  KUBELINTER_OUTPUT=$(kube-linter lint --format json "${K8S_FILES[@]}" 2>"$KUBELINTER_STDERR") || KUBELINTER_EC=$?
+  # Deprecated upstream but still honored: without it undecodable manifests only warn on stderr instead of becoming failed-to-load-object reports.
+  KUBELINTER_OUTPUT=$(kube-linter lint --format json --fail-on-invalid-resource "${K8S_FILES[@]}" 2>"$KUBELINTER_STDERR") || KUBELINTER_EC=$?
   if [[ -z "$KUBELINTER_OUTPUT" && "$KUBELINTER_EC" -ne 0 ]]; then
     echo "WARNING: kube-linter failed (exit ${KUBELINTER_EC}): $(cat "$KUBELINTER_STDERR")" >&2
     rm -f "$KUBELINTER_STDERR"

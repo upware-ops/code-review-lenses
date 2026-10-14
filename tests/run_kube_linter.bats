@@ -121,3 +121,35 @@ teardown() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e 'length > 0' >/dev/null
 }
+
+# ---------------------------------------------------------------------------
+# Undecodable manifests (live binary stub)
+# ---------------------------------------------------------------------------
+
+@test "kube-linter: live run passes --fail-on-invalid-resource and keeps failed-to-load-object reports as findings" {
+  unset KUBELINTER_MOCK_FILE
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/kube-linter" <<'STUB'
+#!/bin/sh
+case " $* " in
+  *" --fail-on-invalid-resource "*) ;;
+  *) echo "missing --fail-on-invalid-resource: $*" >&2; exit 3 ;;
+esac
+cat "$REPORT_FILE"
+echo "Error: found 1 lint errors" >&2
+exit 1
+STUB
+  chmod +x "$WORK/bin/kube-linter"
+  printf 'apiVersion: apps/v1\nkind: Deployment\nspec:\n  replicas: three\n' > "$WORK/broken.yaml"
+  REPORT_FILE="$KL_FIX/kubelinter-invalid-object.json" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$WORK/broken.yaml"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '
+    length == 1 and .[0].source == "kube-linter" and .[0].file == "/repo/k8s/broken.yaml"
+    and (.[0].finding | startswith("failed-to-load-object: failed to decode"))
+    and (.[0].remediation | contains("valid k8s yaml"))
+  ' >/dev/null
+  REPORT_FILE=/dev/null PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/broken.yaml"
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}
