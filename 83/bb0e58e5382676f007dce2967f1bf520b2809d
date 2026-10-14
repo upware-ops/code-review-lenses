@@ -1,0 +1,22 @@
+skills/code-review-lenses/scripts/run-eslint.sh
+  s_22d2264024e6d9::t_78018cfa7fb163 103,112-121,123-124,126,128,130-144,162,164,172
+tests/run_eslint.bats
+  s_22d2264024e6d9::t_9d2ecfc52148d1 253,256-257,259,261-264,267,270,272,274-276,279,282,284,286-288,291,293-297,299,301,304,307-312,314,316,318-320
+  s_22d2264024e6d9::t_867c05af36c46e 23,29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "83bb0e58e5382676f007dce2967f1bf520b2809d",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
