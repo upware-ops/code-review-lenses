@@ -597,5 +597,5 @@ JSON
   has "$dedup" '`line` 0 (unknown) is never proximity-compared'
   has "$dedup" 'file + `category` only'
   has "$(skill_line '**2a — extract json-findings**')" 'Normalize `category` to'
-  grep -q 'same file and `category`' "$REPO_ROOT/docs/architecture.md"
+  grep -q 'per file and `category` that start within 3 lines' "$REPO_ROOT/docs/architecture.md"
 }
