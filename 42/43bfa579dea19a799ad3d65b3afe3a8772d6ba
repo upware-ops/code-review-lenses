@@ -1,0 +1,23 @@
+tests/evaluate_gates.bats
+  s_dbe7474dc5e1f0::t_85d5f96629b5eb 88-98
+skills/code-review-lenses/scripts/classify-diff.sh
+  s_dbe7474dc5e1f0::t_dde866a8ba91d6 63
+skills/code-review-lenses/scripts/evaluate-gates.sh
+  s_dbe7474dc5e1f0::t_dde866a8ba91d6 55,68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "4243bfa579dea19a799ad3d65b3afe3a8772d6ba",
+  "prompts": {},
+  "sessions": {
+    "s_dbe7474dc5e1f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44196ae5-8f36-4730-a2ca-e6a818cdaf89",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
