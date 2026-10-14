@@ -36,7 +36,7 @@ Copy the old files to the new paths if you still want those rules. 2.0 does **no
 
 ### Added
 
-- Shipped parsers: `resolve-profile.sh`, `apply-roster-overlays.sh`, `detect-provider.sh`, `resolve-models.sh`, `resolve-skill-root.sh`, `parse-pr-url.sh`.
+- Shipped parsers: `resolve-profile.sh`, `apply-roster-overlays.sh`, `detect-provider.sh`, `resolve-models.sh`, `resolve-skill-root.sh`, `parse-pr-url.sh`, `fetch-pr-metadata.sh`.
 - GitLab via `glab` on any authenticated host (`GITLAB_HOST`, `glab config get host`, `glab auth status`), including nested groups.
 - Bats coverage that drives those scripts (profiles, overlays, GitLab host detection, model inherit).
 - Optional Claude and Grok workflow wrappers (`.claude/workflows/code-review-lenses-workflow.js`, `.grok/workflows/code-review-lenses-workflow.rhai`) that run the same local review. Roster and flags still come from the shipped parsers. Invoke text is passed through as `$ARGUMENTS`; leftover prose is `GUIDANCE`.
@@ -45,10 +45,14 @@ Copy the old files to the new paths if you still want those rules. 2.0 does **no
 - `review-diff.sh`: local review uses `<base>...HEAD` when there are unique commits; otherwise a dirty working tree vs `$BASE`. Empty range is an explicit stop. PR/MR-URL worktrees stay on `<base>...HEAD`.
 - Invoke text is written to a file and parsed with `resolve-profile.sh --from-file` (no unquoted `$ARGUMENTS` on a bash command line). Wrappers fence `<invoke-argv>` and run Phase 2 before Phase 3.
 - GitHub provider OPs pin `GH_HOST` and `--repo`. Bitbucket fork PRs are refused (the checkout fetches from `origin`). CVE findings emit `source` + `confidence`. `run-trufflehog.sh` no longer expands an empty array under `set -u`.
-- `review-diff.sh` verifies `--base` (`rev-parse`) and refuses option-shaped refs. Dirty `DIFF_FILE` includes untracked via `git diff --no-index`.
+- `review-diff.sh` verifies `--base` (`rev-parse`) and refuses option-shaped refs. `review-diff.sh --diff-file` writes the dirty diff from a temporary index, so untracked files and symlinks are included and the real index is untouched.
 - `GUIDANCE` / `GUIDANCE_REST` strip URL userinfo. `detect-provider.sh --check-url-host` gates `gh`/`glab` after a PR/MR URL. `GATE_CODE_OR_INFRA` cheapens architecture only on `--profile full`.
 - OSV malformed / index-mismatch and unparseable trufflehog NDJSON exit 1 (`CVE_CHECK_FAILED` / `ANALYZER_FAILED`). Wrappers run Phase 0b (worktree, `baseRefName`, `--check-url-host`, `resolve-models.sh`).
 - `--check-url-host` is URL-review only (never local `unknown`); GitHub no longer treats origin-match as enough. `GUIDANCE_REST` is noglob. Analyzer parse/crash and CVE merge/per-package parse fail exit 1. Security-gate grep rc 2 aborts.
+- PR/MR metadata comes from `fetch-pr-metadata.sh`: the title is never fetched and the description stays in a temp file the orchestrator never prints. Vendored toolkit agents receive GOVERNANCE.md's untrusted-input and output-safety sections. The assembled report is redacted once more before printing and writing, including file paths.
+- Static analyzers never load configuration or plugins from a reviewed PR/MR: ESLint, tflint, and golangci-lint use the reviewer checkout's (or home) config. golangci-lint uses v2 flags and runs once per Go module. ESLint parse errors, undecodable Kubernetes manifests, and tflint module-level issues are reported; kube-linter reports use its real JSON shape; ruff lints `.pyw`.
+- CVE check fetches each advisory's full OSV record, queries only exact versions (npm / Composer ranges resolved from `package-lock.json` / `composer.lock`), reports advisories without a CVE alias by their own id, recommends the smallest fixed version above the installed one, and no longer drops Composer vendors named `php*` (only slash-less platform packages are skipped).
+- issue-linker pins every `gh` call to the URL's `HOST/REPO_SLUG`. Nested `AGENTS.md` files are used without a root one. pr-test-analyzer triggers on common test layouts. pr-test-analyzer, type-design-analyzer, and comment-analyzer end with json-findings, and proximity dedup clusters per file and category. `--summary-only --output-file` writes Block A only. Wrappers pass agent names with each result and clean up the PR worktree on every early exit, and the Grok wrapper compiles (no `\$` escapes).
 - Nightly `vendor-sync` workflow: refreshes the five vendored `pr-review-toolkit` agents into a PR on this repo (local patches re-applied); posts a digest issue on this repo listing new `tag1consulting/claude-comprehensive-review` commits (never auto-merged).
 
 ## [1.13.0] - 2026-07-16

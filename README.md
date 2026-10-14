@@ -107,7 +107,7 @@ It does not search `~/.claude` plugin caches.
 | `--no-enrich-context` | Disable symbol-context enrichment |
 | `--no-suppress` | Disable suppression rules |
 | `--min-confidence N` | Drop findings below N (0–100, default 75) |
-| `--output-file <path>` | Write Block A + Block B to a file |
+| `--output-file <path>` | Write the report to a file (Block A only with `--summary-only`) |
 | PR/MR URL | External review. Host and number come from the URL. A bare number is not enough. |
 | free-form text | Remaining leftover (`GUIDANCE`) is review focus |
 
@@ -228,7 +228,7 @@ Injected into findings agents except `blind-hunter` and `pr-summarizer`.
 **Block B** — Critical / High / Medium / Low findings, architectural and
 security write-ups, recommended actions.
 
-Both always print in the terminal. `--output-file` writes them to disk.
+Both print in the terminal (Block A only with `--summary-only`). `--output-file` writes the same report to disk.
 Nothing is posted.
 
 ## Tests
