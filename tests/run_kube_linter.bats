@@ -74,6 +74,22 @@ teardown() {
   echo "$output" | jq -e 'length > 0' >/dev/null
 }
 
+@test "kube-linter: Helm template passes the sniff but is not handed to kube-linter" {
+  unset KUBELINTER_MOCK_FILE
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/kube-linter" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$@" > "$ARGV_FILE"
+echo '{"Reports":[]}'
+STUB
+  chmod +x "$WORK/bin/kube-linter"
+  ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' "$KL_FIX/helm-template.yaml" "$KL_FIX/deployment.yaml")"
+  [ "$status" -eq 0 ]
+  grep -qxF -- "$KL_FIX/deployment.yaml" "$WORK/argv"
+  [ "$(grep -cF -- 'helm-template.yaml' "$WORK/argv")" -eq 0 ]
+}
+
 # ---------------------------------------------------------------------------
 # Schema conformance
 # ---------------------------------------------------------------------------
@@ -111,6 +127,24 @@ teardown() {
   echo "$output" | jq -e '.[0].finding | test("no-read-only-root-fs")' >/dev/null
 }
 
+@test "kube-linter: finding names the object from K8sObject and line is 0" {
+  KUBELINTER_MOCK_FILE="$KL_FIX/kubelinter-violations.json" run --separate-stderr "$SCRIPT" "$KL_FIX/deployment.yaml"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.[0].finding | endswith("[Deployment nginx-deployment]")' >/dev/null
+  echo "$output" | jq -e 'all(.[]; .line == 0)' >/dev/null
+}
+
+@test "kube-linter: absolute FilePath under the working directory becomes repo-relative" {
+  mkdir -p "$WORK/k8s"
+  cp "$KL_FIX/deployment.yaml" "$WORK/k8s/deployment.yaml"
+  cd "$WORK"
+  jq --arg f "$PWD/k8s/deployment.yaml" '.Reports[0].Object.Metadata.FilePath = $f' \
+    "$KL_FIX/kubelinter-violations.json" > "$WORK/violations.json"
+  KUBELINTER_MOCK_FILE="$WORK/violations.json" run --separate-stderr "$SCRIPT" k8s/deployment.yaml
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.[0].file == "k8s/deployment.yaml"' >/dev/null
+}
+
 # ---------------------------------------------------------------------------
 # stdin input contract
 # ---------------------------------------------------------------------------
@@ -145,8 +179,8 @@ STUB
     run --separate-stderr bash "$SCRIPT" "$WORK/broken.yaml"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '
-    length == 1 and .[0].source == "kube-linter" and .[0].file == "/repo/k8s/broken.yaml"
-    and (.[0].finding | startswith("failed-to-load-object: failed to decode"))
+    length == 1 and .[0].source == "kube-linter" and .[0].file == "/repo/k8s/broken.yaml" and .[0].line == 0
+    and (.[0].finding | startswith("failed-to-load-object: failed to decode") and contains("[resource"))
     and (.[0].remediation | contains("valid k8s yaml"))
   ' >/dev/null
   REPORT_FILE=/dev/null PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/broken.yaml"

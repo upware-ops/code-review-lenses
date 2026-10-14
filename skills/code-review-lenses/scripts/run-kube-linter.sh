@@ -40,11 +40,12 @@ if [[ -z "${KUBELINTER_MOCK_FILE:-}" ]] && ! command -v kube-linter >/dev/null 2
   exit 0
 fi
 
-# Filter to YAML/JSON files that look like Kubernetes manifests (apiVersion + kind)
+# Filter to YAML/JSON files that look like Kubernetes manifests (apiVersion + kind), skipping Helm templates ({{) that cannot decode
 K8S_FILES=()
 while IFS= read -r file; do
   [[ -z "$file" ]] && continue
   [[ -f "$file" ]] || continue
+  grep -qF '{{' "$file" 2>/dev/null && continue
   case "$file" in
     *.yaml|*.yml)
       # YAML K8s heuristic: apiVersion: and kind: as top-level keys
@@ -102,26 +103,25 @@ fi
 #       "Check": "no-read-only-root-fs",
 #       "Remediation": "...",
 #       "Object": {
-#         "Metadata": {"FilePath": "deploy.yaml", "LineNumber": 1},
-#         "Type": {"Group":"apps","Version":"v1","Kind":"Deployment"},
-#         "Name": "my-app"
+#         "Metadata": {"FilePath": "/abs/path/deploy.yaml"},
+#         "K8sObject": {"Namespace": "", "Name": "my-app", "GroupVersionKind": {"Group":"apps","Version":"v1","Kind":"Deployment"}}
 #       }
 #     }
 #   ],
-#   "Summary": {"ChecksStatus": "FAILED"}
+#   "Summary": {"ChecksStatus": "Failed"}
 # }
-# kube-linter has no severity field; map all findings to Medium (reliability,
-# not security — security issues are better caught by checkov).
-FINDINGS=$(echo "$KUBELINTER_OUTPUT" | jq -r '
+# kube-linter has no severity or line number; map all findings to Medium (reliability,
+# not security — security issues are better caught by checkov) and line 0 (unknown).
+FINDINGS=$(echo "$KUBELINTER_OUTPUT" | jq -r --arg root "$PWD" '
   [
     .Reports[]? |
     {
       severity: "Medium",
       confidence: 85,
       source: "kube-linter",
-      file: (.Object.Metadata.FilePath // "unknown"),
-      line: (.Object.Metadata.LineNumber // 1),
-      finding: ("\(.Check): \(.Diagnostic.Message // "policy violation") [\(.Object.Type.Kind // "resource") \(.Object.Name // "")]"),
+      file: ((.Object.Metadata.FilePath // "unknown") | ltrimstr($root + "/")),
+      line: 0,
+      finding: ("\(.Check): \(.Diagnostic.Message // "policy violation") [\((.Object.K8sObject.GroupVersionKind.Kind | select(length > 0)) // "resource") \(.Object.K8sObject.Name // "")]"),
       remediation: (.Remediation // "See https://docs.kubelinter.io/#/generated/checks")
     }
   ]
