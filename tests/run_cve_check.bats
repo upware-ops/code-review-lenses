@@ -362,6 +362,21 @@ EOF
     {"version":"3.5.0","package":{"name":"monolog/monolog","ecosystem":"Packagist"}}]' "$SHIM_BODY" >/dev/null
 }
 
+@test "cve-check: Composer platform packages are skipped but php-prefixed vendors are queried" {
+  make_curl_shim
+  cat > "$WORK/composer.json" <<'EOF'
+{"require":{"php":">=8.1","php-64bit":">=8.1","ext-json":">=8.0","lib-curl":">=7.29","composer-plugin-api":"^2.0",
+ "monolog/monolog":"2.9.1","php-http/httplug":"2.4.0"},
+ "require-dev":{"phpunit/phpunit":"9.5.0"}}
+EOF
+  run --separate-stderr "$SCRIPT" "$WORK/composer.json"
+  [ "$status" -eq 0 ]
+  jq -e '.queries == [
+    {"version":"2.9.1","package":{"name":"monolog/monolog","ecosystem":"Packagist"}},
+    {"version":"2.4.0","package":{"name":"php-http/httplug","ecosystem":"Packagist"}},
+    {"version":"9.5.0","package":{"name":"phpunit/phpunit","ecosystem":"Packagist"}}]' "$SHIM_BODY" >/dev/null
+}
+
 @test "cve-check: without a lockfile only exact npm versions are queried and ranges get one stderr note" {
   make_curl_shim
   printf '%s\n' '{"dependencies":{"lodash":"^4.17.0","express":">=4.0.0 <5.0.0","left-pad":"1.3.0","pinned":"v2.0.1"},"devDependencies":{"mocha":"=10.2.0","chai":"4.x"}}' \
