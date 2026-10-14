@@ -26,7 +26,7 @@ If the provider response has no body/description or the value is null/empty, set
 
 Run every command **inside** the temporary worktree created in Phase 0b. Do not checkout in the parent clone.
 
-- **github:** `(cd "$WORKTREE_PATH" && GH_HOST="$HOST" gh pr checkout "$PR_NUMBER" --repo "$REPO_SLUG")`
+- **github:** `(cd "$WORKTREE_PATH" && GH_HOST="$HOST" gh pr checkout "$PR_NUMBER" --repo "$REPO_SLUG" --detach)` (detached, so a PR branch already checked out in another worktree does not block it)
 - **gitlab:** Same host-auth check as fetch, then `(cd "$WORKTREE_PATH" && GITLAB_HOST="$HOST" glab mr checkout <N> -R "https://$HOST/$REPO_SLUG")`
 - **bitbucket:** `git -C "$WORKTREE_PATH" fetch origin "refs/heads/$headRefName" && git -C "$WORKTREE_PATH" checkout FETCH_HEAD` (`headRefName` from the metadata step; a `refs/heads/` refspec cannot be read as a git option)
 

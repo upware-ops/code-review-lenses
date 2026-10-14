@@ -261,6 +261,7 @@ teardown() {
 @test "PROVIDERS.md: GitHub OPs pin GH_HOST and --repo" {
   grep -q 'GH_HOST="$HOST" gh pr view' "$PROVIDERS_MD"
   grep -q 'GH_HOST="$HOST" gh pr checkout' "$PROVIDERS_MD"
+  grep -q -- 'gh pr checkout "$PR_NUMBER" --repo "$REPO_SLUG" --detach' "$PROVIDERS_MD"
   grep -q -- '--repo "$REPO_SLUG"' "$PROVIDERS_MD"
   grep -q 'baseRefName,baseRefOid' "$PROVIDERS_MD"
 }
