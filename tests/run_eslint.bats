@@ -188,6 +188,33 @@ EOF
   echo "$output" | jq -e '.[0].finding | test("no-undef")' >/dev/null
 }
 
+@test "eslint: pins the reviewer's config so configs beside linted files never load" {
+  mkdir -p "$WORK/node_modules/.bin" "$WORK/pr/src"
+  cat > "$WORK/node_modules/.bin/eslint" <<'EOF'
+#!/bin/sh
+if echo "$*" | grep -q -- --help; then
+  echo "--no-warn-ignored"
+  exit 0
+fi
+printf '%s\n' "$@" > "$ARGV_FILE"
+echo '[]'
+EOF
+  chmod +x "$WORK/node_modules/.bin/eslint"
+  echo 'var x' > "$WORK/pr/src/app.js"
+  touch "$WORK/pr/src/.eslintrc.cjs" "$WORK/pr/src/eslint.config.js"
+  unset ESLINT_MOCK_FILE
+  cd "$WORK"
+  ARGV_FILE="$WORK/argv" run --separate-stderr bash "$SCRIPT" "$WORK/pr/src/app.js"
+  [ "$status" -eq 0 ]
+  grep -qx -- '--no-eslintrc' "$WORK/argv"
+  [ "$(grep -A1 -x -- '--config' "$WORK/argv" | tail -1)" = "$WORK/.eslintrc.json" ]
+  touch "$WORK/eslint.config.js"
+  ARGV_FILE="$WORK/argv" run --separate-stderr bash "$SCRIPT" "$WORK/pr/src/app.js"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c -x -- '--no-eslintrc' "$WORK/argv")" -eq 0 ]
+  [ "$(grep -A1 -x -- '--config' "$WORK/argv" | tail -1)" = "$WORK/eslint.config.js" ]
+}
+
 @test "eslint: accepts file list via stdin" {
   touch "$WORK/Button.tsx"
   ESLINT_MOCK_FILE="$ESLINT_FIX/eslint-error.json" run --separate-stderr bash -c \

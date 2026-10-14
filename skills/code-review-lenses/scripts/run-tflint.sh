@@ -77,11 +77,24 @@ else
   # tflint must be run per-directory (it reads the full module in each dir).
   # tflint --chdir emits bare filenames (e.g. "main.tf"), so prepend the dir
   # so json-findings `file` is repo-relative.
+  # --chdir makes tflint load .tflint.hcl and ./.tflint.d/plugins binaries from the reviewed directory.
+  TFLINT_ARGS=(--format=json)
+  if [[ -z "${TFLINT_CONFIG_FILE:-}" ]]; then
+    TFLINT_CONFIG=/dev/null
+    for cfg in "${GITHUB_WORKSPACE:-$PWD}"/.tflint.{hcl,json} "$HOME"/.tflint.{hcl,json}; do
+      [[ -f "$cfg" ]] && { TFLINT_CONFIG="$cfg"; break; }
+    done
+    TFLINT_ARGS+=(--config="$TFLINT_CONFIG")
+  fi
+  TRUSTED_PLUGIN_DIR="${GITHUB_WORKSPACE:-$PWD}/.tflint.d/plugins"
+  [[ -d "$TRUSTED_PLUGIN_DIR" ]] || TRUSTED_PLUGIN_DIR="$HOME/.tflint.d/plugins"
+  export TFLINT_PLUGIN_DIR="${TFLINT_PLUGIN_DIR:-$TRUSTED_PLUGIN_DIR}"
+
   ALL_ISSUES="[]"
   for dir in "${TF_DIRS[@]}"; do
     DIR_STDERR=$(mktemp)
     DIR_EC=0
-    DIR_OUTPUT=$(tflint --chdir="$dir" --format=json 2>"$DIR_STDERR") || DIR_EC=$?
+    DIR_OUTPUT=$(tflint --chdir="$dir" "${TFLINT_ARGS[@]}" 2>"$DIR_STDERR") || DIR_EC=$?
     # tflint: 0 = clean, 2 = issues found. Anything else (or empty stdout
     # after a non-success code) is a crash — fail-closed.
     if [[ "$DIR_EC" -ne 0 && "$DIR_EC" -ne 2 ]] || { [[ "$DIR_EC" -ne 0 ]] && [[ -z "$DIR_OUTPUT" ]]; }; then

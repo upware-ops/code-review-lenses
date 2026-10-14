@@ -59,16 +59,16 @@ if [[ -z "${ESLINT_MOCK_FILE:-}" ]]; then
 
   # Only run if a config file is present — avoids polluting repos without ESLint.
   # Use GITHUB_WORKSPACE (repo root in CI) as primary; fall back to PWD for local runs.
-  ESLINT_CONFIG_FOUND=false
+  ESLINT_CONFIG=""
   SEARCH_DIRS=("${GITHUB_WORKSPACE:-$PWD}")
   [[ -n "${GITHUB_WORKSPACE:-}" && "$GITHUB_WORKSPACE" != "$PWD" ]] && SEARCH_DIRS+=("$PWD")
   for cfg in eslint.config.js eslint.config.mjs eslint.config.cjs \
              .eslintrc.js .eslintrc.cjs .eslintrc.yaml .eslintrc.yml .eslintrc.json .eslintrc; do
     for dir in "${SEARCH_DIRS[@]}"; do
-      [[ -f "$dir/$cfg" ]] && { ESLINT_CONFIG_FOUND=true; break 2; }
+      [[ -f "$dir/$cfg" ]] && { ESLINT_CONFIG="$dir/$cfg"; break 2; }
     done
   done
-  if [[ "$ESLINT_CONFIG_FOUND" == "false" ]]; then
+  if [[ -z "$ESLINT_CONFIG" ]]; then
     echo "WARNING: no ESLint config in ${SEARCH_DIRS[*]}; eslint check skipped." >&2
     echo "[]"
     exit 0
@@ -102,6 +102,11 @@ else
   # ESLint exits 0 (clean), 1 (lint issues found), or 2 (fatal config/plugin error).
   ESLINT_EC=0
   ESLINT_CMD=("${ESLINT_BIN[@]}" --format json)
+  # Without an explicit config, ESLint loads (and executes) configs found next to each linted file.
+  case "$ESLINT_CONFIG" in
+    */eslint.config.*) ESLINT_CMD+=(--config "$ESLINT_CONFIG") ;;
+    *) ESLINT_CMD+=(--no-eslintrc --config "$ESLINT_CONFIG") ;;
+  esac
   [[ "$ESLINT_SUPPORTS_NO_WARN_IGNORED" == "true" ]] && ESLINT_CMD+=(--no-warn-ignored)
   ESLINT_CMD+=("${JS_FILES[@]}")
   ESLINT_OUTPUT=$("${ESLINT_CMD[@]}" 2>/dev/null) || ESLINT_EC=$?

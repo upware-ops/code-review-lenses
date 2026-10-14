@@ -148,3 +148,31 @@ teardown() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e 'length > 0' >/dev/null
 }
+
+# ---------------------------------------------------------------------------
+# Trusted config and plugins (live binary stub)
+# ---------------------------------------------------------------------------
+
+@test "tflint: pins the reviewer's config and plugin dir instead of the reviewed directory's" {
+  unset TFLINT_MOCK_FILE TFLINT_CONFIG_FILE TFLINT_PLUGIN_DIR
+  mkdir -p "$WORK/bin" "$WORK/home" "$WORK/pr/mod/.tflint.d/plugins"
+  cat > "$WORK/bin/tflint" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$@" "PLUGIN_DIR=$TFLINT_PLUGIN_DIR" > "$ARGV_FILE"
+echo '{"issues":[]}'
+STUB
+  chmod +x "$WORK/bin/tflint"
+  touch "$WORK/pr/mod/main.tf" "$WORK/pr/mod/.tflint.hcl" "$WORK/.tflint.hcl"
+  cd "$WORK"
+  GITHUB_WORKSPACE="$WORK" HOME="$WORK/home" ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/main.tf"
+  [ "$status" -eq 0 ]
+  grep -qx -- "--chdir=$WORK/pr/mod" "$WORK/argv"
+  grep -qx -- "--config=$WORK/.tflint.hcl" "$WORK/argv"
+  grep -qx -- "PLUGIN_DIR=$WORK/home/.tflint.d/plugins" "$WORK/argv"
+  rm "$WORK/.tflint.hcl"
+  GITHUB_WORKSPACE="$WORK" HOME="$WORK/home" ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/main.tf"
+  [ "$status" -eq 0 ]
+  grep -qx -- "--config=/dev/null" "$WORK/argv"
+}
