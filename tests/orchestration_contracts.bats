@@ -601,3 +601,12 @@ JSON
   has "$(skill_line '**2a — extract json-findings**')" 'Normalize `category` to'
   grep -q 'per file and `category` that start within 3 lines' "$REPO_ROOT/docs/architecture.md"
 }
+
+@test "SKILL.md Phase 1b: local CHECK_PATHS starting with - get ./ so analyzers never read them as options" {
+  block=$(awk '/^CHECK_PATHS=\$\(while IFS= read -r _p; do$/,/^done <<<"\$DIFF_PATHS"\)$/' "$SKILL_MD")
+  [ -n "$block" ]
+  out=$(DIFF_PATHS=$'src/a.sh\n--config=evil.js' bash -c "$block"$'\nprintf %s "$CHECK_PATHS"')
+  [ "$out" = $'src/a.sh\n./--config=evil.js' ]
+  out=$(WORKTREE_PATH=/tmp/wt DIFF_PATHS=$'--config=evil.js' bash -c "$block"$'\nprintf %s "$CHECK_PATHS"')
+  [ "$out" = "/tmp/wt/--config=evil.js" ]
+}

@@ -423,13 +423,14 @@ Launch scheduled agents in parallel within the host's concurrency limit, collect
 
 ### Phase 1b: Deterministic checks
 
-Skip the whole phase when `RUN_CVE` and `RUN_STATIC_ANALYZERS` are both false (summary profile). Scripts run in the reviewer checkout, so a PR/MR-URL review hands them worktree paths:
+Skip the whole phase when `RUN_CVE` and `RUN_STATIC_ANALYZERS` are both false (summary profile). Scripts run in the reviewer checkout, so a PR/MR-URL review hands them worktree paths; a local path starting with `-` gets `./` so no tool reads it as an option:
 
 ```bash
-CHECK_PATHS="$DIFF_PATHS"
-if [[ -n "${WORKTREE_PATH:-}" ]]; then
-  CHECK_PATHS=$(while IFS= read -r _p; do [[ -z "$_p" ]] || printf '%s\n' "$WORKTREE_PATH/$_p"; done <<<"$DIFF_PATHS")
-fi
+CHECK_PATHS=$(while IFS= read -r _p; do
+  [[ -z "$_p" ]] && continue
+  if [[ -n "${WORKTREE_PATH:-}" ]]; then _p="$WORKTREE_PATH/$_p"; elif [[ "$_p" == -* ]]; then _p="./$_p"; fi
+  printf '%s\n' "$_p"
+done <<<"$DIFF_PATHS")
 ```
 
 **CVE check** when `RUN_CVE=true` and `MANIFEST_FILES` is non-empty (the script picks the manifests and lockfiles out of `CHECK_PATHS`):
