@@ -1,0 +1,66 @@
+tests/orchestration_contracts.bats
+  s_22d2264024e6d9::t_e5570e807ad1ae 372-390,392-494,496-535,537-601
+  s_22d2264024e6d9::t_dc534f1e97c548 495
+  s_22d2264024e6d9::t_0517e5ec16d43f 391
+  s_22d2264024e6d9::t_6512738d2ccf57 536
+README.md
+  s_22d2264024e6d9::t_fa6ff3869f393d 130
+agents/issue-linker.md
+  s_22d2264024e6d9::t_6b64b3a831ed68 15
+  s_22d2264024e6d9::t_a9294447bc3f87 50-52
+  s_22d2264024e6d9::t_e218d606d0d79f 41
+  s_22d2264024e6d9::t_299a06be2e7a7d 18
+  s_22d2264024e6d9::t_f1dbf0661c881f 29
+  s_22d2264024e6d9::t_ec7464a7fa4a8a 19
+docs/architecture.md
+  s_22d2264024e6d9::t_4d3ab2cbf5dd66 18
+  s_22d2264024e6d9::t_b3f8611c3c0131 87
+skills/code-review-lenses/PROVIDERS.md
+  s_22d2264024e6d9::t_eea7b8058788ba 19
+  s_22d2264024e6d9::t_211751dcee72cb 31
+  s_22d2264024e6d9::t_95efe706c86c49 20
+  s_22d2264024e6d9::t_53e82e7714bf1f 21
+  s_22d2264024e6d9::t_a87f735f359c2c 13-15
+skills/code-review-lenses/SEVERITY.md
+  s_22d2264024e6d9::t_985366af9a5a7a 10
+  s_22d2264024e6d9::t_573c51be7de4e1 65-67
+  s_22d2264024e6d9::t_b8d5b55b7c1501 24-25
+docs/governance.md
+  s_22d2264024e6d9::t_677ed7a5e980f3 10
+  s_22d2264024e6d9::t_fb0d0f147144b9 44
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_1182c090e7cd08 253
+  s_22d2264024e6d9::t_9823b477f38d46 575
+  s_22d2264024e6d9::t_03541150c0d3b7 426
+  s_22d2264024e6d9::t_500ac5d579cb89 571
+  s_22d2264024e6d9::t_3f8c3c8e9ff57c 473
+  s_22d2264024e6d9::t_e8961654116844 424-425
+  s_22d2264024e6d9::t_e139e9e79f27aa 122-130
+  s_22d2264024e6d9::t_9cf20524e68c2f 406
+  s_22d2264024e6d9::t_6f5d59eb986c25 481
+  s_22d2264024e6d9::t_eeaa9e5f6329dd 512
+  s_22d2264024e6d9::t_7abb24cc216627 513
+  s_22d2264024e6d9::t_c6a5d71992c3a8 420
+  s_22d2264024e6d9::t_645578aad943d5 29
+  s_22d2264024e6d9::t_797e267619dddd 589
+  s_22d2264024e6d9::t_9fd9d7d890f23a 393
+  s_22d2264024e6d9::t_c56d5fcfde6fe7 262-263
+  s_22d2264024e6d9::t_c585de8fa61800 573
+  s_22d2264024e6d9::t_1923b4f612fce8 402
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "72961b1dd511f228dd83b7316423a21516cf5006",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
