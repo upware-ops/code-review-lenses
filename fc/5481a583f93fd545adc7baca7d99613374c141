@@ -1,0 +1,39 @@
+tests/parse_pr_url.bats
+  s_22d2264024e6d9::t_88b7be81e682b4 193-221
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_0e464fdeac78e5 134
+  s_22d2264024e6d9::t_033768bdad4eaa 140
+skills/code-review-lenses/scripts/resolve-pr-base.sh
+  s_22d2264024e6d9::t_f4923ea423f3a2 91-116,119-120,122
+  s_22d2264024e6d9::t_f261bd01d64208 3-4,7-8,13-17,19-21,25,28-30
+  s_22d2264024e6d9::t_3e102eae2cc8f0 64-78
+skills/code-review-lenses/scripts/parse-pr-url.sh
+  s_22d2264024e6d9::t_ad569ec46646d7 13-16
+  s_22d2264024e6d9::t_fbb66b000f70f0 72
+  s_22d2264024e6d9::t_de87ccd7058b29 73-74
+  s_22d2264024e6d9::t_7db269332b72ac 131-134
+tests/resolve_pr_base.bats
+  s_22d2264024e6d9::t_fc162f9d8b083d 52-67
+  s_22d2264024e6d9::t_a0628040b39435 154-160
+  s_22d2264024e6d9::t_355b2dfed872c9 174-184
+  s_22d2264024e6d9::t_527aeeaf46966f 50-51
+  s_22d2264024e6d9::t_92a3a794a137b6 122-153,161-166,172-173,185-201
+  s_22d2264024e6d9::t_524f1599d4a471 167-171
+  s_22d2264024e6d9::t_b140e61615a208 2-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "fc5481a583f93fd545adc7baca7d99613374c141",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
