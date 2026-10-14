@@ -10,10 +10,24 @@ setup() {
   GOLANGCI_FIX="${FIXTURES_DIR}/golangci"
   WORK=$(mktemp -d)
   touch "$WORK/main.go"
+  export HOME="$WORK/home"
 }
 
 teardown() {
   rm -rf "$WORK"
+}
+
+# Stub binary: logs "<cwd>|<args>" to $GL_LOG, exits 3 if ./fail exists, else copies ./out.json to the --output.json.path file.
+make_golangci_stub() {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/golangci-lint" << 'EOF'
+#!/bin/sh
+printf '%s|%s\n' "$PWD" "$*" >> "$GL_LOG"
+[ -f fail ] && { echo boom >&2; exit 3; }
+cp out.json "${2#--output.json.path=}"
+EOF
+  chmod +x "$WORK/bin/golangci-lint"
+  export GL_LOG="$WORK/gl.log"
 }
 
 @test "golangci-lint: issues map to findings with exit 0" {
@@ -63,18 +77,81 @@ teardown() {
 #!/bin/sh
 [ -f go.mod ] || { echo "not in module root: $PWD" >&2; exit 3; }
 case "$*" in
-  "run --output.json.path=/"*" --path-mode=abs --issues-exit-code=0 ./a/... ./b/...") ;;
+  "run --output.json.path=/"*" --path-mode=abs --issues-exit-code=0 --no-config ./a/... ./b/...") ;;
   *) echo "unexpected args: $*" >&2; exit 3 ;;
 esac
 printf '{"Issues":[{"FromLinter":"errcheck","Text":"x","Pos":{"Filename":"%s/a/x.go","Line":3}}]}\n' "$PWD" > "${2#--output.json.path=}"
 printf '1 issues:\n* errcheck: 1\n'
 EOF
   chmod +x "$WORK/bin/golangci-lint"
-  PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' "$WORK/mod/a/x.go" "$WORK/mod/a/y.go" "$WORK/mod/b/z.go")"
+  GITHUB_WORKSPACE="$WORK" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' "$WORK/mod/a/x.go" "$WORK/mod/a/y.go" "$WORK/mod/b/z.go")"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e --arg f "$WORK/mod/a/x.go" 'length == 1 and .[0].file == $f and .[0].line == 3' >/dev/null
   cd "$WORK"
-  PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' mod/a/x.go mod/a/y.go mod/b/z.go)"
+  GITHUB_WORKSPACE="$WORK" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' mod/a/x.go mod/a/y.go mod/b/z.go)"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.[0].file == "mod/a/x.go"' >/dev/null
+}
+
+@test "golangci-lint: live run lints each Go module from its own root and merges the findings" {
+  unset GOLANGCI_MOCK_FILE
+  make_golangci_stub
+  mkdir -p "$WORK/modA/a" "$WORK/modA/b" "$WORK/modB/c" "$WORK/loose"
+  touch "$WORK/modA/go.mod" "$WORK/modA/a/x.go" "$WORK/modA/b/z.go" "$WORK/modB/go.mod" "$WORK/modB/c/w.go" "$WORK/loose/gen.go"
+  printf '{"Issues":[{"FromLinter":"errcheck","Text":"a","Pos":{"Filename":"%s/modA/a/x.go","Line":3}}]}\n' "$WORK" > "$WORK/modA/out.json"
+  printf '{"Issues":[{"FromLinter":"govet","Text":"b","Pos":{"Filename":"%s/modB/c/w.go","Line":7}}]}\n' "$WORK" > "$WORK/modB/out.json"
+  cd "$WORK"
+  GITHUB_WORKSPACE="$WORK" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' modA/a/x.go modB/c/w.go loose/gen.go modA/b/z.go)"
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '' "$WORK/gl.log")" -eq 2 ]
+  [[ "$(sed -n 1p "$WORK/gl.log")" == "$WORK/modA|run --output.json.path=/"*" --path-mode=abs --issues-exit-code=0 --no-config ./a/... ./b/..." ]]
+  [[ "$(sed -n 2p "$WORK/gl.log")" == "$WORK/modB|run --output.json.path=/"*" --path-mode=abs --issues-exit-code=0 --no-config ./c/..." ]]
+  [[ "$stderr" == *"loose/gen.go"* ]]
+  echo "$output" | jq -e 'map(.file) == ["modA/a/x.go", "modB/c/w.go"] and map(.line) == [3, 7]' >/dev/null
+}
+
+@test "golangci-lint: a failing module run is exit 1 with empty array" {
+  unset GOLANGCI_MOCK_FILE
+  make_golangci_stub
+  mkdir -p "$WORK/modA/a" "$WORK/modB/c"
+  touch "$WORK/modA/go.mod" "$WORK/modA/a/x.go" "$WORK/modB/go.mod" "$WORK/modB/c/w.go" "$WORK/modB/fail"
+  printf '{"Issues":[{"FromLinter":"errcheck","Text":"a","Pos":{"Filename":"%s/modA/a/x.go","Line":3}}]}\n' "$WORK" > "$WORK/modA/out.json"
+  cd "$WORK"
+  GITHUB_WORKSPACE="$WORK" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' modA/a/x.go modB/c/w.go)"
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+  [[ "$stderr" == *"modB"*"exit 3"*"boom"* ]]
+}
+
+@test "golangci-lint: pins the reviewer's config, or --no-config, never the reviewed module's" {
+  unset GOLANGCI_MOCK_FILE
+  make_golangci_stub
+  mkdir -p "$WORK/ws" "$WORK/pr/mod/a"
+  touch "$WORK/pr/mod/go.mod" "$WORK/pr/mod/a/x.go" "$WORK/pr/mod/.golangci.yml"
+  echo '{"Issues":[]}' > "$WORK/pr/mod/out.json"
+  cd "$WORK"
+  for name in .golangci.yml .golangci.yaml .golangci.toml .golangci.json; do
+    touch "$WORK/ws/$name"
+    : > "$WORK/gl.log"
+    GITHUB_WORKSPACE="$WORK/ws" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/a/x.go"
+    [ "$status" -eq 0 ]
+    [[ "$(cat "$WORK/gl.log")" == "$WORK/pr/mod|run "*" --issues-exit-code=0 --config=$WORK/ws/$name ./a/..." ]]
+    rm "$WORK/ws/$name"
+  done
+  : > "$WORK/gl.log"
+  GITHUB_WORKSPACE="$WORK/ws" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/a/x.go"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$WORK/gl.log")" == "$WORK/pr/mod|run "*" --issues-exit-code=0 --no-config ./a/..." ]]
+  mkdir -p "$HOME"
+  touch "$HOME/.golangci.yml"
+  : > "$WORK/gl.log"
+  GITHUB_WORKSPACE="$WORK/ws" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/a/x.go"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$WORK/gl.log")" == "$WORK/pr/mod|run "*" --issues-exit-code=0 --config=$HOME/.golangci.yml ./a/..." ]]
+  touch "$WORK/ws/.golangci.yml"
+  : > "$WORK/gl.log"
+  cd "$WORK/ws"
+  GITHUB_WORKSPACE="" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/a/x.go"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$WORK/gl.log")" == "$WORK/pr/mod|run "*" --issues-exit-code=0 --config=$WORK/ws/.golangci.yml ./a/..." ]]
 }

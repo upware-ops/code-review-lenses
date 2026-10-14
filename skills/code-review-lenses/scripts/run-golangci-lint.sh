@@ -60,56 +60,68 @@ if [[ -n "${GOLANGCI_MOCK_FILE:-}" ]]; then
   fi
   GL_OUTPUT=$(cat "$GOLANGCI_MOCK_FILE")
 else
-  # golangci-lint must run from the Go module root (where go.mod lives).
-  # Walk up from the first changed file's directory.
-  MODULE_ROOT=""
-  _dir=$(dirname "${GO_FILES[0]}")
-  while true; do
-    if [[ -f "$_dir/go.mod" ]]; then
-      MODULE_ROOT="$_dir"
-      break
-    fi
-    [[ "$_dir" == "/" || "$_dir" == "." ]] && break
-    _dir=$(dirname "$_dir")
-  done
-  # Final check: CWD itself
-  if [[ -z "$MODULE_ROOT" && -f "go.mod" ]]; then
-    MODULE_ROOT="."
-  fi
-  if [[ -z "$MODULE_ROOT" ]]; then
-    echo "WARNING: could not find go.mod — golangci-lint check skipped." >&2
-    echo "[]"
-    exit 0
-  fi
-
-  # Derive unique package directories relative to the module root
-  PKG_PATTERNS=()
+  # golangci-lint must run from the root of each Go module (where go.mod lives).
+  # Walk up from every changed file's directory to its nearest go.mod.
+  FILE_ROOTS=()
   for f in "${GO_FILES[@]}"; do
-    d=$(dirname "$f")
-    if [[ "$MODULE_ROOT" == "." ]]; then
-      rel_d="$d"
-    else
-      rel_d="${d#"${MODULE_ROOT}/"}"
-      [[ "$rel_d" == "$d" ]] && rel_d="."
-    fi
-    already=false
-    for p in "${PKG_PATTERNS[@]+"${PKG_PATTERNS[@]}"}"; do
-      [[ "$p" == "./${rel_d}/..." ]] && { already=true; break; }
+    _dir=$(dirname "$f")
+    until [[ -f "$_dir/go.mod" || "$_dir" == "/" || "$_dir" == "." ]]; do
+      _dir=$(dirname "$_dir")
     done
-    [[ "$already" == "false" ]] && PKG_PATTERNS+=("./${rel_d}/...")
+    if [[ -f "$_dir/go.mod" ]]; then
+      FILE_ROOTS+=("$_dir")
+    else
+      echo "WARNING: could not find go.mod for ${f} — skipped." >&2
+      FILE_ROOTS+=("")
+    fi
+  done
+
+  # Without an explicit config, golangci-lint loads the first one found from the module root upward, which a reviewed PR controls.
+  GL_CONFIG_ARG="--no-config"
+  for cfg in "${GITHUB_WORKSPACE:-$PWD}"/.golangci.{yml,yaml,toml,json} "$HOME"/.golangci.{yml,yaml,toml,json}; do
+    [[ -f "$cfg" ]] && { GL_CONFIG_ARG="--config=$cfg"; break; }
   done
 
   GOLANGCI_STDERR=$(mktemp)
   GOLANGCI_JSON=$(mktemp)
   trap 'rm -f "$GOLANGCI_STDERR" "$GOLANGCI_JSON"' EXIT
-  GL_EC=0
-  (cd "$MODULE_ROOT" && golangci-lint run --output.json.path="$GOLANGCI_JSON" --path-mode=abs --issues-exit-code=0 "${PKG_PATTERNS[@]}" >/dev/null 2>"$GOLANGCI_STDERR") || GL_EC=$?
-  GL_OUTPUT=$(cat "$GOLANGCI_JSON")
-  if [[ "$GL_EC" -ne 0 || -z "$GL_OUTPUT" ]]; then
-    echo "WARNING: golangci-lint failed (exit ${GL_EC}). stderr: $(cat "$GOLANGCI_STDERR")" >&2
-    echo "[]"
-    exit 1
-  fi
+
+  GL_OUTPUT=""
+  SEEN_ROOTS=$'\n'
+  for i in "${!GO_FILES[@]}"; do
+    MODULE_ROOT="${FILE_ROOTS[$i]}"
+    [[ -z "$MODULE_ROOT" || "$SEEN_ROOTS" == *$'\n'"$MODULE_ROOT"$'\n'* ]] && continue
+    SEEN_ROOTS+="$MODULE_ROOT"$'\n'
+
+    # Derive unique package directories relative to the module root
+    PKG_PATTERNS=()
+    for j in "${!GO_FILES[@]}"; do
+      [[ "${FILE_ROOTS[$j]}" == "$MODULE_ROOT" ]] || continue
+      d=$(dirname "${GO_FILES[$j]}")
+      if [[ "$MODULE_ROOT" == "." ]]; then
+        rel_d="$d"
+      else
+        rel_d="${d#"${MODULE_ROOT}/"}"
+        [[ "$rel_d" == "$d" ]] && rel_d="."
+      fi
+      already=false
+      for p in "${PKG_PATTERNS[@]+"${PKG_PATTERNS[@]}"}"; do
+        [[ "$p" == "./${rel_d}/..." ]] && { already=true; break; }
+      done
+      [[ "$already" == "false" ]] && PKG_PATTERNS+=("./${rel_d}/...")
+    done
+
+    : >"$GOLANGCI_JSON"
+    GL_EC=0
+    (cd "$MODULE_ROOT" && golangci-lint run --output.json.path="$GOLANGCI_JSON" --path-mode=abs --issues-exit-code=0 "$GL_CONFIG_ARG" "${PKG_PATTERNS[@]}" >/dev/null 2>"$GOLANGCI_STDERR") || GL_EC=$?
+    MODULE_OUTPUT=$(cat "$GOLANGCI_JSON")
+    if [[ "$GL_EC" -ne 0 || -z "$MODULE_OUTPUT" ]]; then
+      echo "WARNING: golangci-lint failed in '${MODULE_ROOT}' (exit ${GL_EC}). stderr: $(cat "$GOLANGCI_STDERR")" >&2
+      echo "[]"
+      exit 1
+    fi
+    GL_OUTPUT+="$MODULE_OUTPUT"$'\n'
+  done
 fi
 
 if [[ -z "$GL_OUTPUT" ]]; then
@@ -121,9 +133,9 @@ fi
 # Severity mapping by linter name:
 #   errcheck, govet, staticcheck → High
 #   everything else               → Medium
-FINDINGS=$(echo "$GL_OUTPUT" | jq -r --arg cwd "$PWD/" '
+FINDINGS=$(echo "$GL_OUTPUT" | jq -rs --arg cwd "$PWD/" '
   [
-    .Issues[]? |
+    .[].Issues[]? |
     {
       severity: (
         if (.FromLinter == "errcheck" or .FromLinter == "govet" or .FromLinter == "staticcheck")
