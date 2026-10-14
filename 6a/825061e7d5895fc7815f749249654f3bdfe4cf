@@ -1,0 +1,28 @@
+tests/fixtures/kubelinter/kubelinter-invalid-object.json
+  s_22d2264024e6d9::t_5107d3278491c6 11
+tests/run_kube_linter.bats
+  s_22d2264024e6d9::t_2d86ce255c1698 132-141
+  s_22d2264024e6d9::t_5107d3278491c6 18-28,88-92,94,97-131,142-151,243
+skills/code-review-lenses/scripts/run-kube-linter.sh
+  s_22d2264024e6d9::t_3bbcb89d83257f 62
+  s_22d2264024e6d9::t_5107d3278491c6 43-56,58,67,73,79-81
+  s_22d2264024e6d9::t_dc1513fb092d94 82
+docs/static-analyzers.md
+  s_22d2264024e6d9::t_6fc0f388538707 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "6a825061e7d5895fc7815f749249654f3bdfe4cf",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
