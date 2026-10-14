@@ -20,6 +20,21 @@ teardown() {
   unset GITHUB_WORKSPACE
 }
 
+# Stub eslint at $1: logs "<cwd>|<argv0>|<args>" to $ESLINT_LOG and reports one finding for its last argument.
+make_eslint_stub() {
+  mkdir -p "$(dirname "$1")"
+  cat > "$1" << 'EOF'
+#!/bin/sh
+case "$*" in *--help*) echo "--no-warn-ignored"; exit 0 ;; esac
+printf '%s|%s|%s\n' "$PWD" "$0" "$*" >> "$ESLINT_LOG"
+for last; do :; done
+printf '[{"filePath":"%s","messages":[{"ruleId":"no-undef","severity":2,"message":"x","line":1}]}]\n' "$last"
+exit 1
+EOF
+  chmod +x "$1"
+  export ESLINT_LOG="$WORK/eslint.log"
+}
+
 # ---------------------------------------------------------------------------
 # No-op paths
 # ---------------------------------------------------------------------------
@@ -233,6 +248,86 @@ EOF
   [ "$status" -eq 0 ]
   [ "$(grep -c -x -- '--no-eslintrc' "$WORK/argv")" -eq 0 ]
   [ "$(grep -A1 -x -- '--config' "$WORK/argv" | tail -1)" = "$WORK/eslint.config.js" ]
+}
+
+@test "eslint: a flat config lints checkout files only and warns once naming the files outside the checkout" {
+  unset ESLINT_MOCK_FILE
+  make_eslint_stub "$WORK/node_modules/.bin/eslint"
+  mkdir -p "$BATS_TEST_TMPDIR/pr"
+  touch "$WORK/eslint.config.js" "$WORK/local.js" "$WORK/abs.js" "$BATS_TEST_TMPDIR/pr/a.js" "$BATS_TEST_TMPDIR/pr/b.js"
+  cd "$WORK"
+  run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' "$BATS_TEST_TMPDIR/pr/a.js" local.js "$WORK/abs.js" "$BATS_TEST_TMPDIR/pr/b.js")"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$ESLINT_LOG")" = "$WORK|$WORK/node_modules/.bin/eslint|--format json --config $WORK/eslint.config.js --no-warn-ignored local.js $WORK/abs.js" ]
+  echo "$output" | jq -e 'map(.file) == ["abs.js"]' >/dev/null
+  [ "$(printf '%s\n' "$stderr" | grep -c '')" -eq 1 ]
+  [[ "$stderr" == "WARNING: eslint: not linting 2 file(s) outside the reviewer checkout with a flat config"*"): $BATS_TEST_TMPDIR/pr/a.js $BATS_TEST_TMPDIR/pr/b.js" ]]
+}
+
+@test "eslint: a flat config with only files outside the checkout warns and does not run eslint" {
+  unset ESLINT_MOCK_FILE
+  make_eslint_stub "$WORK/node_modules/.bin/eslint"
+  touch "$WORK/eslint.config.js" "$BATS_TEST_TMPDIR/x.js"
+  cd "$WORK"
+  run --separate-stderr bash "$SCRIPT" "$BATS_TEST_TMPDIR/x.js"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  [[ "$stderr" == "WARNING: eslint: not linting 1 file(s) outside the reviewer checkout with a flat config"*"): $BATS_TEST_TMPDIR/x.js" ]]
+  [ ! -e "$ESLINT_LOG" ]
+}
+
+@test "eslint: a changed file whose relative path starts with - is passed as a path, not an option" {
+  unset ESLINT_MOCK_FILE
+  make_eslint_stub "$WORK/node_modules/.bin/eslint"
+  cd "$WORK"
+  touch -- "--config=evil.js"
+  run --separate-stderr bash "$SCRIPT" "--config=evil.js"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$ESLINT_LOG")" == *" --no-warn-ignored ./--config=evil.js" ]]
+}
+
+@test "eslint: a legacy config still lints files outside the checkout, from the checkout" {
+  unset ESLINT_MOCK_FILE
+  make_eslint_stub "$WORK/node_modules/.bin/eslint"
+  touch "$BATS_TEST_TMPDIR/x.js"
+  cd "$WORK"
+  run --separate-stderr bash "$SCRIPT" "$BATS_TEST_TMPDIR/x.js"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$ESLINT_LOG")" = "$WORK|$WORK/node_modules/.bin/eslint|--format json --no-eslintrc --config $WORK/.eslintrc.json --no-warn-ignored $BATS_TEST_TMPDIR/x.js" ]
+  echo "$output" | jq -e --arg f "$BATS_TEST_TMPDIR/x.js" 'map(.file) == [$f]' >/dev/null
+  [ -z "$stderr" ]
+}
+
+@test "eslint: the npx fallback runs the eslint that npx resolves, by absolute path" {
+  unset ESLINT_MOCK_FILE
+  make_eslint_stub "$WORK/hoisted/eslint"
+  mkdir -p "$WORK/bin"
+  printf '#!/bin/sh\n[ "$*" = "--no -c command -v eslint" ] && echo "%s"\n' "$WORK/hoisted/eslint" > "$WORK/bin/npx"
+  chmod +x "$WORK/bin/npx"
+  touch "$WORK/local.js"
+  cd "$WORK"
+  PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" local.js
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$ESLINT_LOG")" == "$WORK|$WORK/hoisted/eslint|"*" local.js" ]]
+}
+
+@test "eslint: an npx that cannot resolve eslint skips with a warning and never runs npx eslint" {
+  unset ESLINT_MOCK_FILE
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/npx" << 'EOF'
+#!/bin/sh
+echo "$*" >> "$NPX_LOG"
+case "$*" in "--no -c "*) exit 1 ;; esac
+exit 0
+EOF
+  chmod +x "$WORK/bin/npx"
+  touch "$WORK/local.js"
+  cd "$WORK"
+  NPX_LOG="$WORK/npx.log" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" local.js
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  [[ "$stderr" == *"eslint not found"* ]]
+  [ "$(cat "$WORK/npx.log")" = "--no -c command -v eslint" ]
 }
 
 @test "eslint: accepts file list via stdin" {

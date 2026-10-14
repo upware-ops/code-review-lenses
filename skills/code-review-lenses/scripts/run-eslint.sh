@@ -36,14 +36,14 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-# Resolve eslint binary: prefer local node_modules, fall back to npx
+# Resolve eslint binary to an absolute path: prefer local node_modules, fall back to npx
 ESLINT_BIN=()
 ESLINT_SUPPORTS_NO_WARN_IGNORED=false
 if [[ -z "${ESLINT_MOCK_FILE:-}" ]]; then
   if [[ -x "./node_modules/.bin/eslint" ]]; then
-    ESLINT_BIN=("./node_modules/.bin/eslint")
-  elif command -v npx >/dev/null 2>&1 && npx --no eslint --version >/dev/null 2>&1; then
-    ESLINT_BIN=("npx" "eslint")
+    ESLINT_BIN=("$PWD/node_modules/.bin/eslint")
+  elif command -v npx >/dev/null 2>&1 && NPX_ESLINT=$(npx --no -c 'command -v eslint' 2>/dev/null) && [[ "$NPX_ESLINT" == /* ]]; then
+    ESLINT_BIN=("$NPX_ESLINT")
   else
     echo "WARNING: eslint not found (tried node_modules/.bin/eslint and npx); eslint check skipped." >&2
     echo "[]"
@@ -79,6 +79,7 @@ fi
 JS_FILES=()
 while IFS= read -r file; do
   [[ -z "$file" ]] && continue
+  [[ "$file" == -* ]] && file="./$file"
   case "$file" in
     *.js|*.jsx|*.ts|*.tsx|*.mjs|*.cjs)
       [[ -f "$file" ]] && JS_FILES+=("$file") ;;
@@ -104,10 +105,32 @@ else
   ESLINT_CMD=("${ESLINT_BIN[@]}" --format json)
   # Without an explicit config, ESLint loads (and executes) configs found next to each linted file.
   case "$ESLINT_CONFIG" in
-    */eslint.config.*) ESLINT_CMD+=(--config "$ESLINT_CONFIG") ;;
-    *) ESLINT_CMD+=(--no-eslintrc --config "$ESLINT_CONFIG") ;;
+    */eslint.config.*) ESLINT_FLAT=true; ESLINT_CMD+=(--config "$ESLINT_CONFIG") ;;
+    *) ESLINT_FLAT=false; ESLINT_CMD+=(--no-eslintrc --config "$ESLINT_CONFIG") ;;
   esac
   [[ "$ESLINT_SUPPORTS_NO_WARN_IGNORED" == "true" ]] && ESLINT_CMD+=(--no-warn-ignored)
+
+  # Flat config patterns are relative to the cwd, so ESLint silently skips files outside it; running from their tree would load that tree's project configs.
+  if [[ "$ESLINT_FLAT" == "true" ]]; then
+    KEPT_FILES=()
+    SKIPPED_FILES=()
+    for f in "${JS_FILES[@]}"; do
+      if [[ "$f" != /* || "$f" == "$PWD"/* ]]; then
+        KEPT_FILES+=("$f")
+      else
+        SKIPPED_FILES+=("$f")
+      fi
+    done
+    if [[ ${#SKIPPED_FILES[@]} -gt 0 ]]; then
+      echo "WARNING: eslint: not linting ${#SKIPPED_FILES[@]} file(s) outside the reviewer checkout with a flat config (linting them would load the reviewed tree's project configs): ${SKIPPED_FILES[*]}" >&2
+    fi
+    if [[ ${#KEPT_FILES[@]} -eq 0 ]]; then
+      echo "[]"
+      exit 0
+    fi
+    JS_FILES=("${KEPT_FILES[@]}")
+  fi
+
   ESLINT_CMD+=("${JS_FILES[@]}")
   ESLINT_OUTPUT=$("${ESLINT_CMD[@]}" 2>/dev/null) || ESLINT_EC=$?
   if [[ "$ESLINT_EC" -ne 0 && "$ESLINT_EC" -ne 1 ]]; then
