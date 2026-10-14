@@ -1,12 +1,19 @@
 tests/fixtures/kubelinter/kubelinter-invalid-object.json
   s_22d2264024e6d9::t_5107d3278491c6 11
+  s_22d2264024e6d9::t_4ffcab61898a9c 11
 tests/run_kube_linter.bats
   s_22d2264024e6d9::t_2d86ce255c1698 132-141
   s_22d2264024e6d9::t_5107d3278491c6 18-28,88-92,94,97-131,142-151,243
+  s_22d2264024e6d9::t_77b9afa62960ad 88-92,94,97-131,142-151
+  s_22d2264024e6d9::t_a623672bbd0989 18-28
+  s_22d2264024e6d9::t_2ae09ac293fe0d 243
 skills/code-review-lenses/scripts/run-kube-linter.sh
   s_22d2264024e6d9::t_3bbcb89d83257f 62
   s_22d2264024e6d9::t_5107d3278491c6 43-56,58,67,73,79-81
   s_22d2264024e6d9::t_dc1513fb092d94 82
+  s_22d2264024e6d9::t_d2241ba0fd6173 43-55,58,67,73,79-81
+  s_22d2264024e6d9::t_63ccbc644034a9 56
+  s_22d2264024e6d9::t_af5c5d066a3a6b 82
 docs/static-analyzers.md
   s_22d2264024e6d9::t_6fc0f388538707 25
 ---
