@@ -85,6 +85,17 @@ gate_value() {
   [ "$(gate_value GATE_CONTROL_FLOW)" = "false" ]
 }
 
+@test "gates: >100KB of added lines still triggers GATE_CONTROL_FLOW (echo|grep -q SIGPIPEs under pipefail)" {
+  {
+    printf '%s\n' '+if (x) {'
+    for _ in {1..8000}; do printf '%s\n' '+  let padding = 0;'; done
+  } > "$WORK/large.diff"
+  [ "$(wc -c < "$WORK/large.diff" | tr -d ' ')" -gt 102400 ]
+  DIFF_FILE="$WORK/large.diff" DIFF_PATHS="src/main.js" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ "$(gate_value GATE_CONTROL_FLOW)" = "true" ]
+}
+
 # ---------------------------------------------------------------------------
 # GATE_SECURITY_PATTERNS
 # ---------------------------------------------------------------------------

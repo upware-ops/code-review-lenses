@@ -60,7 +60,7 @@ DOCS_ONLY=false
 LOW_RISK_CONFIG=false
 if [[ "$DOCS_ONLY" == "false" && "$GATE_SECURITY_PATTERNS" == "false" ]]; then
   _nonempty=$(printf '%s\n' "${DIFF_PATHS-}" | sed '/^$/d')
-  if [[ -n "$_nonempty" ]] && ! echo "$_nonempty" | grep -qiEv '\.(ya?ml|toml|ini|conf|cfg|env\.example)$'; then
+  if [[ -n "$_nonempty" ]] && ! grep -qiEv '\.(ya?ml|toml|ini|conf|cfg|env\.example)$' <<< "$_nonempty"; then
     LOW_RISK_CONFIG=true
   fi
 fi

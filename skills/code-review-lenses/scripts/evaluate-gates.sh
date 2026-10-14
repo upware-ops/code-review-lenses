@@ -52,7 +52,7 @@ _added_lines=$(grep -E '^\+' "$DIFF_FILE") || _rc=$?
 if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed reading $DIFF_FILE" >&2; exit 1; fi
 if [[ -n "$_added_lines" ]]; then
   _rc=0
-  echo "$_added_lines" | grep -qE '\b(if|elif|else|for|while|do|case|switch|match|try|catch|except|rescue|unless|when|loop|break|continue|return|goto|defer|finally)\b' || _rc=$?
+  grep -qE '\b(if|elif|else|for|while|do|case|switch|match|try|catch|except|rescue|unless|when|loop|break|continue|return|goto|defer|finally)\b' <<< "$_added_lines" || _rc=$?
   if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed on added lines" >&2; exit 1; fi
   if [[ $_rc -eq 0 ]]; then GATE_CONTROL_FLOW=true; fi
 fi
@@ -65,7 +65,7 @@ grep -qiE 'auth|token|secret|password|crypt|hash|\bsign\b|verify|exec\b|eval\b|s
 if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed reading $DIFF_FILE" >&2; exit 1; fi
 if [[ $_rc -eq 0 ]]; then GATE_SECURITY_PATTERNS=true; fi
 _rc=0
-echo "$DIFF_PATHS" | grep -qiE '(auth|passwords?|credentials?|tokens?|secrets?)|(^|/)(api|routes?)/|(^|/)(package\.json|package-lock\.json|go\.mod|go\.sum|composer\.json|composer\.lock|requirements[^/]*\.txt|pyproject\.toml|Pipfile(\.lock)?|Gemfile(\.lock)?|[Cc]argo\.(toml|lock)|yarn\.lock|pnpm-lock\.yaml)$|(^|/)\.env|(^|/)settings\.(py|ya?ml|json|toml)$|(^|/)(Dockerfile|Containerfile)$|\.sh$|\.bash$|(^|/)\.github/workflows/' || _rc=$?
+grep -qiE '(auth|passwords?|credentials?|tokens?|secrets?)|(^|/)(api|routes?)/|(^|/)(package\.json|package-lock\.json|go\.mod|go\.sum|composer\.json|composer\.lock|requirements[^/]*\.txt|pyproject\.toml|Pipfile(\.lock)?|Gemfile(\.lock)?|[Cc]argo\.(toml|lock)|yarn\.lock|pnpm-lock\.yaml)$|(^|/)\.env|(^|/)settings\.(py|ya?ml|json|toml)$|(^|/)(Dockerfile|Containerfile)$|\.sh$|\.bash$|(^|/)\.github/workflows/' <<< "$DIFF_PATHS" || _rc=$?
 if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed reading DIFF_PATHS" >&2; exit 1; fi
 if [[ $_rc -eq 0 ]]; then GATE_SECURITY_PATTERNS=true; fi
 
