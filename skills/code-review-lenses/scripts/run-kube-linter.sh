@@ -40,27 +40,45 @@ if [[ -z "${KUBELINTER_MOCK_FILE:-}" ]] && ! command -v kube-linter >/dev/null 2
   exit 0
 fi
 
-# Filter to YAML/JSON files that look like Kubernetes manifests (apiVersion + kind), skipping Helm templates ({{) that cannot decode
+add_manifest() {
+  local dir
+  dir=$(dirname -- "$1")
+  while [[ "$dir" != "." && "$dir" != "/" ]]; do
+    if [[ "$(basename -- "$dir")" == "templates" && -f "$(dirname -- "$dir")/Chart.yaml" ]]; then
+      HELM_SKIPPED+=("$1")
+      return 0
+    fi
+    dir=$(dirname -- "$dir")
+  done
+  K8S_FILES+=("$1")
+}
+
+# Filter to YAML/JSON files that look like Kubernetes manifests (apiVersion + kind), skipping Helm chart templates that cannot decode until rendered
 K8S_FILES=()
+HELM_SKIPPED=()
 while IFS= read -r file; do
   [[ -z "$file" ]] && continue
   [[ -f "$file" ]] || continue
-  grep -qF '{{' "$file" 2>/dev/null && continue
+  [[ "$file" == -* ]] && file="./$file"
   case "$file" in
     *.yaml|*.yml)
       # YAML K8s heuristic: apiVersion: and kind: as top-level keys
       if grep -qE '^apiVersion:' "$file" 2>/dev/null && grep -qE '^kind:' "$file" 2>/dev/null; then
-        K8S_FILES+=("$file")
+        add_manifest "$file"
       fi
       ;;
     *.json)
       # JSON K8s heuristic: "apiVersion": and "kind": as object keys
       if grep -qE '"apiVersion"\s*:' "$file" 2>/dev/null && grep -qE '"kind"\s*:' "$file" 2>/dev/null; then
-        K8S_FILES+=("$file")
+        add_manifest "$file"
       fi
       ;;
   esac
 done <<< "$CHANGED_FILES"
+
+if [[ ${#HELM_SKIPPED[@]} -gt 0 ]]; then
+  echo "kube-linter: skipped Helm chart templates (render them with helm template to lint): ${HELM_SKIPPED[*]}" >&2
+fi
 
 if [[ ${#K8S_FILES[@]} -eq 0 ]]; then
   echo "[]"

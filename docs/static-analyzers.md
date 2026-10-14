@@ -22,7 +22,7 @@ In addition to LLM agents, the skill runs deterministic checks when relevant fil
 | **checkov** — IaC security scanning | `*.tf`, `*.tfvars`, `Dockerfile`, k8s YAML, CloudFormation, Azure ARM changed | quick, security, full, deep | `checkov` |
 | **eslint** — JavaScript/TypeScript linting | `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` files changed; only runs when an ESLint config is present; parse errors are findings | quick, security, full, deep | `eslint` (via `npx` or `node_modules/.bin`) |
 | **hadolint** — Dockerfile linting | `Dockerfile`, `Dockerfile.*`, or `*.dockerfile` changed | quick, security, full, deep | `hadolint` |
-| **kube-linter** — Kubernetes manifest linting | `.yaml`, `.yml`, or `.json` files containing `apiVersion` and `kind` fields (Helm `{{` templates skipped; undecodable manifests are findings) | quick, security, full, deep | `kube-linter` |
+| **kube-linter** — Kubernetes manifest linting | `.yaml`, `.yml`, or `.json` files containing `apiVersion` and `kind` fields (Helm chart templates under a chart's `templates/` are skipped with a stderr note; undecodable manifests are findings) | quick, security, full, deep | `kube-linter` |
 | **phpcs** — PHP CodeSniffer | `.php` files changed; uses Drupal/DrupalPractice standard when available, falls back to PSR-12 | quick, security, full, deep | `phpcs` |
 | **phpstan** — PHP static analysis | `.php`, `.module`, `.inc`, `.install`, `.theme` files changed | quick, security, full, deep | `phpstan` |
 | **tflint** — Terraform linting | `.tf` or `.tfvars` files changed; runs per-directory | quick, security, full, deep | `tflint` |

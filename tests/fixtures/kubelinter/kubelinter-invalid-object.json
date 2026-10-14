@@ -8,7 +8,7 @@
       "Remediation": "Confirm that the file is accessible and is valid k8s yaml.",
       "Object": {
         "Metadata": {
-          "FilePath": "/repo/k8s/broken.yaml"
+          "FilePath": "/nonexistent-kubelinter-root/k8s/broken.yaml"
         },
         "K8sObject": {
           "Namespace": "",

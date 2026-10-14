@@ -15,6 +15,17 @@ teardown() {
   rm -rf "$WORK"
 }
 
+stub_kube_linter() {
+  unset KUBELINTER_MOCK_FILE
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/kube-linter" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$@" > "$ARGV_FILE"
+echo '{"Reports":[]}'
+STUB
+  chmod +x "$WORK/bin/kube-linter"
+}
+
 # ---------------------------------------------------------------------------
 # No-op paths
 # ---------------------------------------------------------------------------
@@ -74,20 +85,70 @@ teardown() {
   echo "$output" | jq -e 'length > 0' >/dev/null
 }
 
-@test "kube-linter: Helm template passes the sniff but is not handed to kube-linter" {
-  unset KUBELINTER_MOCK_FILE
-  mkdir -p "$WORK/bin"
-  cat > "$WORK/bin/kube-linter" <<'STUB'
-#!/bin/sh
-printf '%s\n' "$@" > "$ARGV_FILE"
-echo '{"Reports":[]}'
-STUB
-  chmod +x "$WORK/bin/kube-linter"
+@test "kube-linter: Helm chart template is not handed to kube-linter and is named on stderr" {
+  stub_kube_linter
+  mkdir -p "$WORK/chart/templates"
+  printf 'apiVersion: v2\nname: app\nversion: 0.1.0\n' > "$WORK/chart/Chart.yaml"
+  cp "$KL_FIX/helm-template.yaml" "$WORK/chart/templates/deploy.yaml"
   ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
-    run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' "$KL_FIX/helm-template.yaml" "$KL_FIX/deployment.yaml")"
+    run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' "$WORK/chart/templates/deploy.yaml" "$KL_FIX/deployment.yaml")"
   [ "$status" -eq 0 ]
   grep -qxF -- "$KL_FIX/deployment.yaml" "$WORK/argv"
-  [ "$(grep -cF -- 'helm-template.yaml' "$WORK/argv")" -eq 0 ]
+  [ "$(grep -cF -- "$WORK/chart/templates/deploy.yaml" "$WORK/argv")" -eq 0 ]
+  [ "${#stderr_lines[@]}" -eq 1 ]
+  [[ "$stderr" == *"skipped Helm chart templates"*"$WORK/chart/templates/deploy.yaml" ]]
+}
+
+@test "kube-linter: chart templates are skipped for relative paths and nested template directories" {
+  stub_kube_linter
+  mkdir -p "$WORK/templates" "$WORK/chart/templates/sub"
+  printf 'apiVersion: v2\nname: root\nversion: 0.1.0\n' > "$WORK/Chart.yaml"
+  printf 'apiVersion: v2\nname: app\nversion: 0.1.0\n' > "$WORK/chart/Chart.yaml"
+  cp "$KL_FIX/helm-template.yaml" "$WORK/templates/root.yaml"
+  cp "$KL_FIX/helm-template.yaml" "$WORK/chart/templates/sub/nested.yaml"
+  cp "$KL_FIX/deployment.yaml" "$WORK/plain.yaml"
+  cd "$WORK"
+  ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' templates/root.yaml chart/templates/sub/nested.yaml plain.yaml)"
+  [ "$status" -eq 0 ]
+  grep -qxF -- plain.yaml "$WORK/argv"
+  [ "$(grep -cF -e root.yaml -e nested.yaml "$WORK/argv")" -eq 0 ]
+  [ "${#stderr_lines[@]}" -eq 1 ]
+  [[ "$stderr" == *"templates/root.yaml"*"chart/templates/sub/nested.yaml" ]]
+}
+
+@test "kube-linter: plain manifests containing {{ outside a chart are still linted" {
+  stub_kube_linter
+  { cat "$KL_FIX/deployment.yaml"; echo '# {{ }}'; } > "$WORK/comment.yaml"
+  printf 'apiVersion: v1\nkind: Pod\nmetadata:\n  name: p\n  annotations:\n    note: "{{x}}"\nspec:\n  containers:\n  - name: c\n    image: i\n    securityContext:\n      privileged: true\n' > "$WORK/annotation.yaml"
+  ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' "$WORK/comment.yaml" "$WORK/annotation.yaml")"
+  [ "$status" -eq 0 ]
+  grep -qxF -- "$WORK/comment.yaml" "$WORK/argv"
+  grep -qxF -- "$WORK/annotation.yaml" "$WORK/argv"
+  [ -z "$stderr" ]
+}
+
+@test "kube-linter: a manifest whose relative path starts with - is linted, not read as an option" {
+  stub_kube_linter
+  cp "$KL_FIX/deployment.yaml" "$WORK/-x.yaml"
+  cd "$WORK"
+  ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "-x.yaml"
+  [ "$status" -eq 0 ]
+  grep -qxF -- "./-x.yaml" "$WORK/argv"
+}
+
+@test "kube-linter: templates/ directory without a Chart.yaml beside it is not a chart" {
+  stub_kube_linter
+  mkdir -p "$WORK/app/templates"
+  printf 'apiVersion: v2\nname: decoy\nversion: 0.1.0\n' > "$WORK/Chart.yaml"
+  cp "$KL_FIX/helm-template.yaml" "$WORK/app/templates/deploy.yaml"
+  ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$WORK/app/templates/deploy.yaml"
+  [ "$status" -eq 0 ]
+  grep -qxF -- "$WORK/app/templates/deploy.yaml" "$WORK/argv"
+  [ -z "$stderr" ]
 }
 
 # ---------------------------------------------------------------------------
@@ -179,7 +240,7 @@ STUB
     run --separate-stderr bash "$SCRIPT" "$WORK/broken.yaml"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '
-    length == 1 and .[0].source == "kube-linter" and .[0].file == "/repo/k8s/broken.yaml" and .[0].line == 0
+    length == 1 and .[0].source == "kube-linter" and .[0].file == "/nonexistent-kubelinter-root/k8s/broken.yaml" and .[0].line == 0
     and (.[0].finding | startswith("failed-to-load-object: failed to decode") and contains("[resource"))
     and (.[0].remediation | contains("valid k8s yaml"))
   ' >/dev/null
