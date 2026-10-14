@@ -390,7 +390,7 @@ setup() {
   done
 }
 
-@test "Claude wrapper: safeTempPath keeps only clean absolute paths under the system temp roots" {
+@test "Claude wrapper: safeTempPath keeps only clean code-review-lenses.* paths under the system temp roots" {
   if ! command -v node >/dev/null 2>&1; then
     skip "node not installed"
   fi
@@ -398,13 +398,15 @@ setup() {
     sed -n '/^function safeTempPath/,/^}/p' "$CLAUDE_WF"
     cat <<'JS'
 const keep = [
-  '/tmp/x',
-  '/tmp/tmp.AbC123',
-  '/private/tmp/review/diff.patch',
-  '/var/folders/d4/r7jlsr2s3_gbckcs5fdrkkgr0000gn/T/tmp.JBI28RKCyr',
-  '/private/var/folders/ab/T/tmp.1/x',
+  '/tmp/code-review-lenses.AbC123',
+  '/private/tmp/code-review-lenses.x1',
+  '/var/folders/d4/r7jlsr2s3_gbckcs5fdrkkgr0000gn/T/code-review-lenses.JBI28RKCyr',
+  '/var/folders/d4/r7jlsr2s3_gbckcs5fdrkkgr0000gn/T//code-review-lenses.JBI28RKCyr',
+  '/private/var/folders/ab/T/code-review-lenses.1',
 ]
 const drop = [
+  '/tmp/x', '/tmp/tmp.AbC123', '/private/tmp/review/diff.patch', '/var/folders/ab/T/tmp.JBI28RKCyr',
+  '/tmp/code-review-lenses.x/inner', '/tmp/code-review-lensesX', '/tmp/other.code-review-lenses.x', '/tmp/code-review-lenses.x/',
   '', '/', '/tmp', '/var/folders', 'tmp/x', './tmp/x', 'x/tmp/y', '/Users/x/file', '/etc/passwd', '/tmpx/y', '/private/tmpx/y',
   '/tmp/../etc/passwd', '/tmp/a/../../b', '/tmp/..', '/var/folders/../../etc',
   '/tmp/x y', '/tmp/x\n/Users/x/file', '/tmp/x;rm', '/tmp/x$HOME', '/tmp/x`id`',
@@ -435,11 +437,11 @@ globalThis.agent = async (prompt) => {
   prompts.push(prompt)
   return reply
 }
-const note = (s) => ' Not cleaned (outside the system temp dir): ' + JSON.stringify(s)
+const note = (s) => ' Not cleaned (not a code-review-lenses temp path): ' + JSON.stringify(s)
 
 ;(async () => {
-  const wt = '/private/var/folders/ab/T/tmp.wt1'
-  const df = '/tmp/tmp.diff1'
+  const wt = '/private/var/folders/ab/T/code-review-lenses.wt1'
+  const df = '/tmp/code-review-lenses.diff1'
 
   assert.strictEqual(await cleanupNote({ worktree_path: wt, diff_file: df }), ' WORKTREE_REMOVED')
   assert.strictEqual(prompts.length, 1)
@@ -448,6 +450,8 @@ const note = (s) => ' Not cleaned (outside the system temp dir): ' + JSON.string
   prompts.length = 0
   const foreign = { worktree_path: '/Users/x/.claude/worktrees/other', diff_file: '/Users/x/notes.txt' }
   assert.strictEqual(await cleanupNote(foreign), note(foreign.worktree_path) + note(foreign.diff_file))
+  const unrelated = { worktree_path: '/tmp/other-tool', diff_file: '/var/folders/ab/T/tmp.other' }
+  assert.strictEqual(await cleanupNote(unrelated), note(unrelated.worktree_path) + note(unrelated.diff_file))
   assert.strictEqual(prompts.length, 0)
 
   assert.strictEqual(
@@ -481,11 +485,13 @@ JS
   fi
 }
 
-@test "wrappers pass only temp-dir-validated paths to destructive cleanup and name the rest in a manual note" {
+@test "wrappers pass only their own temp-dir paths to destructive cleanup and name the rest in a manual note" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     grep -q -F '/private/var/folders/' "$f"
-    grep -q -F ' Not cleaned (outside the system temp dir): ' "$f"
+    grep -q -F ' Not cleaned (not a code-review-lenses temp path): ' "$f"
   done
+  grep -q -F "if (p.split('/').pop().indexOf('code-review-lenses.') !== 0) return ''" "$CLAUDE_WF"
+  grep -q -F 'if segs[segs.len() - 1].starts_with("code-review-lenses.") == false {' "$GROK_WF"
   grep -q -F 'function safeTempPath(p) {' "$CLAUDE_WF"
   grep -q -F 'const wt = safeTempPath(p && p.worktree_path)' "$CLAUDE_WF"
   grep -q -F 'const df = safeTempPath(p && p.diff_file)' "$CLAUDE_WF"
@@ -511,13 +517,17 @@ JS
   done
 }
 
-@test "wrappers have the prelude create the URL worktree and the diff copy under the system temp dir with mktemp" {
+@test "wrappers have the prelude create the URL worktree and every diff file as code-review-lenses.* temp paths" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     [ "$(grep -c -F 'git worktree add' "$f")" -eq 1 ]
-    line=$(grep -F 'git worktree add' "$f")
-    [[ "$line" == *'WORKTREE_PATH=$(mktemp -d)'*'git worktree add'* ]]
-    [[ "$line" == *'DIFF_FILE=$(mktemp)'* ]]
-    grep -q -F -- '--diff-file <diff temp file from mktemp>' "$f"
+    line=$(grep -F 'git worktree add' "$f" | sed 's/\\"/"/g')
+    [[ "$line" == *'WORKTREE_PATH=$(mktemp -d "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'*'git worktree add'* ]]
+    [[ "$line" == *'DIFF_FILE=$(mktemp "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'* ]]
+    sed 's/\\"/"/g' "$f" | grep -q -F -- '--diff-file "$DIFF_FILE" with DIFF_FILE=$(mktemp "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'
+    if grep -q -F -e '$(mktemp)' -e '$(mktemp -d)' -e 'temp file from mktemp' "$f"; then
+      echo "REGRESSION: $f has the prelude create a temp path the cleanup check rejects" >&2
+      return 1
+    fi
   done
 }
 
