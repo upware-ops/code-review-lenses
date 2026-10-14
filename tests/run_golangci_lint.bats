@@ -54,3 +54,27 @@ teardown() {
   [ "$output" = "[]" ]
   [[ "$stderr" == *"golangci-lint not installed"* ]]
 }
+
+@test "golangci-lint: live run passes v2 flags and unique packages from the module root" {
+  unset GOLANGCI_MOCK_FILE
+  mkdir -p "$WORK/bin" "$WORK/mod/a" "$WORK/mod/b"
+  touch "$WORK/mod/go.mod" "$WORK/mod/a/x.go" "$WORK/mod/a/y.go" "$WORK/mod/b/z.go"
+  cat > "$WORK/bin/golangci-lint" << 'EOF'
+#!/bin/sh
+[ -f go.mod ] || { echo "not in module root: $PWD" >&2; exit 3; }
+case "$*" in
+  "run --output.json.path=/"*" --path-mode=abs --issues-exit-code=0 ./a/... ./b/...") ;;
+  *) echo "unexpected args: $*" >&2; exit 3 ;;
+esac
+printf '{"Issues":[{"FromLinter":"errcheck","Text":"x","Pos":{"Filename":"%s/a/x.go","Line":3}}]}\n' "$PWD" > "${2#--output.json.path=}"
+printf '1 issues:\n* errcheck: 1\n'
+EOF
+  chmod +x "$WORK/bin/golangci-lint"
+  PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' "$WORK/mod/a/x.go" "$WORK/mod/a/y.go" "$WORK/mod/b/z.go")"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e --arg f "$WORK/mod/a/x.go" 'length == 1 and .[0].file == $f and .[0].line == 3' >/dev/null
+  cd "$WORK"
+  PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' mod/a/x.go mod/a/y.go mod/b/z.go)"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.[0].file == "mod/a/x.go"' >/dev/null
+}

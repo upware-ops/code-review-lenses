@@ -18,7 +18,7 @@ In addition to LLM agents, the skill runs deterministic checks when relevant fil
 | **semgrep** — polyglot SAST | Any source file changed | quick, security, full, deep | `semgrep` |
 | **trufflehog** — secret scanning | Any file changed | quick, security, full, deep | `trufflehog` |
 | **ruff** — Python linting | `.py` files changed | quick, security, full, deep | `ruff` |
-| **golangci-lint** — Go static analysis | `.go` files changed | quick, security, full, deep | `golangci-lint` |
+| **golangci-lint** — Go static analysis | `.go` files changed | quick, security, full, deep | `golangci-lint` v2.1+ |
 | **checkov** — IaC security scanning | `*.tf`, `*.tfvars`, `Dockerfile`, k8s YAML, CloudFormation, Azure ARM changed | quick, security, full, deep | `checkov` |
 | **eslint** — JavaScript/TypeScript linting | `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` files changed; only runs when an ESLint config is present | quick, security, full, deep | `eslint` (via `npx` or `node_modules/.bin`) |
 | **hadolint** — Dockerfile linting | `Dockerfile`, `Dockerfile.*`, or `*.dockerfile` changed | quick, security, full, deep | `hadolint` |
@@ -41,7 +41,7 @@ brew install shellcheck hadolint kube-linter tflint
 pip install semgrep ruff checkov
 
 # Go-based
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
 # TruffleHog — see https://github.com/trufflesecurity/trufflehog/releases
 # or: brew install trufflehog

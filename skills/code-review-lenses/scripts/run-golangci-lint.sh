@@ -51,7 +51,7 @@ if [[ ${#GO_FILES[@]} -eq 0 ]]; then
 fi
 
 # Run golangci-lint (or read mock).
-# --out-format=json --issues-exit-code=0 ensures JSON output even when issues exist.
+# golangci-lint v2 also prints stats and config-defined formats on stdout, and reports paths relative to its config file.
 if [[ -n "${GOLANGCI_MOCK_FILE:-}" ]]; then
   if [[ ! -r "$GOLANGCI_MOCK_FILE" ]]; then
     echo "WARNING: GOLANGCI_MOCK_FILE '${GOLANGCI_MOCK_FILE}' is not readable." >&2
@@ -84,7 +84,6 @@ else
 
   # Derive unique package directories relative to the module root
   PKG_PATTERNS=()
-  declare -A _seen_dirs
   for f in "${GO_FILES[@]}"; do
     d=$(dirname "$f")
     if [[ "$MODULE_ROOT" == "." ]]; then
@@ -93,16 +92,19 @@ else
       rel_d="${d#"${MODULE_ROOT}/"}"
       [[ "$rel_d" == "$d" ]] && rel_d="."
     fi
-    if [[ -z "${_seen_dirs[$rel_d]+x}" ]]; then
-      _seen_dirs[$rel_d]=1
-      PKG_PATTERNS+=("./${rel_d}/...")
-    fi
+    already=false
+    for p in "${PKG_PATTERNS[@]+"${PKG_PATTERNS[@]}"}"; do
+      [[ "$p" == "./${rel_d}/..." ]] && { already=true; break; }
+    done
+    [[ "$already" == "false" ]] && PKG_PATTERNS+=("./${rel_d}/...")
   done
 
   GOLANGCI_STDERR=$(mktemp)
-  trap 'rm -f "$GOLANGCI_STDERR"' EXIT
+  GOLANGCI_JSON=$(mktemp)
+  trap 'rm -f "$GOLANGCI_STDERR" "$GOLANGCI_JSON"' EXIT
   GL_EC=0
-  GL_OUTPUT=$(cd "$MODULE_ROOT" && golangci-lint run --out-format=json --issues-exit-code=0 "${PKG_PATTERNS[@]}" 2>"$GOLANGCI_STDERR") || GL_EC=$?
+  (cd "$MODULE_ROOT" && golangci-lint run --output.json.path="$GOLANGCI_JSON" --path-mode=abs --issues-exit-code=0 "${PKG_PATTERNS[@]}" >/dev/null 2>"$GOLANGCI_STDERR") || GL_EC=$?
+  GL_OUTPUT=$(cat "$GOLANGCI_JSON")
   if [[ "$GL_EC" -ne 0 || -z "$GL_OUTPUT" ]]; then
     echo "WARNING: golangci-lint failed (exit ${GL_EC}). stderr: $(cat "$GOLANGCI_STDERR")" >&2
     echo "[]"
@@ -115,18 +117,11 @@ if [[ -z "$GL_OUTPUT" ]]; then
   exit 0
 fi
 
-# golangci-lint reports Pos.Filename relative to the module root.
-# Prepend MODULE_ROOT so the path matches git-relative paths.
-FILE_PREFIX=""
-if [[ -n "${MODULE_ROOT:-}" && "$MODULE_ROOT" != "." ]]; then
-  FILE_PREFIX="${MODULE_ROOT}/"
-fi
-
 # Convert golangci-lint JSON to the findings schema.
 # Severity mapping by linter name:
 #   errcheck, govet, staticcheck → High
 #   everything else               → Medium
-FINDINGS=$(echo "$GL_OUTPUT" | jq -r --arg prefix "$FILE_PREFIX" '
+FINDINGS=$(echo "$GL_OUTPUT" | jq -r --arg cwd "$PWD/" '
   [
     .Issues[]? |
     {
@@ -138,7 +133,7 @@ FINDINGS=$(echo "$GL_OUTPUT" | jq -r --arg prefix "$FILE_PREFIX" '
       ),
       confidence: 90,
       source: "golangci-lint",
-      file: ($prefix + .Pos.Filename),
+      file: (.Pos.Filename | ltrimstr($cwd)),
       line: .Pos.Line,
       finding: ("\(.FromLinter): \(.Text)"),
       remediation: "Review the \(.FromLinter) linter documentation for this issue."
