@@ -1,11 +1,19 @@
 skills/code-review-lenses/scripts/run-kube-linter.sh
   s_22d2264024e6d9::t_1b52c1a1296638 43,48,106-107,111,113-115,122-124
+  s_22d2264024e6d9::t_dbc79a799f07f9 106-107,111,113-115,122-124
+  s_22d2264024e6d9::t_b72cf4f656361c 43,48
 tests/fixtures/kubelinter/helm-template.yaml
   s_22d2264024e6d9::t_102032843acf50 1-17
+  s_22d2264024e6d9::t_eb162956c5bdea 1-17
 tests/fixtures/kubelinter/kubelinter-violations.json
   s_22d2264024e6d9::t_e1f97303c08c76 11,13-21,25
+  s_22d2264024e6d9::t_3f42a39e71a599 11,13-21,25
 tests/run_kube_linter.bats
   s_22d2264024e6d9::t_75ef5dcc3eb409 77-92,130-147,182-183
+  s_22d2264024e6d9::t_f018dc94d1d028 182-183
+  s_22d2264024e6d9::t_c7ca2b73a2d685 77-88,91-92
+  s_22d2264024e6d9::t_3d4b6c77c186c5 89-90
+  s_22d2264024e6d9::t_9c9e6ba6c37864 130-147
 ---
 {
   "schema_version": "authorship/3.0.0",
