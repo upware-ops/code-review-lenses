@@ -7,6 +7,7 @@ setup() {
   load test_helper
   REVIEW="${SCRIPTS_DIR}/review-diff.sh"
   WORK=$(mktemp -d)
+  OUT="$BATS_TEST_TMPDIR/review.diff"
   git -C "$WORK" init -q
   git -C "$WORK" config user.email t@t
   git -C "$WORK" config user.name t
@@ -80,4 +81,132 @@ teardown() {
   [[ "$output" == *"not an option"* ]]
   [[ ! -e /tmp/crl-review-diff-pwned ]]
   [[ ! -e /tmp/crl-review-diff-pwned...HEAD ]]
+}
+
+@test "review-diff: --diff-file in dirty mode has tracked changes, untracked files and both symlink kinds" {
+  echo changed > "$WORK/a"
+  echo hello > "$WORK/new.txt"
+  ln -s /nonexistent/secret "$WORK/broken"
+  ln -s "$BATS_TEST_TMPDIR" "$WORK/dirlink"
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'REVIEW_MODE=dirty\nDIFF_RANGE=main' ]
+  grep -qxF '+changed' "$OUT"
+  grep -qxF 'diff --git a/new.txt b/new.txt' "$OUT"
+  grep -qxF '+hello' "$OUT"
+  grep -A1 -xF 'diff --git a/broken b/broken' "$OUT" | grep -qxF 'new file mode 120000'
+  grep -qxF '+/nonexistent/secret' "$OUT"
+  grep -A1 -xF 'diff --git a/dirlink b/dirlink' "$OUT" | grep -qxF 'new file mode 120000'
+  grep -qxF "+$BATS_TEST_TMPDIR" "$OUT"
+}
+
+@test "review-diff: --diff-file leaves the real index, status and temp dir untouched" {
+  echo hello > "$WORK/new.txt"
+  ln -s /nonexistent/secret "$WORK/broken"
+  mkdir "$BATS_TEST_TMPDIR/tmp"
+  git -C "$WORK" status --porcelain > "$BATS_TEST_TMPDIR/status.before"
+  git -C "$WORK" ls-files --stage > "$BATS_TEST_TMPDIR/stage.before"
+  run bash -c "cd '$WORK' && TMPDIR='$BATS_TEST_TMPDIR/tmp' bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 0 ]
+  grep -qxF 'diff --git a/new.txt b/new.txt' "$OUT"
+  git -C "$WORK" status --porcelain | cmp - "$BATS_TEST_TMPDIR/status.before"
+  git -C "$WORK" ls-files --stage | cmp - "$BATS_TEST_TMPDIR/stage.before"
+  git -C "$WORK" diff --cached --quiet
+  [ -z "$(ls -A "$BATS_TEST_TMPDIR/tmp")" ]
+}
+
+@test "review-diff: --diff-file without untracked files is exactly git diff <base> and runs no empty git add" {
+  echo changed > "$WORK/a"
+  run --separate-stderr bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 0 ]
+  [ -z "$stderr" ]
+  git -C "$WORK" diff main | cmp - "$OUT"
+}
+
+@test "review-diff: --diff-file keeps untracked names with spaces, newlines, a leading colon and glob characters" {
+  echo SPACE > "$WORK/with space.txt"
+  echo NEWLINE > "$WORK/$(printf 'two\nlines.txt')"
+  echo COLON > "$WORK/:colon"
+  echo GLOB > "$WORK/g[1].txt"
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 0 ]
+  grep -qxF '+SPACE' "$OUT"
+  grep -qxF '+NEWLINE' "$OUT"
+  grep -qxF '+COLON' "$OUT"
+  grep -qxF '+GLOB' "$OUT"
+}
+
+@test "review-diff: --diff-file skips an untracked nested repo without noise" {
+  git init -q "$WORK/nested"
+  git -C "$WORK/nested" -c user.email=t@t -c user.name=t commit -q --allow-empty -m n
+  echo hello > "$WORK/new.txt"
+  run --separate-stderr bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 0 ]
+  [ -z "$stderr" ]
+  grep -qxF '+hello' "$OUT"
+  [ "$(grep -c nested "$OUT")" -eq 0 ]
+}
+
+@test "review-diff: --diff-file in committed mode writes <base>...HEAD and leaves the stdout contract alone" {
+  echo b >> "$WORK/a"
+  git -C "$WORK" add a
+  git -C "$WORK" commit -qm feat
+  echo dirtied >> "$WORK/a"
+  ln -s /nonexistent/secret "$WORK/broken"
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main"
+  [ "$output" = $'REVIEW_MODE=committed\nDIFF_RANGE=main...HEAD' ]
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'REVIEW_MODE=committed\nDIFF_RANGE=main...HEAD' ]
+  git -C "$WORK" diff main...HEAD | cmp - "$OUT"
+}
+
+@test "review-diff: --diff-file writes nothing when empty" {
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 1 ]
+  [ ! -e "$OUT" ]
+}
+
+@test "review-diff: --diff-file works from a subdirectory" {
+  mkdir "$WORK/sub"
+  echo hello > "$WORK/sub/new.txt"
+  ln -s /nonexistent/secret "$WORK/sub/broken"
+  run bash -c "cd '$WORK/sub' && bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 0 ]
+  grep -qxF 'diff --git a/sub/new.txt b/sub/new.txt' "$OUT"
+  grep -A1 -xF 'diff --git a/sub/broken b/sub/broken' "$OUT" | grep -qxF 'new file mode 120000'
+}
+
+@test "review-diff: --diff-file works from a linked worktree" {
+  git -C "$WORK" worktree add -q -b wt "$BATS_TEST_TMPDIR/wt" main
+  echo hello > "$BATS_TEST_TMPDIR/wt/new.txt"
+  run bash -c "cd '$BATS_TEST_TMPDIR/wt' && bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 0 ]
+  grep -qxF '+hello' "$OUT"
+}
+
+@test "review-diff: an unwritable --diff-file is exit 2, emits nothing and leaves no temp index" {
+  echo hello > "$WORK/new.txt"
+  mkdir "$BATS_TEST_TMPDIR/tmp"
+  run bash -c "cd '$WORK' && TMPDIR='$BATS_TEST_TMPDIR/tmp' bash '$REVIEW' --base main --diff-file '$BATS_TEST_TMPDIR/missing/out.diff'"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"Error:"* ]]
+  [[ "$output" != *REVIEW_MODE* ]]
+  [ -z "$(ls -A "$BATS_TEST_TMPDIR/tmp")" ]
+}
+
+@test "review-diff: a failing git add is exit 2, emits nothing and leaves no temp index" {
+  echo hello > "$WORK/new.txt"
+  mkdir "$BATS_TEST_TMPDIR/tmp" "$BATS_TEST_TMPDIR/bin"
+  cat > "$BATS_TEST_TMPDIR/bin/git" <<STUB
+#!/bin/sh
+[ "\$1" = add ] && exit 1
+exec '$(command -v git)' "\$@"
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/bin/git"
+  run bash -c "cd '$WORK' && PATH='$BATS_TEST_TMPDIR/bin':\$PATH TMPDIR='$BATS_TEST_TMPDIR/tmp' bash '$REVIEW' --base main --diff-file '$OUT'"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"Error: Cannot add untracked files"* ]]
+  [[ "$output" != *REVIEW_MODE* ]]
+  [ -z "$(ls -A "$BATS_TEST_TMPDIR/tmp")" ]
 }

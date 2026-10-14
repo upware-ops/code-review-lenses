@@ -51,7 +51,7 @@ teardown() {
   grep -q 'parse-pr-url.sh' "$SKILL_MD"
   grep -q 'review-diff.sh' "$SKILL_MD"
   grep -q 'resolve-pr-base.sh' "$SKILL_MD"
-  grep -q 'git diff --no-index' "$SKILL_MD"
+  grep -q -- '--diff-file' "$SKILL_MD"
   grep -q -- '--check-url-host' "$SKILL_MD"
   grep -q 'origin match is not enough' "$SKILL_MD"
   grep -q '_gates_rc' "$SKILL_MD"

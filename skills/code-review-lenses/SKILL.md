@@ -271,13 +271,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
    ```bash
    DIFF_FILE=$(mktemp)
    if [[ "${REVIEW_MODE:-committed}" == "dirty" ]]; then
-     "${_git[@]}" diff "$BASE" > "$DIFF_FILE" || { echo "Error: git diff $BASE failed." >&2; exit 2; }
-     while IFS= read -r _uf; do
-       [[ -z "$_uf" || ! -f "$_uf" ]] && continue
-       "${_git[@]}" diff --no-index -- /dev/null "$_uf" >> "$DIFF_FILE" || {
-         [[ $? -eq 1 ]] || { echo "Error: git diff --no-index failed for $_uf." >&2; exit 2; }
-       }
-     done < <("${_git[@]}" ls-files --others --exclude-standard)
+     bash "$SCRIPTS_DIR/review-diff.sh" --base "$BASE" --diff-file "$DIFF_FILE" >/dev/null || { echo "Error: review-diff.sh --diff-file failed." >&2; exit 2; }
    else
      "${_git[@]}" diff "${BASE}...HEAD" > "$DIFF_FILE" || { echo "Error: git diff ${BASE}...HEAD failed." >&2; exit 2; }
    fi
