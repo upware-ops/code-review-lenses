@@ -1,0 +1,43 @@
+tests/fixtures/ruff/ruff-findings.json
+  s_22d2264024e6d9::t_2e72c4d262abe9 1-13
+tests/fixtures/eslint/eslint-ignored.json
+  s_22d2264024e6d9::t_2e72c4d262abe9 1-19
+tests/fixtures/tflint/tflint-module-level.json
+  s_22d2264024e6d9::t_2e72c4d262abe9 1-31
+tests/run_eslint.bats
+  s_22d2264024e6d9::t_2e72c4d262abe9 124-143
+skills/code-review-lenses/scripts/run-kube-linter.sh
+  s_22d2264024e6d9::t_2e72c4d262abe9 81-82
+skills/code-review-lenses/scripts/run-ruff.sh
+  s_22d2264024e6d9::t_2e72c4d262abe9 44
+skills/code-review-lenses/scripts/run-tflint.sh
+  s_22d2264024e6d9::t_2e72c4d262abe9 46,60,95-96,111-112,114-117,154,166
+tests/fixtures/eslint/eslint-parse-error.json
+  s_22d2264024e6d9::t_2e72c4d262abe9 1-21
+tests/run_tflint.bats
+  s_22d2264024e6d9::t_2e72c4d262abe9 179-210
+tests/run_kube_linter.bats
+  s_22d2264024e6d9::t_2e72c4d262abe9 124-155
+tests/fixtures/kubelinter/kubelinter-invalid-object.json
+  s_22d2264024e6d9::t_2e72c4d262abe9 1-22
+tests/run_ruff.bats
+  s_22d2264024e6d9::t_2e72c4d262abe9 1-41
+skills/code-review-lenses/scripts/run-eslint.sh
+  s_22d2264024e6d9::t_2e72c4d262abe9 145,152,157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "54f1fa77707896c9857e629b04a0e3d1b972b9a4",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
