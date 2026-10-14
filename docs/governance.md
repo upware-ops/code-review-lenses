@@ -7,7 +7,7 @@ render_with_liquid: false
 
 # Governance
 
-Every spawned agent receives a shared governance block (`skills/code-review-lenses/GOVERNANCE.md`) inlined into its task description. This ensures consistent behavior across all agents without duplicating rules in individual agent prompts.
+Every custom agent receives a shared governance block (`skills/code-review-lenses/GOVERNANCE.md`) inlined into its task description. The five vendored toolkit agents (`code-reviewer`, `silent-failure-hunter`, `pr-test-analyzer`, `comment-analyzer`, `type-design-analyzer`) keep their vendored prompts and receive only the block's `## Untrusted input` and `## Output safety` sections, verbatim. This ensures consistent behavior across agents without duplicating rules in individual agent prompts.
 
 ## Shared agent directives
 
@@ -41,7 +41,7 @@ The orchestrator itself follows a separate set of rules (in the "Orchestrator Go
 Secret redaction happens at two layers:
 
 1. **Agent source (GOVERNANCE.md directive)** — agents are instructed to redact secrets in their finding text before emitting findings
-2. **Phase 2 redaction pass** — the orchestrator runs a hardcoded-pattern redaction pass against all collected findings before display, as defense-in-depth against agent failures
+2. **Phase 2 redaction pass** — the orchestrator runs a hardcoded-pattern redaction pass against all collected findings, then once more over the assembled report (Block A + Block B), before display, as defense-in-depth against agent failures
 
 Both layers are always active regardless of flags.
 

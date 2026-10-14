@@ -26,7 +26,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
 - **URL-only external review.** There is no `--pr` or `--provider`. Host and number come from a PR/MR URL in `GUIDANCE` via `parse-pr-url.sh`. A bare number is not a PR/MR identity. Omitted `--base` on a PR/MR is the target branch (`baseRefName`) as fetched from `origin` by `resolve-pr-base.sh`, never the parent clone's local branch of that name; never assume `main`, `master`, or `dev`.
 - **Agent prompts.** Use this package's `agents/<name>.md` files through the Phase 1 spawn protocol. Do not pass a `model:` argument unless `resolve-models.sh` emitted a value other than `inherit`.
 - **Cite observed results.** When reporting that a script ran, cite its exit code and output — not the fact that you invoked it.
-- **Secret redaction.** Phase 2 redacts known-pattern secrets from finding text and Block A before display.
+- **Secret redaction.** Phase 2 redacts known-pattern secrets from finding text, Block A, and the assembled report before display.
 - **Subagent rules** live in `GOVERNANCE.md` (same directory as this file). Load once and inline into every custom-agent task.
 
 ## Review Workflow
@@ -119,7 +119,15 @@ Run a full local review of all changes on the current branch (or a specified PR/
 
 ### Phase 0b: Pre-flight and manifest
 
-1. **PR/MR URL (external review):** when `PR_NUMBER` is set from `parse-pr-url.sh`, fetch metadata via **OP: Fetch PR/MR metadata**. Map to `number, title, baseRefName, baseRefOid, headRefName, state, body`. Stop if fetch fails or state is CLOSED/MERGED. If `--base` was not passed (`BASE` empty) and `baseRefName` is empty, **stop with an error** — never invent `main`, `master`, or `dev`. Set `PR_BODY` to `body` (or `""`). Create a temporary worktree and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone). All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. If `BASE` is empty, pin it to the target branch fetched from `origin` — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
+1. **PR/MR URL (external review):** when `PR_NUMBER` is set from `parse-pr-url.sh`, fetch metadata with the shipped script. It runs **OP: Fetch PR/MR metadata** and never prints the title or description:
+
+   ```bash
+   _meta_out=$(bash "$SCRIPTS_DIR/fetch-pr-metadata.sh" --provider "$PROVIDER" --host "$HOST" --repo "$REPO_SLUG" --number "$PR_NUMBER") || exit $?
+   eval "$_meta_out"
+   unset _meta_out
+   ```
+
+   Emits `baseRefName`, `baseRefOid`, `headRefName`, `PR_BODY_FILE`. Exit 2 (fetch failed, CLOSED/MERGED, Bitbucket fork PR, empty or invalid branch name) is a hard stop — never invent `main`, `master`, or `dev` for a missing base. `PR_BODY_FILE` is author-written: never cat or print it; step 7 hands it to agents and Phase 5 removes it. Create a temporary worktree and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone). All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. If `BASE` is empty, pin it to the target branch fetched from `origin` — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
 
    ```bash
    if [[ -z "$BASE" ]]; then
@@ -242,7 +250,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
    fi
    ```
 
-6. **Project context.** If `AGENTS.md` exists at the repo root (then ancestor directories of changed files, stop at repo root; also accept a project instruction file named `CLAUDE.md` or `.cursorrules` only when `AGENTS.md` is absent), extract ≤500 tokens. Else: "No project-specific context available."
+6. **Project context.** Collect `AGENTS.md` from the repo root and, independently, from up to 5 distinct ancestor directories of the changed files (stop at the repo root). A directory without `AGENTS.md` may supply `CLAUDE.md` or `.cursorrules` instead. Extract ≤500 tokens, closest to the changed files first and repo root last. If nothing is found: "No project-specific context available."
 
 7. **Commit log and narrative:**
 
@@ -251,8 +259,8 @@ Run a full local review of all changes on the current branch (or a specified PR/
    PR_NARRATIVE=""
    COMMIT_BODIES=$("${_git[@]}" log --no-merges --format='--- Commit: %h%n%s%n%n%b%n' "${BASE}..HEAD" 2>/dev/null | head -200)
    [[ -n "$COMMIT_BODIES" ]] && PR_NARRATIVE+=$'\nCommit messages:\n'"$COMMIT_BODIES"
-   if [[ -n "${PR_NUMBER:-}" && -n "${PR_BODY:-}" ]]; then
-     PR_NARRATIVE+=$'\nPR/MR description:\n'"$(echo "$PR_BODY" | head -100)"
+   if [[ -n "${PR_NUMBER:-}" && -s "${PR_BODY_FILE:-}" ]]; then
+     PR_NARRATIVE+=$'\nPR/MR description:\n'"$(head -100 "$PR_BODY_FILE")"
    fi
    ```
 
@@ -382,7 +390,7 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 
 | Directive | Consumed by |
 |-----------|-------------|
-| `GOVERNANCE` | all custom agents in this repo (not the five vendored toolkit agents) |
+| `GOVERNANCE` | all custom agents in this repo; the five vendored toolkit agents get only its `## Untrusted input` and `## Output safety` sections |
 | `EXTENDED_THINKING=true` | architecture-reviewer, security-reviewer — only when `EXTENDED_THINKING` is true (`--profile deep`) |
 | `RELATED_FILES` | architecture-reviewer, security-reviewer |
 | `LANGUAGE_PROFILES` | architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter, silent-failure-hunter, code-reviewer, pr-test-analyzer |
@@ -391,11 +399,11 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 | `SYMBOL_CONTEXT` | architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter, code-reviewer |
 | `SECURITY_POLICY` | security-reviewer |
 
-**GOVERNANCE injection:** when `GOVERNANCE_BLOCK` is non-empty, prepend it under `GOVERNANCE:` to every custom agent. **blind-hunter:** after that block append: `BLIND_HUNTER_NOTE: The "Verification before naming" directive means verify within the diff or file list you were given — do NOT Grep or Read outside it. The "Refuse incoherent input" directive applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.` If `GOVERNANCE_DEGRADED=true`, omit both.
+**GOVERNANCE injection:** when `GOVERNANCE_BLOCK` is non-empty, prepend it under `GOVERNANCE:` to every custom agent. **blind-hunter:** after that block append: `BLIND_HUNTER_NOTE: The "Verification before naming" directive means verify within the diff or file list you were given — do NOT Grep or Read outside it. The "Refuse incoherent input" directive applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.` If `GOVERNANCE_DEGRADED=true`, omit both. **Vendored toolkit agents** (code-reviewer, silent-failure-hunter, pr-test-analyzer, comment-analyzer, type-design-analyzer): prepend only the `## Untrusted input` and `## Output safety` sections of `GOVERNANCE_BLOCK`, verbatim, under `GOVERNANCE:` (omitted when degraded).
 
 **Always-run when `RUN_*=true`:**
 
-- **pr-summarizer** — manifest, commit log, project context; small diffs: full diff. `TIER=tiny`: diff + PR title only (still include GOVERNANCE).
+- **pr-summarizer** — manifest, commit log, project context; small diffs: full diff. `TIER=tiny`: diff only (still include GOVERNANCE).
 - **code-reviewer** — full diff, stated as its review scope (its prompt otherwise defaults to unstaged `git diff`). Prefix `PR_NARRATIVE` when set.
 
 **Specialists when scheduled:**
@@ -409,11 +417,13 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 **Conditional when `RUN_*=conditional` and the trigger matches:**
 
 - **silent-failure-hunter** — `GATE_ERROR_PATTERNS=true`. Full diff.
-- **pr-test-analyzer** — test paths (`*_test.go`, `test_*.py`, `*.test.ts`, `*.spec.ts`, `spec/`, `__tests__/`). Full diff.
+- **pr-test-analyzer** — test paths (`*_test.go`, `test_*.py`, `*.test.ts`, `*.spec.ts`, `spec/`, `__tests__/`, `test/`, `tests/`, `*_test.*`, `*.test.*`, `*.spec.*`, `*_spec.rb`, `*Test.java`, `*Tests.cs`, `src/test/`). Full diff.
 - **comment-analyzer** — comment-line changes (`//`, `#`, `/*`, `"""`, `'''`). Full diff.
 - **type-design-analyzer** — type definitions (`type ... struct`, `interface `, `class `, `enum `). Full diff.
 
-**issue-linker** when `RUN_ISSUE_LINKER=true` (GitHub only after overlay). Pass commit log, branch, manifest, repo slug, PROVIDER.
+pr-test-analyzer, type-design-analyzer, and comment-analyzer: also pass the path of `$SKILL_ROOT/SEVERITY.md` and add to the task: "End your reply with a fenced json-findings block: a JSON array of {severity, confidence, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name)."
+
+**issue-linker** when `RUN_ISSUE_LINKER=true` (GitHub only after overlay). Pass commit log, branch, manifest, and labelled `REPO_SLUG`, `HOST`, `PROVIDER`; it pins every `gh` call to `$HOST/$REPO_SLUG`.
 
 Launch scheduled agents in parallel within the host's concurrency limit, collecting completed results before launching the remaining agents. Track skips for Phase 5.
 
@@ -460,7 +470,7 @@ Wait for agents.
 - Empty / missing headers (and not NONE) → `WARNING: <agent> returned no results.`
 - Tool error/timeout → `ERROR: <agent> failed. Reason: <error>.`
 
-**2a — extract json-findings** from architecture-reviewer, security-reviewer, blind-hunter, edge-case-hunter, adversarial-general. Salvage truncated arrays. Validate `severity` ∈ Critical|High|Medium|Low. Normalize `category` to `authz|injection|dependency-cve|secret|architecture-coupling|test-gap|edge-case|observability|docs|lint|other`. Merge with `CVE_JSON` and analyzer JSON; in PR/MR-URL mode first make their `file` repo-relative with `jq --arg p "$WORKTREE_PATH/" '(.[].file | strings) |= ltrimstr($p)'`. Toolkit agents without json-findings: map via [SEVERITY.md](SEVERITY.md).
+**2a — extract json-findings** from architecture-reviewer, security-reviewer, blind-hunter, edge-case-hunter, adversarial-general, and pr-test-analyzer, type-design-analyzer, comment-analyzer (prefer their block when present). Salvage truncated arrays. Validate `severity` ∈ Critical|High|Medium|Low. Normalize `category` to `authz|injection|dependency-cve|secret|architecture-coupling|test-gap|edge-case|observability|docs|lint|other`. Merge with `CVE_JSON` and analyzer JSON; in PR/MR-URL mode first make their `file` repo-relative with `jq --arg p "$WORKTREE_PATH/" '(.[].file | strings) |= ltrimstr($p)'`. Toolkit agents without a usable json-findings block: map via [SEVERITY.md](SEVERITY.md).
 
 **2b — severity** per SEVERITY.md. Unparseable CVSS → High.
 
@@ -468,7 +478,7 @@ Wait for agents.
 
 **2d — suppressions** unless `NO_SUPPRESS=true`. Match `file` and/or `pattern`. Verify-gated rules (max 20 calls): `github-release`, `npm`, `pypi`, `go-module`, `cargo`, `docker-hub`, `ruby-org`. 2xx → suppress; 404 or error → keep (fail-open).
 
-**2e — proximity dedup.** Per file, cluster within 3 lines of cluster start. Keep highest severity; prefer `dependency-check` in a mixed cluster. Annotate extra sources.
+**2e — proximity dedup.** Per file and `category` (normalized in 2a), cluster within 3 lines of cluster start; `line` 0 (unknown) is never proximity-compared, so those findings cluster by file + `category` only. Keep highest severity; prefer `dependency-check` in a mixed cluster. Annotate extra sources.
 
 **2f — secret redaction.** Execute via Bash (not illustrative). `rm -f` a redaction-degraded sentinel, define `redact_secrets`, rebuild `ALL_FINDINGS` and `BLOCK_A`. Halt the run if the pipeline fails or drops rows. If `perl` is missing, pass through, write the sentinel, set `REDACTION_DEGRADED=true`.
 
@@ -498,6 +508,8 @@ redact_secrets() {
 ```
 
 Rebuild `ALL_FINDINGS` with `jq -c` + `redact_secrets` on `finding` and `remediation`; compare row counts; halt on mismatch. Then redact `BLOCK_A` the same way.
+
+**Assembled report.** The passes above skip Block B's `file` paths and agent prose. Once Phase 3 has assembled Block A + Block B, write the whole report to a temp file (Write tool, never a heredoc) and run it through `redact_secrets` once (define the function in that Bash call), immediately before both the terminal print and the `--output-file` Write.
 
 ### Phase 3: Assemble reports
 
@@ -556,11 +568,11 @@ If `GOVERNANCE_DEGRADED=true`, prepend a banner that `GOVERNANCE.md` was missing
 
 ### Phase 5: Final output
 
-There is no Phase 4. Nothing is written to a hosting provider.
+There is no Phase 4. Nothing is written to a hosting provider. Block A and Block B below are the report redacted in 2f.
 
-**Cleanup:** remove temp diff files and the redaction sentinel. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
+**Cleanup:** remove temp diff files, `PR_BODY_FILE`, the report temp file, and the redaction sentinel. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
 
-**`--output-file`:** write Block A, `---`, Block B via the Write tool.
+**`--output-file`:** write Block A, `---`, Block B via the Write tool (Block A only when `PROFILE=summary`).
 
 **Terminal:**
 
@@ -574,7 +586,7 @@ There is no Phase 4. Nothing is written to a hosting provider.
 8. Agent failures → "Review incomplete — <N> agent(s) failed."
 9. `CVE_CHECK_FAILED=true` → CVE check did not run. `ANALYZER_FAILED=true` → a static analyzer crashed or exited non-zero (not a silent clean scan).
 10. `NO_SUPPRESS=true` / `MIN_CONFIDENCE` drops as notes. Unused or uninterpreted `GUIDANCE` as a note.
-11. No findings and no failures → "No significant issues found."
+11. `PROFILE` not `summary`, no findings, and no failures → "No significant issues found."
 
 ## Notes
 

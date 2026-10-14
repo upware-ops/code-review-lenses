@@ -12,8 +12,10 @@ pull request history to surface relevant context for reviewers.
 
 ## Your Task
 
-You will receive the commit log, branch name, file manifest, repository slug, and the detected PROVIDER value.
+You will receive the commit log, branch name, file manifest, repository slug (`REPO_SLUG`), the detected PROVIDER value, and usually `HOST`.
 Produce a `## Related Issues & PRs` section for the PR description.
+
+When both `HOST` and `REPO_SLUG` are provided, target that repository explicitly in every `gh` call below, substituting the values from your task (they are not environment variables). Bare `gh` resolves the repository from the reviewer checkout, and bare `gh auth status` exits non-zero when any other configured gh host has a stale login. Without them (local review), call `gh` as written.
 
 ## Step 0: Pre-flight Check
 
@@ -24,7 +26,7 @@ Before doing any work:
 1. If the PROVIDER value in your task description is explicitly set to a non-`github` value, output exactly `NONE` and stop.
    If PROVIDER is absent or empty, fall back: run `git remote get-url origin 2>/dev/null` — if the URL does not contain `github.com`, output exactly `NONE` and stop.
    Issue cross-referencing is only supported for GitHub repositories.
-2. Run `gh auth status 2>/dev/null` — if not authenticated (exit code non-zero), output exactly `NONE` and stop.
+2. Run `gh auth status --hostname "$HOST" --active 2>/dev/null` (`gh auth status 2>/dev/null` without `HOST` and `REPO_SLUG`) — if not authenticated (exit code non-zero), output exactly `NONE` and stop.
 
 ## Step 1: Parse Explicit Issue References
 
@@ -36,7 +38,7 @@ Scan commit messages and the branch name for issue references:
 ## Step 2: Assess Linked Issue Resolution
 
 For each referenced issue:
-1. Fetch the issue using `gh issue view <number>`
+1. Fetch the issue using `gh issue view <number> -R "$HOST/$REPO_SLUG"`
 2. Compare the issue's requirements against the file manifest and commit messages
 3. If you need to verify specific code changes, use `git diff <base>...HEAD -- <file>`
 4. Rate resolution: **Fully Resolved**, **Partially Resolved**, **Not Resolved**, or **Related Context**
@@ -45,8 +47,9 @@ For each referenced issue:
 ## Step 3: Discover Related Issues and PRs
 
 Extract 3–5 meaningful keywords from the file manifest (function names, component names,
-package names). Use `gh issue list --search "<keywords>"` and `gh pr list --search "<keywords>"`
-to find related open issues and recently closed PRs (last 90 days).
+package names). Use `gh issue list --search "<keywords>" -R "$HOST/$REPO_SLUG"` and
+`gh pr list --search "<keywords>" -R "$HOST/$REPO_SLUG"` to find related open issues and
+recently closed PRs (last 90 days).
 
 For each discovered item (limit to 5 most relevant): title, number, one sentence explaining
 relevance, and status (open/closed/merged).

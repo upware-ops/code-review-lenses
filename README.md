@@ -127,7 +127,7 @@ architecture-reviewer and security-reviewer.
 
 They do not fork roster or flag logic. A prelude agent runs the shipped
 parsers (`resolve-skill-root.sh`, `resolve-profile.sh`, `parse-pr-url.sh`,
-`detect-provider.sh`, `evaluate-gates.sh`, `apply-roster-overlays.sh`) and fans out the existing
+`detect-provider.sh`, `fetch-pr-metadata.sh`, `evaluate-gates.sh`, `apply-roster-overlays.sh`) and fans out the existing
 `agents/*.md` stems.
 
 | Host | File | Invoke |

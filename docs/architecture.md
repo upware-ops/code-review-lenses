@@ -15,6 +15,7 @@ skills/code-review-lenses/SKILL.md                         ← orchestrator: pha
 skills/code-review-lenses/models.conf                      ← optional model routing (default: inherit)
 skills/code-review-lenses/scripts/resolve-profile.sh       ← --profile / flag parser
 skills/code-review-lenses/scripts/parse-pr-url.sh          ← PR/MR URL → host + number
+skills/code-review-lenses/scripts/fetch-pr-metadata.sh     ← PR/MR base/head refs + description file (never printed)
 skills/code-review-lenses/scripts/review-diff.sh           ← committed vs dirty vs empty range
 skills/code-review-lenses/scripts/apply-roster-overlays.sh ← TIER / docs-only / gate overlays
 skills/code-review-lenses/scripts/detect-provider.sh       ← GitHub / GitLab (any glab host) / Bitbucket
@@ -83,7 +84,7 @@ Both blocks are always shown locally in the terminal (and optionally `--output-f
 
 ## Severity normalization
 
-Each agent uses its own severity scale. The skill normalizes all findings to a unified Critical/High/Medium/Low scale via the normalization table in `SEVERITY.md`, and deduplicates findings when two agents flag the same `file:line`.
+Each agent uses its own severity scale. The skill normalizes all findings to a unified Critical/High/Medium/Low scale via the normalization table in `SEVERITY.md`, and merges findings that two agents report in the same file and `category` within 3 lines of each other.
 
 CVE findings whose CVSS vector cannot be parsed (CVSS v4.0/v2 vectors, or no severity entry) are emitted as `"High"` as a conservative fallback.
 

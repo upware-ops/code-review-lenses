@@ -7,7 +7,7 @@ unified Critical/High/Medium/Low scale.
 |-------|-------------|---------|
 | code-reviewer | confidence [91,100] / [80,90] / [60,79] / [0,59] | Critical / High / Medium / Low |
 | silent-failure-hunter | CRITICAL/HIGH/MEDIUM | pass through |
-| comment-analyzer | Critical/High/Medium/Low | pass through |
+| comment-analyzer | section: Critical Issues / Improvement Opportunities / Recommended Removals | High / Medium / Low |
 | pr-test-analyzer | gap [9,10] / [7,8] / [5,6] / [1,4] | Critical / High / Medium / Low |
 | type-design-analyzer | lowest of its four ratings: [1,2] / [3,5] / [6,10] | High / Medium / Low |
 | architecture-reviewer, security-reviewer, adversarial-general | Critical/High/Medium/Low via json-findings | pass through |
@@ -20,6 +20,8 @@ unified Critical/High/Medium/Low scale.
 | ruff | all findings | Medium |
 | golangci-lint | all findings | Medium |
 | checkov | CKV2_*/CKV_SECRET_* vs others | High / Medium |
+
+pr-test-analyzer, type-design-analyzer, and comment-analyzer end their reply with a json-findings block whose `severity` and `confidence` follow the rows above and the confidence mapping below, without `category` (step 2a sets it to `other`). Phase 2a uses that block when present and falls back to these rows otherwise.
 
 ## json-findings field contract
 
@@ -60,8 +62,9 @@ calls on sub-threshold noise.
 
 ### External agent confidence mapping
 
-External pr-review-toolkit agents don't emit a confidence integer. For uniform
-`--min-confidence` filtering, their numeric scores are mapped as follows:
+External pr-review-toolkit agents have no native confidence integer. For uniform
+`--min-confidence` filtering (and as the `confidence` of their json-findings block),
+their numeric scores are mapped as follows:
 - `pr-test-analyzer` gap score [1,10]: `confidence = gap_score * 10`
   (gap=8 → confidence=80; gap=3 → confidence=30)
 - `type-design-analyzer` lowest of its four ratings [1,10]: `confidence = (11 - rating) * 10`
