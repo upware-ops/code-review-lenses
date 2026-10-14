@@ -1,7 +1,9 @@
 tests/run_cve_check.bats
   s_22d2264024e6d9::t_ec64e6b1b33206 365-379
+  s_22d2264024e6d9::t_c4667e7ae37c77 365-379
 skills/code-review-lenses/scripts/run-cve-check.sh
   s_22d2264024e6d9::t_ec64e6b1b33206 520
+  s_22d2264024e6d9::t_c1f728ae4529e4 520
 ---
 {
   "schema_version": "authorship/3.0.0",
