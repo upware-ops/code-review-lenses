@@ -1,0 +1,29 @@
+tests/run_eslint.bats
+  s_22d2264024e6d9::t_1832c53129b3a9 45,262-334
+  s_22d2264024e6d9::t_ca03090f6f5baf 16-17,25-44
+  s_22d2264024e6d9::t_f1bda057cb76bd 46
+skills/code-review-lenses/scripts/run-eslint.sh
+  s_22d2264024e6d9::t_851ffb22b6c59b 107-108,111,113-126,128,131-141,144-147,149,151-166
+  s_22d2264024e6d9::t_0c70d9b34268f0 42,127,129-130,142-143,150
+  s_22d2264024e6d9::t_054bbca5887c99 112
+  s_22d2264024e6d9::t_802a1969817347 184-185,187,195
+  s_22d2264024e6d9::t_3b705d461da234 148
+  s_22d2264024e6d9::t_70fb4b2300ea43 45-47
+  s_22d2264024e6d9::t_969e9093a27b5c 39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "ec13461b912994dbdc978265582be223f1752027",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
