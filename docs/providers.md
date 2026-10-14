@@ -50,4 +50,4 @@ GitHub (including Enterprise).
 
 A Bitbucket PR URL needs `BITBUCKET_EMAIL` and `BITBUCKET_TOKEN`
 (`BITBUCKET_APP_PASSWORD` is mapped if set). Local branch review needs neither.
-PRs from a fork are refused: the source branch is fetched from `origin`.
+PRs from a fork are refused: the source branch is fetched from the git remote for the PR's own repository.

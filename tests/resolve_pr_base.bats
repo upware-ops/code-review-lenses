@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
-# Drive shipped resolve-pr-base.sh: a PR/MR-URL compare base comes from origin,
-# never the parent clone's (possibly stale) local branch of the same name.
+# Drive shipped resolve-pr-base.sh: a PR/MR-URL compare base comes from the remote
+# that owns the PR/MR repository (origin by default), never the parent clone's
+# (possibly stale) local branch of the same name.
 
 bats_require_minimum_version 1.5.0
 
@@ -44,6 +45,24 @@ commit_file() {
   echo "$1" > "$WORK/pusher/$1"
   git -C "$WORK/pusher" add "$1"
   git -C "$WORK/pusher" commit -qm "$1"
+}
+
+# git remote get-url expands insteadOf, so hosted-looking remote URLs are served by a fake ssh
+# (user-level url.*.insteadOf is ignored so nothing can reroute them to the network).
+hosted_remotes() {
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+  export FAKE_SSH_ROOT="$WORK/ssh" GIT_SSH_COMMAND="$WORK/fake-ssh" GIT_SSH_VARIANT=simple
+  cat > "$WORK/fake-ssh" <<'EOF'
+#!/bin/sh
+cd "$FAKE_SSH_ROOT/$1" && exec sh -c "$2"
+EOF
+  chmod +x "$WORK/fake-ssh"
+
+  mkdir -p "$WORK/ssh/git@github.com/acme" "$WORK/ssh/git@github.com/me"
+  git clone -q --bare "$WORK/origin.git" "$WORK/ssh/git@github.com/acme/app.git"
+  git clone -q --bare "$WORK/parent" "$WORK/ssh/git@github.com/me/app.git"
+  git -C "$WORK/parent" remote set-url origin git@github.com:me/app.git
+  git -C "$WORK/parent" remote add upstream git@github.com:acme/app.git
 }
 
 teardown() {
@@ -99,4 +118,84 @@ teardown() {
   [[ "$output" == *"must be a commit SHA"* ]]
   run -2 bash -c "cd '$WT' && bash '$RESOLVE'"
   [[ "$output" == *"--ref is required"* ]]
+}
+
+@test "resolve-pr-base: --provider/--host/--repo fetch from the remote that owns the PR/MR repository" {
+  hosted_remotes
+
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host github.com --repo acme/app"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BASE=$D"* ]]
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BASE=$A"* ]]
+}
+
+@test "resolve-pr-base: messages name the matched remote" {
+  hosted_remotes
+
+  run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref no-such-branch --provider github --host github.com --repo acme/app"
+  [[ "$output" == *"git fetch upstream no-such-branch failed"* ]]
+  run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider-base '$A' --provider github --host github.com --repo acme/app"
+  [[ "$output" == *"Merge-base of upstream/release/x and HEAD"* ]]
+  git clone -q --depth 1 -b release/x "file://$WORK/origin.git" "$WORK/shallow"
+  git -C "$WORK/shallow" remote add upstream git@github.com:acme/app.git
+  run -2 bash -c "cd '$WORK/shallow' && bash '$RESOLVE' --ref release/x --provider github --host github.com --repo acme/app"
+  [[ "$output" == *"git fetch --unshallow upstream"* ]]
+}
+
+@test "resolve-pr-base: remote match ignores case and prefers origin over an earlier-sorting remote" {
+  hosted_remotes
+
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host GitHub.COM --repo ACME/App"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BASE=$D"* ]]
+
+  mkdir -p "$WORK/ssh/git@GitHub.com/Acme"
+  git clone -q --bare "$WORK/origin.git" "$WORK/ssh/git@GitHub.com/Acme/Lib.git"
+  git -C "$WORK/parent" remote add mixed git@GitHub.com:Acme/Lib.git
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host github.com --repo acme/lib"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BASE=$D"* ]]
+
+  mkdir -p "$WORK/ssh/other@github.com/me"
+  git clone -q --bare "$WORK/origin.git" "$WORK/ssh/other@github.com/me/app.git"
+  git -C "$WORK/parent" remote add aaa other@github.com:me/app.git
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host github.com --repo me/app"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BASE=$A"* ]]
+
+  git -C "$WORK/parent" remote remove origin
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host github.com --repo me/app"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BASE=$D"* ]]
+}
+
+@test "resolve-pr-base: a GitLab nested-group project matches on a self-hosted host" {
+  hosted_remotes
+
+  mkdir -p "$WORK/ssh/git@git.example.test/group/sub"
+  git clone -q --bare "$WORK/origin.git" "$WORK/ssh/git@git.example.test/group/sub/proj.git"
+  git -C "$WORK/parent" remote add gl git@git.example.test:group/sub/proj.git
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider gitlab --host git.example.test --repo group/sub/proj"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BASE=$D"* ]]
+}
+
+@test "resolve-pr-base: no remote for the PR/MR repository, or a bad flag group, is exit 2" {
+  run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host github.com --repo acme/app"
+  [[ "$output" == *"No git remote points at https://github.com/acme/app"* ]]
+  [[ "$output" == *"git remote add <name> https://github.com/acme/app.git"* ]]
+  [[ "$output" == *"--base <ref>"* ]]
+
+  hosted_remotes
+  run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host ghe.example.test --repo acme/app"
+  [[ "$output" == *"No git remote points at https://ghe.example.test/acme/app"* ]]
+  run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host github.com --repo acme/other"
+  [[ "$output" == *"No git remote points at https://github.com/acme/other"* ]]
+
+  run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --host github.com"
+  [[ "$output" == *"--provider, --host and --repo must be passed together"* ]]
+  run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider svn --host github.com --repo acme/app"
+  [[ "$output" == *"--provider must be github, gitlab, or bitbucket"* ]]
 }

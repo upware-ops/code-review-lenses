@@ -477,7 +477,8 @@ JSON
     echo "REGRESSION: PROVIDERS.md fetches fields the script does not" >&2
     return 1
   fi
-  grep -qF 'fetch origin "refs/heads/$headRefName" && git -C "$WORKTREE_PATH" checkout FETCH_HEAD' "$PROVIDERS_MD"
+  grep -qF 'fetch <remote> "refs/heads/$headRefName" && git -C "$WORKTREE_PATH" checkout FETCH_HEAD' "$PROVIDERS_MD"
+  grep -qF 'is the git remote whose URL is `https://$HOST/$REPO_SLUG`' "$PROVIDERS_MD"
   if grep -qF 'fetch origin <branch>' "$PROVIDERS_MD"; then
     echo "REGRESSION: Bitbucket checkout fetches a bare branch name" >&2
     return 1

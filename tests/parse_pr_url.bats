@@ -190,3 +190,32 @@ source_url() {
   run -2 bash "$PARSE" "https://github.com/evil.example/acme/app/pull/42"
   [[ "$output" == *"owner/repo"* ]]
 }
+
+@test "parse-pr-url: a non-default port is exit 2 (auth checks and API calls would hit the default port)" {
+  run -2 bash "$PARSE" "https://git.example.test:8443/group/project/-/merge_requests/7"
+  [[ "$output" == *"non-default port"* ]]
+  run -2 bash "$PARSE" "git.example.test:8443/group/project/-/merge_requests/7"
+  run -2 bash "$PARSE" "https://github.com:80/acme/app/pull/42"
+  run -2 bash "$PARSE" "http://github.com:443/acme/app/pull/42"
+  run -2 bash "$PARSE" "https://oauth2:s3cret@git.example.test:8443/group/project/-/merge_requests/7"
+  [[ "$output" != *s3cret* ]]
+}
+
+@test "parse-pr-url: the default port (:443 for https, :80 for http) is accepted and dropped" {
+  source_url "https://oauth2:s3cret@git.example.test:443/group/sub/proj/-/merge_requests/7"
+  [[ "$HOST" == "git.example.test" ]]
+  [[ "$REPO_SLUG" == "group/sub/proj" ]]
+  [[ "$PR_URL" == "https://git.example.test/group/sub/proj/-/merge_requests/7" ]]
+  source_url "http://github.com:80/acme/app/pull/42.diff"
+  [[ "$HOST" == "github.com" ]]
+  [[ "$PR_URL" == "http://github.com/acme/app/pull/42.diff" ]]
+  source_url "git.example.test:443/group/proj/-/merge_requests/7"
+  [[ "$HOST" == "git.example.test" ]]
+}
+
+@test "parse-pr-url: a port on a non-PR link does not block the first PR/MR URL" {
+  source_url "see https://example.com:8443/docs and https://github.com/acme/app/pull/42"
+  [[ "$HOST" == "github.com" ]]
+  run bash "$PARSE" "https://example.com:8443/docs"
+  [ "$status" -eq 1 ]
+}
