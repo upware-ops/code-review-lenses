@@ -29,6 +29,30 @@ mock_batch() {
     --args "$@" > "$WORK/batch.json"
 }
 
+# Advisory GHSA-test-ver on package $2 (ecosystem $1) with one introduced-0 range per fixed
+# version after them, served as the only vulnerability of a one-package batch.
+mock_advisory() {
+  local eco="$1" name="$2"
+  shift 2
+  mkdir -p "$WORK/records"
+  jq -n --arg eco "$eco" --arg name "$name" '{
+      id: "GHSA-test-ver", summary: "Synthetic advisory", aliases: ["CVE-2025-00001"],
+      severity: [{type: "CVSS_V3", score: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}],
+      affected: [{package: {name: $name, ecosystem: $eco},
+                  ranges: [$ARGS.positional[] | {type: "ECOSYSTEM", events: [{introduced: "0"}, {fixed: .}]}]}]}' \
+    --args "$@" > "$WORK/records/GHSA-test-ver.json"
+  mock_batch GHSA-test-ver
+}
+
+run_mocked() {
+  OSV_MOCK_FILE="$WORK/batch.json" OSV_VULNS_MOCK_DIR="$WORK/records" run --separate-stderr "$SCRIPT" "$@"
+}
+
+# Version in the first remediation ("Upgrade X to <v> or later."), "none" when no fix is recommended.
+recommended_fix() {
+  echo "$output" | jq -r '.[0].remediation | capture("^Upgrade \\S+ to (?<v>\\S+) or later").v // "none"'
+}
+
 # curl stand-in on PATH. Logs "<method> <url>" to $SHIM_LOG, saves the last POST body to
 # $SHIM_BODY, answers POST from $SHIM_BATCH (default: no vulnerabilities) and GET .../<id>
 # from $SHIM_VULNS_DIR/<id>.json (exit 22 when missing, like --fail-with-body on a 404).
@@ -315,6 +339,94 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Version ordering: pre-releases sort below their release, .post above it
+# ---------------------------------------------------------------------------
+
+@test "cve-check: a stable fix above an installed pre-release is recommended" {
+  mock_advisory npm lib 1.2.3
+  printf '%s\n' '{"dependencies":{"lib":"1.2.3-rc.1"}}' > "$WORK/package.json"
+  run_mocked "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(recommended_fix)" = "1.2.3" ]
+}
+
+@test "cve-check: a pre-release fix below the installed release is not recommended" {
+  mock_advisory npm lib 1.2.3-rc.2 1.2.4
+  printf '%s\n' '{"dependencies":{"lib":"1.2.3"}}' > "$WORK/package.json"
+  run_mocked "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(recommended_fix)" = "1.2.4" ]
+}
+
+@test "cve-check: pre-releases of one release are ordered by their numbers" {
+  mock_advisory npm lib 1.2.3-rc.2 1.2.3-rc.10 1.2.3
+  printf '%s\n' '{"dependencies":{"lib":"1.2.3-rc.1"}}' > "$WORK/package.json"
+  run_mocked "$WORK/package.json"
+  [ "$(recommended_fix)" = "1.2.3-rc.2" ]
+  printf '%s\n' '{"dependencies":{"lib":"1.2.3-rc.2"}}' > "$WORK/package.json"
+  run_mocked "$WORK/package.json"
+  [ "$(recommended_fix)" = "1.2.3-rc.10" ]
+  printf '%s\n' '{"dependencies":{"lib":"1.2.3-rc.10"}}' > "$WORK/package.json"
+  run_mocked "$WORK/package.json"
+  [ "$(recommended_fix)" = "1.2.3" ]
+}
+
+@test "cve-check: PEP 440 pre-releases sort below their release with or without a separator" {
+  mock_advisory PyPI lib 1.2.3
+  local v
+  for v in 1.2.3rc1 1.2.3.rc1 1.2.3-rc1 1.2.3_rc1 1.2.3a1 1.2.3b2 1.2.3c1 1.2.3alpha1 1.2.3beta2 1.2.3pre1 1.2.3.dev4; do
+    printf 'lib==%s\n' "$v" > "$WORK/requirements.txt"
+    run_mocked "$WORK/requirements.txt"
+    [ "$status" -eq 0 ]
+    [ "$(recommended_fix)" = "1.2.3" ] || { echo "installed $v: recommended $(recommended_fix)" >&2; false; }
+  done
+}
+
+@test "cve-check: PEP 440 post-releases sort above their release" {
+  mock_advisory PyPI lib 1.2.3 1.2.3.post1 1.2.4
+  printf 'lib==1.2.3\n' > "$WORK/requirements.txt"
+  run_mocked "$WORK/requirements.txt"
+  [ "$(recommended_fix)" = "1.2.3.post1" ]
+  printf 'lib==1.2.3.post1\n' > "$WORK/requirements.txt"
+  run_mocked "$WORK/requirements.txt"
+  [ "$(recommended_fix)" = "1.2.4" ]
+
+  mock_advisory PyPI lib 1.2.3.post 1.2.4
+  printf 'lib==1.2.3\n' > "$WORK/requirements.txt"
+  run_mocked "$WORK/requirements.txt"
+  [ "$(recommended_fix)" = "1.2.3.post" ]
+
+  mock_advisory PyPI lib 1.2.1 1.2.4
+  printf 'lib==1.2.post1\n' > "$WORK/requirements.txt"
+  run_mocked "$WORK/requirements.txt"
+  [ "$(recommended_fix)" = "1.2.1" ]
+}
+
+@test "cve-check: a leading v, V or = and build metadata are ignored when comparing versions" {
+  printf '%s\n' '{"dependencies":{"lib":"1.2.3"}}' > "$WORK/package.json"
+  local p
+  for p in v V =; do
+    mock_advisory npm lib "${p}1.2.4"
+    run_mocked "$WORK/package.json"
+    [ "$status" -eq 0 ]
+    [ "$(recommended_fix)" = "${p}1.2.4" ] || { echo "prefix $p: recommended $(recommended_fix)" >&2; false; }
+  done
+
+  mock_advisory npm lib 1.2.3+build.9 1.2.4
+  printf '%s\n' '{"dependencies":{"lib":"1.2.3+build.5"}}' > "$WORK/package.json"
+  run_mocked "$WORK/package.json"
+  [ "$(recommended_fix)" = "1.2.4" ]
+}
+
+@test "cve-check: a Go pseudo-version sorts below the release it precedes" {
+  mock_advisory Go example.com/lib 1.2.4
+  printf '%s\n' 'module example.com/app' '' 'go 1.22' '' 'require example.com/lib v1.2.4-0.20210817164053-abcdef123456' > "$WORK/go.mod"
+  run_mocked "$WORK/go.mod"
+  [ "$status" -eq 0 ]
+  [ "$(recommended_fix)" = "1.2.4" ]
+}
+
+# ---------------------------------------------------------------------------
 # Queried versions: exact manifest versions or lockfile-resolved, never a range
 # ---------------------------------------------------------------------------
 
@@ -375,6 +487,84 @@ EOF
     {"version":"2.9.1","package":{"name":"monolog/monolog","ecosystem":"Packagist"}},
     {"version":"2.4.0","package":{"name":"php-http/httplug","ecosystem":"Packagist"}},
     {"version":"9.5.0","package":{"name":"phpunit/phpunit","ecosystem":"Packagist"}}]' "$SHIM_BODY" >/dev/null
+}
+
+@test "cve-check: wildcard npm specs are queried at the package-lock.json version" {
+  make_curl_shim
+  printf '%s\n' '{"dependencies":{"a":"*","b":"x","c":"X","d":"latest","e":""}}' > "$WORK/package.json"
+  cat > "$WORK/package-lock.json" <<'EOF'
+{"lockfileVersion":3,"packages":{"":{},
+ "node_modules/a":{"version":"1.0.0"},"node_modules/b":{"version":"2.0.0"},"node_modules/c":{"version":"3.0.0"},
+ "node_modules/d":{"version":"4.0.0"},"node_modules/e":{"version":"5.0.0"}}}
+EOF
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  jq -e '.queries == [
+    {"version":"1.0.0","package":{"name":"a","ecosystem":"npm"}},
+    {"version":"2.0.0","package":{"name":"b","ecosystem":"npm"}},
+    {"version":"3.0.0","package":{"name":"c","ecosystem":"npm"}},
+    {"version":"4.0.0","package":{"name":"d","ecosystem":"npm"}},
+    {"version":"5.0.0","package":{"name":"e","ecosystem":"npm"}}]' "$SHIM_BODY" >/dev/null
+  [[ "$stderr" != *"skipped ranged"* ]]
+}
+
+@test "cve-check: wildcard npm specs without a lockfile get one stderr note and no OSV request" {
+  make_curl_shim
+  printf '%s\n' '{"dependencies":{"a":"*","b":"latest"}}' > "$WORK/package.json"
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  [ ! -e "$SHIM_LOG" ]
+  [ "$(printf '%s\n' "$stderr" | grep -c 'skipped ranged dependencies')" -eq 1 ]
+  [[ "$stderr" == *": 2 in "* ]]
+}
+
+@test "cve-check: non-registry npm specs are never queried, even when the lockfile has an entry" {
+  make_curl_shim
+  cat > "$WORK/package.json" <<'EOF'
+{"dependencies":{"reg":"*","f":"file:../x","l":"link:../y","w":"workspace:*","g":"git+https://example.com/r.git",
+ "h":"github:org/repo","u":"https://example.com/p.tgz","n":"npm:other@^1.0.0","s":"org/repo","p":"../local"}}
+EOF
+  cat > "$WORK/package-lock.json" <<'EOF'
+{"lockfileVersion":3,"packages":{"":{},"node_modules/reg":{"version":"1.0.0"},
+ "node_modules/f":{"version":"9.9.9"},"node_modules/l":{"version":"9.9.9"},"node_modules/w":{"version":"9.9.9"},
+ "node_modules/g":{"version":"9.9.9"},"node_modules/h":{"version":"9.9.9"},"node_modules/u":{"version":"9.9.9"},
+ "node_modules/n":{"version":"9.9.9"},"node_modules/s":{"version":"9.9.9"},"node_modules/p":{"version":"9.9.9"}}}
+EOF
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  jq -e '.queries == [{"version":"1.0.0","package":{"name":"reg","ecosystem":"npm"}}]' "$SHIM_BODY" >/dev/null
+  [[ "$stderr" != *"skipped ranged"* ]]
+}
+
+@test "cve-check: npm workspace link with a wildcard spec is skipped without a note" {
+  make_curl_shim
+  printf '%s\n' '{"dependencies":{"sibling":"*","reg":"*"}}' > "$WORK/package.json"
+  printf '%s\n' '{"lockfileVersion":3,"packages":{"":{},"node_modules/sibling":{"resolved":"packages/sibling","link":true},"node_modules/reg":{"version":"1.0.0"}}}' \
+    > "$WORK/package-lock.json"
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  jq -e '.queries == [{"version":"1.0.0","package":{"name":"reg","ecosystem":"npm"}}]' "$SHIM_BODY" >/dev/null
+  [[ "$stderr" != *"skipped ranged"* ]]
+}
+
+@test "cve-check: Composer wildcard specs use composer.lock, dev branches are skipped" {
+  make_curl_shim
+  printf '%s\n' '{"require":{"vendor/a":"*","vendor/b":"dev-main","vendor/c":"1.x-dev","vendor/d":"^2.0"}}' > "$WORK/composer.json"
+  printf '%s\n' '{"packages":[{"name":"vendor/a","version":"2.5.0"},{"name":"vendor/b","version":"dev-main"},{"name":"vendor/c","version":"1.x-dev"},{"name":"vendor/d","version":"2.1.0"}],"packages-dev":[]}' \
+    > "$WORK/composer.lock"
+  run --separate-stderr "$SCRIPT" "$WORK/composer.json"
+  [ "$status" -eq 0 ]
+  jq -e '.queries == [
+    {"version":"2.5.0","package":{"name":"vendor/a","ecosystem":"Packagist"}},
+    {"version":"2.1.0","package":{"name":"vendor/d","ecosystem":"Packagist"}}]' "$SHIM_BODY" >/dev/null
+  [[ "$stderr" != *"skipped ranged"* ]]
+
+  rm "$WORK/composer.lock" "$SHIM_LOG"
+  run --separate-stderr "$SCRIPT" "$WORK/composer.json"
+  [ "$status" -eq 0 ]
+  [ ! -e "$SHIM_LOG" ]
+  [[ "$stderr" == *": 2 in "* ]]
 }
 
 @test "cve-check: without a lockfile only exact npm versions are queried and ranges get one stderr note" {
