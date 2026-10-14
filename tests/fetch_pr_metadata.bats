@@ -104,6 +104,10 @@ EOF
   jq '.headRefName = "bad..name"' "$STUB_JSON" > "$WORK/next.json"
   STUB_JSON="$WORK/next.json" fetch --provider github --host github.com --repo acme/app --number 1
   [ "$status" -eq 2 ]
+  jq '.headRefName = "--upload-pack=x"' "$STUB_JSON" > "$WORK/next.json"
+  STUB_JSON="$WORK/next.json" fetch --provider github --host github.com --repo acme/app --number 1
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"must not start with '-'"* ]]
   jq '.baseRefName = ""' "$STUB_JSON" > "$WORK/next.json"
   STUB_JSON="$WORK/next.json" fetch --provider github --host github.com --repo acme/app --number 1
   [ "$status" -eq 2 ]

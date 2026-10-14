@@ -85,6 +85,7 @@ esac
 [[ "$(jq -r '.fork // false' <<<"$META")" != true ]] || die "Bitbucket fork PRs are not supported."
 git check-ref-format "refs/heads/$BASE_REF" || die "invalid target branch name."
 git check-ref-format "refs/heads/$HEAD_REF" || die "invalid source branch name."
+[[ "$BASE_REF" != -* && "$HEAD_REF" != -* ]] || die "branch names must not start with '-'."
 [[ -z "$BASE_OID" || "$BASE_OID" =~ ^[0-9a-f]{7,64}$ ]] || die "invalid base commit SHA."
 
 PR_BODY_FILE=$(mktemp)
