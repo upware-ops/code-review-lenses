@@ -1,12 +1,19 @@
 skills/code-review-lenses/scripts/run-golangci-lint.sh
   s_22d2264024e6d9::t_73b06b9f5924dc 81-83
+  s_22d2264024e6d9::t_170ae8e4cd9996 81-83
 tests/run_golangci_lint.bats
   s_22d2264024e6d9::t_73b06b9f5924dc 158-174
+  s_22d2264024e6d9::t_2d0611433935a3 158-174
 tests/run_tflint.bats
   s_22d2264024e6d9::t_73b06b9f5924dc 18-28,191-240
   s_22d2264024e6d9::t_9ef4f5d0e9df9c 241
+  s_22d2264024e6d9::t_1b0ffcf38feabb 211
+  s_22d2264024e6d9::t_30b18cb179fb0b 229
+  s_22d2264024e6d9::t_c515bfeaee7dde 18-28
+  s_22d2264024e6d9::t_44c57fdadc7f46 191-210,212-228,230-241
 skills/code-review-lenses/scripts/run-tflint.sh
   s_22d2264024e6d9::t_73b06b9f5924dc 81,83-84,86-87,89,95
+  s_22d2264024e6d9::t_bd0e9f93dd5279 81,83-84,86-87,89,95
 ---
 {
   "schema_version": "authorship/3.0.0",
