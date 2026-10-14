@@ -185,7 +185,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
    | `.tf`, `.tfvars` | Terraform |
    | `.yaml`, `.yml` | YAML |
 
-   Collect `MANIFEST_FILES` (`go.mod`, `package.json`, `requirements*.txt`, `composer.json`) from the unfiltered name-only list.
+   Collect `MANIFEST_FILES` (`go.mod`, `package.json`, `package-lock.json`, `requirements*.txt`, `composer.json`, `composer.lock`) from the unfiltered name-only list.
 
    ```bash
    _git=(git)
@@ -432,7 +432,7 @@ if [[ -n "${WORKTREE_PATH:-}" ]]; then
 fi
 ```
 
-**CVE check** when `RUN_CVE=true` and `MANIFEST_FILES` is non-empty (the script picks the manifests out of `CHECK_PATHS`):
+**CVE check** when `RUN_CVE=true` and `MANIFEST_FILES` is non-empty (the script picks the manifests and lockfiles out of `CHECK_PATHS`):
 
 ```bash
 CVE_SCRIPT="$SCRIPTS_DIR/run-cve-check.sh"

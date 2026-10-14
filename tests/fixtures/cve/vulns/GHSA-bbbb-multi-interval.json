@@ -1,0 +1,27 @@
+{
+  "id": "GHSA-bbbb-multi-interval",
+  "modified": "2025-06-01T00:00:00Z",
+  "summary": "Two vulnerable intervals plus a GIT range",
+  "severity": [
+    { "type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N" }
+  ],
+  "affected": [
+    {
+      "package": { "name": "lib", "ecosystem": "npm" },
+      "ranges": [
+        {
+          "type": "SEMVER",
+          "events": [
+            { "introduced": "1.0.0" }, { "fixed": "2.0.0" },
+            { "introduced": "3.0.0" }, { "fixed": "4.0.0" }
+          ]
+        },
+        {
+          "type": "GIT",
+          "repo": "https://example.com/lib.git",
+          "events": [ { "introduced": "0" }, { "fixed": "3a9f0c8e7d6b5a4938271605f4e3d2c1b0a99887" } ]
+        }
+      ]
+    }
+  ]
+}
