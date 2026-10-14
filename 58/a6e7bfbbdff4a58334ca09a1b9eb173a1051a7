@@ -1,7 +1,10 @@
 skills/code-review-lenses/scripts/review-diff.sh
   s_22d2264024e6d9::t_9b231541bfcbb0 86,89-91
+  s_22d2264024e6d9::t_6f5e77e0783a1b 86,90-91
+  s_22d2264024e6d9::t_cdefda0508b2dd 89
 tests/review_diff.bats
   s_22d2264024e6d9::t_9b231541bfcbb0 213-242
+  s_22d2264024e6d9::t_5b1a5ffd9698a5 213-242
 ---
 {
   "schema_version": "authorship/3.0.0",
