@@ -1,9 +1,16 @@
 tests/orchestration_contracts.bats
   s_22d2264024e6d9::t_b860290d415eec 54
+  s_22d2264024e6d9::t_3f1bf35442f013 54
 skills/code-review-lenses/SKILL.md
   s_22d2264024e6d9::t_b860290d415eec 274
+  s_22d2264024e6d9::t_cb5152cdb15a39 274
 tests/review_diff.bats
   s_22d2264024e6d9::t_b860290d415eec 10,85-212
+  s_22d2264024e6d9::t_8abc2b84f8f6d6 118
+  s_22d2264024e6d9::t_72d22967885f7f 10
+  s_22d2264024e6d9::t_c1175c71378522 85-102,104-105,107-108,110-114,116-117,119-192,194-212
+  s_22d2264024e6d9::t_43cd861a7593e0 193
+  s_22d2264024e6d9::t_6461691e1a897c 103,106,109,115
 tests/workflow_wrappers.bats
   s_22d2264024e6d9::t_bc7a8b47dadf94 55-56
 .claude/workflows/code-review-lenses-workflow.js
@@ -12,6 +19,17 @@ tests/workflow_wrappers.bats
   s_22d2264024e6d9::t_4062e356910838 132
 skills/code-review-lenses/scripts/review-diff.sh
   s_22d2264024e6d9::t_b860290d415eec 5,12-14,18-22,28,53-57,78-95,101-104,115-118
+  s_22d2264024e6d9::t_24a0727e3e0ace 79
+  s_22d2264024e6d9::t_fb9a4ecdf2b055 93
+  s_22d2264024e6d9::t_44eef61f3fb510 13-14
+  s_22d2264024e6d9::t_55fd0c9c021f1a 53-57
+  s_22d2264024e6d9::t_c7e8fb8302f84a 88
+  s_22d2264024e6d9::t_b95470890fb520 78,81,83-87,89,91-92,94-95,101-104
+  s_22d2264024e6d9::t_eee7fb96f1b3da 90
+  s_22d2264024e6d9::t_4aaa69e54db24a 82
+  s_22d2264024e6d9::t_3a0ca3f0ae3c2b 5,12,18-22,28
+  s_22d2264024e6d9::t_db5a9d8c2d6ee7 115-118
+  s_22d2264024e6d9::t_a4df38c8097cea 80
 ---
 {
   "schema_version": "authorship/3.0.0",
