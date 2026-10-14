@@ -100,19 +100,18 @@ teardown() {
   grep -qxF "+$BATS_TEST_TMPDIR" "$OUT"
 }
 
-@test "review-diff: --diff-file leaves the real index, status and temp dir untouched" {
+@test "review-diff: --diff-file leaves the real index and status untouched and no temp dir in the git dir" {
   echo hello > "$WORK/new.txt"
   ln -s /nonexistent/secret "$WORK/broken"
-  mkdir "$BATS_TEST_TMPDIR/tmp"
   git -C "$WORK" status --porcelain > "$BATS_TEST_TMPDIR/status.before"
   git -C "$WORK" ls-files --stage > "$BATS_TEST_TMPDIR/stage.before"
-  run bash -c "cd '$WORK' && TMPDIR='$BATS_TEST_TMPDIR/tmp' bash '$REVIEW' --base main --diff-file '$OUT'"
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$OUT'"
   [ "$status" -eq 0 ]
   grep -qxF 'diff --git a/new.txt b/new.txt' "$OUT"
   git -C "$WORK" status --porcelain | cmp - "$BATS_TEST_TMPDIR/status.before"
   git -C "$WORK" ls-files --stage | cmp - "$BATS_TEST_TMPDIR/stage.before"
   git -C "$WORK" diff --cached --quiet
-  [ -z "$(ls -A "$BATS_TEST_TMPDIR/tmp")" ]
+  [ -z "$(find "$WORK/.git" -name 'review-diff.*')" ]
 }
 
 @test "review-diff: --diff-file without untracked files is exactly git diff <base> and runs no empty git add" {
@@ -177,38 +176,39 @@ teardown() {
   grep -A1 -xF 'diff --git a/sub/broken b/sub/broken' "$OUT" | grep -qxF 'new file mode 120000'
 }
 
-@test "review-diff: --diff-file works from a linked worktree" {
+@test "review-diff: --diff-file works from a linked worktree and leaves no temp dir behind" {
   git -C "$WORK" worktree add -q -b wt "$BATS_TEST_TMPDIR/wt" main
   echo hello > "$BATS_TEST_TMPDIR/wt/new.txt"
   run bash -c "cd '$BATS_TEST_TMPDIR/wt' && bash '$REVIEW' --base main --diff-file '$OUT'"
   [ "$status" -eq 0 ]
   grep -qxF '+hello' "$OUT"
+  [ -z "$(find "$WORK/.git" -name 'review-diff.*')" ]
 }
 
 @test "review-diff: an unwritable --diff-file is exit 2, emits nothing and leaves no temp index" {
   echo hello > "$WORK/new.txt"
-  mkdir "$BATS_TEST_TMPDIR/tmp"
-  run bash -c "cd '$WORK' && TMPDIR='$BATS_TEST_TMPDIR/tmp' bash '$REVIEW' --base main --diff-file '$BATS_TEST_TMPDIR/missing/out.diff'"
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$BATS_TEST_TMPDIR/missing/out.diff'"
   [ "$status" -eq 2 ]
   [[ "$output" == *"Error:"* ]]
   [[ "$output" != *REVIEW_MODE* ]]
-  [ -z "$(ls -A "$BATS_TEST_TMPDIR/tmp")" ]
+  [ -z "$(find "$WORK/.git" -name 'review-diff.*')" ]
 }
 
 @test "review-diff: a failing git add is exit 2, emits nothing and leaves no temp index" {
   echo hello > "$WORK/new.txt"
-  mkdir "$BATS_TEST_TMPDIR/tmp" "$BATS_TEST_TMPDIR/bin"
+  mkdir "$BATS_TEST_TMPDIR/bin"
   cat > "$BATS_TEST_TMPDIR/bin/git" <<STUB
 #!/bin/sh
-[ "\$1" = add ] && exit 1
+[ "\$1" = add ] && { printf '%s\n' "\$GIT_INDEX_FILE" > '$BATS_TEST_TMPDIR/index_file'; exit 1; }
 exec '$(command -v git)' "\$@"
 STUB
   chmod +x "$BATS_TEST_TMPDIR/bin/git"
-  run bash -c "cd '$WORK' && PATH='$BATS_TEST_TMPDIR/bin':\$PATH TMPDIR='$BATS_TEST_TMPDIR/tmp' bash '$REVIEW' --base main --diff-file '$OUT'"
+  run bash -c "cd '$WORK' && PATH='$BATS_TEST_TMPDIR/bin':\$PATH bash '$REVIEW' --base main --diff-file '$OUT'"
   [ "$status" -eq 2 ]
   [[ "$output" == *"Error: Cannot add untracked files"* ]]
   [[ "$output" != *REVIEW_MODE* ]]
-  [ -z "$(ls -A "$BATS_TEST_TMPDIR/tmp")" ]
+  [[ "$(cat "$BATS_TEST_TMPDIR/index_file")" == */.git/review-diff.*/index ]]
+  [ -z "$(find "$WORK/.git" -name 'review-diff.*')" ]
 }
 
 @test "review-diff: --diff-file pre-created inside the checkout is not diffed as its own untracked input" {
@@ -239,4 +239,15 @@ STUB
   [ "$status" -eq 0 ]
   grep -qxF '+hello' "$WORK/self.diff"
   [ "$(grep -cF self.diff "$WORK/self.diff")" -eq 0 ]
+}
+
+@test "review-diff: with TMPDIR inside the checkout neither the diff file nor the temp index reaches the diff" {
+  echo changed > "$WORK/a"
+  mkdir "$WORK/.tmp"
+  diff_file=$(mktemp "$WORK/.tmp/diff.XXXXXX")
+  run bash -c "cd '$WORK' && TMPDIR='$WORK/.tmp' bash '$REVIEW' --base main --diff-file '$diff_file'"
+  [ "$status" -eq 0 ]
+  grep -qxF '+changed' "$diff_file"
+  [ "$(grep -cF review-diff. "$diff_file")" -eq 0 ]
+  git -C "$WORK" diff main | cmp - "$diff_file"
 }

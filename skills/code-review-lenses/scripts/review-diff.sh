@@ -76,7 +76,9 @@ emit() {
 }
 
 write_dirty_diff() {
-  INDEX_DIR=$(mktemp -d "${TMPDIR:-/tmp}/review-diff.XXXXXX") || die "mktemp failed."
+  # In the git dir, not TMPDIR: untracked listing skips .git but not a TMPDIR inside the checkout.
+  git_dir=$(git rev-parse --absolute-git-dir) || die "Cannot resolve the git dir."
+  INDEX_DIR=$(mktemp -d "$git_dir/review-diff.XXXXXX") || die "mktemp failed."
   trap 'rm -rf "$INDEX_DIR"' EXIT
 
   cp "$(git rev-parse --git-path index)" "$INDEX_DIR/index" || die "Cannot copy the git index."
