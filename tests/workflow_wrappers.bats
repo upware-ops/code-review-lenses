@@ -368,7 +368,7 @@ setup() {
 }
 
 @test "wrappers tell pr-test-analyzer, type-design-analyzer and comment-analyzer to end with a json-findings block" {
-  sentence='End your reply with a fenced json-findings block: a JSON array of {severity, confidence, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name).'
+  sentence='End your reply with a fenced json-findings block: a JSON array of {severity, confidence, category, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name).'
   [ -f "${SCRIPTS_DIR}/../SEVERITY.md" ]
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     [ "$(grep -c -F "$sentence" "$f")" -eq 1 ]

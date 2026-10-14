@@ -568,7 +568,7 @@ JSON
 @test "SKILL.md: toolkit agents are asked for a json-findings block and 2a prefers it" {
   ask=$(skill_line 'End your reply with a fenced json-findings block')
   [ -n "$ask" ]
-  has "$ask" 'End your reply with a fenced json-findings block: a JSON array of {severity, confidence, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name).'
+  has "$ask" 'End your reply with a fenced json-findings block: a JSON array of {severity, confidence, category, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name).'
   for agent in pr-test-analyzer type-design-analyzer comment-analyzer; do
     has "$ask" "$agent"
   done

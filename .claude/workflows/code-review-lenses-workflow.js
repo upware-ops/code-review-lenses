@@ -177,7 +177,7 @@ const blindHunterNote =
 const vendoredGovernance = untrustedAndOutputSafety(prelude.governance || '')
 const jsonFindingsStems = ['pr-test-analyzer', 'type-design-analyzer', 'comment-analyzer']
 const jsonFindingsNote =
-  'End your reply with a fenced json-findings block: a JSON array of {severity, confidence, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name).'
+  'End your reply with a fenced json-findings block: a JSON array of {severity, confidence, category, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name).'
 
 const reviews = await pipeline(names, function (name) {
   const model = prelude.models && prelude.models[name]

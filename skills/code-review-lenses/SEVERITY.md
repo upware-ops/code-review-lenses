@@ -21,7 +21,7 @@ unified Critical/High/Medium/Low scale.
 | golangci-lint | all findings | Medium |
 | checkov | CKV2_*/CKV_SECRET_* vs others | High / Medium |
 
-pr-test-analyzer, type-design-analyzer, and comment-analyzer end their reply with a json-findings block whose `severity` and `confidence` follow the rows above and the confidence mapping below, without `category` (step 2a sets it to `other`). Phase 2a uses that block when present and falls back to these rows otherwise.
+pr-test-analyzer, type-design-analyzer, and comment-analyzer end their reply with a json-findings block whose `severity` and `confidence` follow the rows above and the confidence mapping below; `category` is one of the values listed below. Phase 2a uses that block when present and falls back to these rows otherwise.
 
 ## json-findings field contract
 

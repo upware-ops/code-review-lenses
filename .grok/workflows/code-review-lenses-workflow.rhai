@@ -292,7 +292,7 @@ for name in names {
     p += "Do not post or create a PR/MR. ";
     p += "Emit json-findings if that agent file requires them.";
     if name == "pr-test-analyzer" || name == "type-design-analyzer" || name == "comment-analyzer" {
-        p += " End your reply with a fenced json-findings block: a JSON array of {severity, confidence, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name).";
+        p += " End your reply with a fenced json-findings block: a JSON array of {severity, confidence, category, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name).";
     }
     let job = #{
         prompt: p,

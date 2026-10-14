@@ -421,7 +421,7 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 - **comment-analyzer** — comment-line changes (`//`, `#`, `/*`, `"""`, `'''`). Full diff.
 - **type-design-analyzer** — type definitions (`type ... struct`, `interface `, `class `, `enum `). Full diff.
 
-pr-test-analyzer, type-design-analyzer, and comment-analyzer: also pass the path of `$SKILL_ROOT/SEVERITY.md` and add to the task: "End your reply with a fenced json-findings block: a JSON array of {severity, confidence, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name)."
+pr-test-analyzer, type-design-analyzer, and comment-analyzer: also pass the path of `$SKILL_ROOT/SEVERITY.md` and add to the task: "End your reply with a fenced json-findings block: a JSON array of {severity, confidence, category, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name)."
 
 **issue-linker** when `RUN_ISSUE_LINKER=true` (GitHub only after overlay). Pass commit log, branch, manifest, and labelled `REPO_SLUG`, `HOST`, `PROVIDER`; it pins every `gh` call to `$HOST/$REPO_SLUG`.
 
