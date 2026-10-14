@@ -610,3 +610,8 @@ JSON
   out=$(WORKTREE_PATH=/tmp/wt DIFF_PATHS=$'--config=evil.js' bash -c "$block"$'\nprintf %s "$CHECK_PATHS"')
   [ "$out" = "/tmp/wt/--config=evil.js" ]
 }
+
+@test "SKILL.md: Phase 1b analyzer warnings and skips reach the Phase 5 notes" {
+  grep -qF 'carry its `WARNING:` and skip lines, except a missing binary'\''s, to Phase 5 as notes' "$SKILL_MD"
+  grep -qF 'Phase 1b analyzer `WARNING:` / skip lines as notes.' "$SKILL_MD"
+}

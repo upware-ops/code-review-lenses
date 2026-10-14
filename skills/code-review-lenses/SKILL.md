@@ -451,7 +451,7 @@ else
 fi
 ```
 
-**Static analyzers** when `RUN_STATIC_ANALYZERS=true`. Each script reads `CHECK_PATHS` on stdin and emits json-findings. Missing binary → silent skip. Run matching tools in background, `wait`, then read the temp JSON files. Tools: shellcheck, semgrep, trufflehog, ruff, golangci-lint, checkov, eslint, hadolint, kube-linter, phpcs, phpstan, tflint. Same path/binary gates as the `run-*.sh` scripts in `$SCRIPTS_DIR`. If a script is present and exits non-zero, set `ANALYZER_FAILED=true` (do not treat `[]` after a crash as a clean scan) and still merge the findings it printed (semgrep and checkov emit partial results with exit 1).
+**Static analyzers** when `RUN_STATIC_ANALYZERS=true`. Each script reads `CHECK_PATHS` on stdin and emits json-findings. Missing binary → silent skip. Run matching tools in background, `wait`, then read the temp JSON files. Keep each script's stderr (CVE check included) and carry its `WARNING:` and skip lines, except a missing binary's, to Phase 5 as notes: an empty array can mean files were skipped, not scanned. Tools: shellcheck, semgrep, trufflehog, ruff, golangci-lint, checkov, eslint, hadolint, kube-linter, phpcs, phpstan, tflint. Same path/binary gates as the `run-*.sh` scripts in `$SCRIPTS_DIR`. If a script is present and exits non-zero, set `ANALYZER_FAILED=true` (do not treat `[]` after a crash as a clean scan) and still merge the findings it printed (semgrep and checkov emit partial results with exit 1).
 
 ### Phase 1c: CVE reachability (`PROFILE=deep` only)
 
@@ -580,7 +580,7 @@ There is no Phase 4. Nothing is written to a hosting provider. Block A and Block
 7. Critical/High → "Address Critical/High findings before requesting review."
 8. Agent failures → "Review incomplete — <N> agent(s) failed."
 9. `CVE_CHECK_FAILED=true` → CVE check did not run. `ANALYZER_FAILED=true` → a static analyzer crashed or exited non-zero (not a silent clean scan).
-10. `NO_SUPPRESS=true` / `MIN_CONFIDENCE` drops as notes. Unused or uninterpreted `GUIDANCE` as a note.
+10. `NO_SUPPRESS=true` / `MIN_CONFIDENCE` drops as notes. Unused or uninterpreted `GUIDANCE` as a note. Phase 1b analyzer `WARNING:` / skip lines as notes.
 11. `PROFILE` not `summary`, no findings, and no failures → "No significant issues found."
 
 ## Notes

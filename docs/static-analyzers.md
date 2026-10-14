@@ -20,7 +20,7 @@ In addition to LLM agents, the skill runs deterministic checks when relevant fil
 | **ruff** — Python linting | `.py` or `.pyw` files changed | quick, security, full, deep | `ruff` |
 | **golangci-lint** — Go static analysis | `.go` files changed; runs once per Go module | quick, security, full, deep | `golangci-lint` v2.1+ |
 | **checkov** — IaC security scanning | `*.tf`, `*.tfvars`, `Dockerfile`, k8s YAML, CloudFormation, Azure ARM changed | quick, security, full, deep | `checkov` |
-| **eslint** — JavaScript/TypeScript linting | `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` files changed; only runs when an ESLint config is present; parse errors are findings | quick, security, full, deep | `eslint` (via `npx` or `node_modules/.bin`) |
+| **eslint** — JavaScript/TypeScript linting | `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` files changed; only runs when an ESLint config is present; parse errors are findings | quick, security, full, deep | `eslint` (the checkout's `node_modules/.bin/eslint`, else the one `npx --no` finds; never downloaded) |
 | **hadolint** — Dockerfile linting | `Dockerfile`, `Dockerfile.*`, or `*.dockerfile` changed | quick, security, full, deep | `hadolint` |
 | **kube-linter** — Kubernetes manifest linting | `.yaml`, `.yml`, or `.json` files containing `apiVersion` and `kind` fields (Helm chart templates under a chart's `templates/` are skipped with a stderr note; undecodable manifests are findings) | quick, security, full, deep | `kube-linter` |
 | **phpcs** — PHP CodeSniffer | `.php` files changed; uses Drupal/DrupalPractice standard when available, falls back to PSR-12 | quick, security, full, deep | `phpcs` |
@@ -30,6 +30,8 @@ In addition to LLM agents, the skill runs deterministic checks when relevant fil
 Findings appear in Block B with the tool name as source (e.g., `[shellcheck]`, `[eslint]`).
 
 ESLint, tflint, and golangci-lint load configuration and plugins only from the reviewer checkout (`$GITHUB_WORKSPACE`, else the current directory) or your home directory (or from `TFLINT_CONFIG_FILE` / `TFLINT_PLUGIN_DIR` when you set them; relative values resolve against the reviewer checkout), so a PR/MR-URL review never runs configs or plugins from the reviewed PR/MR. A local review runs the checkout's own configs: do not run one on an untrusted checkout in an environment that holds secrets.
+
+ESLint always runs from the reviewer checkout. With a flat config (`eslint.config.*`), files outside it, such as a PR/MR-URL worktree, are not linted: flat config resolves patterns against the working directory, and running ESLint from the reviewed tree would load that tree's project configs (for example a `babel.config.js` that a parser loads). One `WARNING:` line names them, and the review lists it as a note. Legacy `.eslintrc*` configs still lint such files from the reviewer checkout.
 
 ## Installing analyzers
 
