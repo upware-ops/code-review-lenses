@@ -313,7 +313,7 @@ setup() {
              'Assemble failed.'; do
     grep -q -F "\"$msg\" + cleanup_note(pre)" "$GROK_WF"
   done
-  grep -q -F 'p && (p.worktree_path || p.diff_file)' "$CLAUDE_WF"
+  grep -q -F 'wt || df' "$CLAUDE_WF"
   grep -q -F 'if wt != "" || df != "" {' "$GROK_WF"
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     [ "$(grep -c 'Phase 5 cleanup only: rm -f DIFF_FILE if set' "$f")" -eq 1 ]
@@ -340,7 +340,7 @@ setup() {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     grep -q -F 'provider, repo_slug, host, governance' "$f"
     grep -q -F 'host = PROVIDER, REPO_SLUG and HOST' "$f"
-    grep -A4 -E 'name ===? .issue-linker.( \{)?$' "$f" | grep -q 'HOST: '
+    grep -A8 -E 'name ===? .issue-linker.( \{)?$' "$f" | grep -q 'HOST: '
   done
 }
 
@@ -388,4 +388,168 @@ setup() {
       return 1
     fi
   done
+}
+
+@test "Claude wrapper: safeTempPath keeps only clean absolute paths under the system temp roots" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  {
+    sed -n '/^function safeTempPath/,/^}/p' "$CLAUDE_WF"
+    cat <<'JS'
+const keep = [
+  '/tmp/x',
+  '/tmp/tmp.AbC123',
+  '/private/tmp/review/diff.patch',
+  '/var/folders/d4/r7jlsr2s3_gbckcs5fdrkkgr0000gn/T/tmp.JBI28RKCyr',
+  '/private/var/folders/ab/T/tmp.1/x',
+]
+const drop = [
+  '', '/', '/tmp', '/var/folders', 'tmp/x', './tmp/x', 'x/tmp/y', '/Users/x/file', '/etc/passwd', '/tmpx/y', '/private/tmpx/y',
+  '/tmp/../etc/passwd', '/tmp/a/../../b', '/tmp/..', '/var/folders/../../etc',
+  '/tmp/x y', '/tmp/x\n/Users/x/file', '/tmp/x;rm', '/tmp/x$HOME', '/tmp/x`id`',
+  null, undefined, 5, {},
+]
+const wrong = keep.filter((p) => safeTempPath(p) !== p).concat(drop.filter((p) => safeTempPath(p) !== ''))
+process.stdout.write(JSON.stringify(wrong))
+JS
+  } > "$BATS_TEST_TMPDIR/safe-temp-path.js"
+  run node "$BATS_TEST_TMPDIR/safe-temp-path.js"
+  if [ "$status" -ne 0 ] || [ "$output" != "[]" ]; then
+    echo "REGRESSION: safeTempPath misclassified: $output" >&2
+    return 1
+  fi
+}
+
+@test "Claude wrapper: cleanupNote gives the cleanup agent only validated paths and names the rest in a manual note" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  {
+    sed -n '/^function safeTempPath/,/^}/p;/^function notCleaned/,/^}/p;/^async function cleanupNote/,/^}/p' "$CLAUDE_WF"
+    cat <<'JS'
+const assert = require('assert')
+const prompts = []
+let reply = 'WORKTREE_REMOVED'
+globalThis.agent = async (prompt) => {
+  prompts.push(prompt)
+  return reply
+}
+const note = (s) => ' Not cleaned (outside the system temp dir): ' + JSON.stringify(s)
+
+;(async () => {
+  const wt = '/private/var/folders/ab/T/tmp.wt1'
+  const df = '/tmp/tmp.diff1'
+
+  assert.strictEqual(await cleanupNote({ worktree_path: wt, diff_file: df }), ' WORKTREE_REMOVED')
+  assert.strictEqual(prompts.length, 1)
+  assert.ok(prompts[0].includes('DIFF_FILE: ' + df + '. WORKTREE_PATH: ' + wt + '.'))
+
+  prompts.length = 0
+  const foreign = { worktree_path: '/Users/x/.claude/worktrees/other', diff_file: '/Users/x/notes.txt' }
+  assert.strictEqual(await cleanupNote(foreign), note(foreign.worktree_path) + note(foreign.diff_file))
+  assert.strictEqual(prompts.length, 0)
+
+  assert.strictEqual(
+    await cleanupNote({ worktree_path: wt, diff_file: '/tmp/../Users/x/f' }),
+    ' WORKTREE_REMOVED' + note('/tmp/../Users/x/f'),
+  )
+  assert.strictEqual(prompts.length, 1)
+  assert.ok(prompts[0].includes('WORKTREE_PATH: ' + wt + '.'))
+  assert.ok(!prompts[0].includes('Users/x/f'))
+
+  reply = null
+  assert.strictEqual(
+    await cleanupNote({ worktree_path: wt, diff_file: '' }),
+    ' Clean up leftover worktree: git worktree remove --force ' + wt,
+  )
+  assert.strictEqual(await cleanupNote({ worktree_path: '/home/u/wt' }), note('/home/u/wt'))
+
+  prompts.length = 0
+  assert.strictEqual(await cleanupNote(null), '')
+  assert.strictEqual(prompts.length, 0)
+})().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})
+JS
+  } > "$BATS_TEST_TMPDIR/cleanup-note.js"
+  run node "$BATS_TEST_TMPDIR/cleanup-note.js"
+  if [ "$status" -ne 0 ]; then
+    echo "$output" >&2
+    return 1
+  fi
+}
+
+@test "wrappers pass only temp-dir-validated paths to destructive cleanup and name the rest in a manual note" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q -F '/private/var/folders/' "$f"
+    grep -q -F ' Not cleaned (outside the system temp dir): ' "$f"
+  done
+  grep -q -F 'function safeTempPath(p) {' "$CLAUDE_WF"
+  grep -q -F 'const wt = safeTempPath(p && p.worktree_path)' "$CLAUDE_WF"
+  grep -q -F 'const df = safeTempPath(p && p.diff_file)' "$CLAUDE_WF"
+  grep -q -F "'DIFF_FILE: ' + df + '. WORKTREE_PATH: ' + wt + '.'" "$CLAUDE_WF"
+  grep -q -F "'WORKTREE_PATH: ' + safeTempPath(prelude.worktree_path) + '. DIFF_FILE: ' + safeTempPath(prelude.diff_file) + '.'" "$CLAUDE_WF"
+  grep -q -F 'notCleaned(prelude)' "$CLAUDE_WF"
+  grep -q -F 'fn safe_temp_path(p) {' "$GROK_WF"
+  grep -q -F 'wt = safe_temp_path(wt);' "$GROK_WF"
+  grep -q -F 'df = safe_temp_path(df);' "$GROK_WF"
+  grep -q -F 'assemble_prompt += safe_temp_path(wt);' "$GROK_WF"
+  grep -q -F 'assemble_prompt += safe_temp_path(df_a);' "$GROK_WF"
+  grep -q -F 'not_cleaned([wt, df_a])' "$GROK_WF"
+  validated=$(grep -n -F 'df = safe_temp_path(df);' "$GROK_WF" | head -1 | cut -d: -f1)
+  used=$(grep -n -F 'cleanup_prompt += df;' "$GROK_WF" | head -1 | cut -d: -f1)
+  [ -n "$validated" ]
+  [[ "$validated" -lt "$used" ]]
+  for raw in "'DIFF_FILE: ' + (p.diff_file || '')" "'. DIFF_FILE: ' + (prelude.diff_file || '')" \
+             'assemble_prompt += wt;' 'assemble_prompt += df_a;'; do
+    if grep -q -F "$raw" "$CLAUDE_WF" "$GROK_WF"; then
+      echo "REGRESSION: a raw prelude path reaches a destructive cleanup prompt: $raw" >&2
+      return 1
+    fi
+  done
+}
+
+@test "wrappers have the prelude create the URL worktree and the diff copy under the system temp dir with mktemp" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    [ "$(grep -c -F 'git worktree add' "$f")" -eq 1 ]
+    line=$(grep -F 'git worktree add' "$f")
+    [[ "$line" == *'WORKTREE_PATH=$(mktemp -d)'*'git worktree add'* ]]
+    [[ "$line" == *'DIFF_FILE=$(mktemp)'* ]]
+    grep -q -F -- '--diff-file <diff temp file from mktemp>' "$f"
+  done
+}
+
+@test "wrappers take the issue-linker host from detect-provider.sh on local reviews" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q -F 'from detect-provider.sh for a local review; empty only when PROVIDER=unknown' "$f"
+    if grep -q -F 'host is empty for local review' "$f"; then
+      echo "REGRESSION: $f discards the HOST detect-provider.sh emits for a local review" >&2
+      return 1
+    fi
+  done
+}
+
+@test "wrappers leave HOST and REPO_SLUG out of the issue-linker prompt when they are empty" {
+  grep -q -F "(prelude.host ? ' HOST: ' + prelude.host + '.' : '')" "$CLAUDE_WF"
+  grep -q -F "(prelude.repo_slug ? ' REPO_SLUG: ' + prelude.repo_slug + '.' : '')" "$CLAUDE_WF"
+  grep -B1 -F 'p += "HOST: ";' "$GROK_WF" | grep -q -F 'if host != "" {'
+  grep -B1 -F 'p += "REPO_SLUG: ";' "$GROK_WF" | grep -q -F 'if repo_slug != "" {'
+  if grep -q -F "(prelude.host || '')" "$CLAUDE_WF" || grep -q -F 'p += ". HOST: ";' "$GROK_WF"; then
+    echo "REGRESSION: the issue-linker prompt carries an empty HOST" >&2
+    return 1
+  fi
+}
+
+@test "Grok review jobs run read-only and only issue-linker keeps execute" {
+  grep -q -F 'let capability = "read-only";' "$GROK_WF"
+  grep -B1 -F 'capability = "execute";' "$GROK_WF" | grep -q -F 'if name == "issue-linker" {'
+  grep -q -F 'capability_mode: capability,' "$GROK_WF"
+  [ "$(grep -c -F 'capability_mode: "execute"' "$GROK_WF")" -eq 3 ]
+  grep -q -F 'Read files under that path.' "$GROK_WF"
+  [ "$(grep -c -F 'All git commands: git -C that path.' "$GROK_WF")" -eq 1 ]
+  grep -B1 -F 'All git commands: git -C that path.' "$GROK_WF" | grep -q -F 'if name == "issue-linker" {'
+  grep -q -F 'Return that file as diff_file in every mode' "$GROK_WF"
+  grep -A3 -F 'if name != "blind-hunter" && name != "issue-linker" && df != "" {' "$GROK_WF" | grep -q -F 'Read the diff under review from that file'
 }
