@@ -1,0 +1,25 @@
+tests/review_diff.bats
+  s_22d2264024e6d9::t_1b29322e7d5c3c 103,108,114
+  s_22d2264024e6d9::t_2f434e277792ef 179,185,190,194,199,202,206,210-211
+  s_22d2264024e6d9::t_5ed4fd350d9b73 243-253
+skills/code-review-lenses/scripts/review-diff.sh
+  s_22d2264024e6d9::t_48a93f1920a114 80
+  s_22d2264024e6d9::t_1407a9d4d778ab 81
+  s_22d2264024e6d9::t_f3b644af772346 79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "9d925f9cb22443356b398cb2e4ff3d2639bab343",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
