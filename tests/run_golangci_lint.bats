@@ -155,3 +155,20 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$(cat "$WORK/gl.log")" == "$WORK/pr/mod|run "*" --issues-exit-code=0 --config=$WORK/ws/.golangci.yml ./a/..." ]]
 }
+
+@test "golangci-lint: without HOME it still runs, using only the reviewer-root config or --no-config" {
+  unset GOLANGCI_MOCK_FILE
+  make_golangci_stub
+  mkdir -p "$WORK/ws" "$WORK/pr/mod/a"
+  touch "$WORK/pr/mod/go.mod" "$WORK/pr/mod/a/x.go" "$WORK/ws/.golangci.yml"
+  echo '{"Issues":[]}' > "$WORK/pr/mod/out.json"
+  cd "$WORK"
+  GITHUB_WORKSPACE="$WORK/ws" PATH="$WORK/bin:$PATH" run --separate-stderr env -u HOME bash "$SCRIPT" "$WORK/pr/mod/a/x.go"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$WORK/gl.log")" == "$WORK/pr/mod|run "*" --issues-exit-code=0 --config=$WORK/ws/.golangci.yml ./a/..." ]]
+  rm "$WORK/ws/.golangci.yml"
+  : > "$WORK/gl.log"
+  GITHUB_WORKSPACE="$WORK/ws" HOME="" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/a/x.go"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$WORK/gl.log")" == "$WORK/pr/mod|run "*" --issues-exit-code=0 --no-config ./a/..." ]]
+}

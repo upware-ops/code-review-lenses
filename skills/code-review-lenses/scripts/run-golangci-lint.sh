@@ -78,7 +78,9 @@ else
 
   # Without an explicit config, golangci-lint loads the first one found from the module root upward, which a reviewed PR controls.
   GL_CONFIG_ARG="--no-config"
-  for cfg in "${GITHUB_WORKSPACE:-$PWD}"/.golangci.{yml,yaml,toml,json} "$HOME"/.golangci.{yml,yaml,toml,json}; do
+  GL_CONFIGS=("${GITHUB_WORKSPACE:-$PWD}"/.golangci.{yml,yaml,toml,json})
+  [[ -n "${HOME:-}" ]] && GL_CONFIGS+=("$HOME"/.golangci.{yml,yaml,toml,json})
+  for cfg in "${GL_CONFIGS[@]}"; do
     [[ -f "$cfg" ]] && { GL_CONFIG_ARG="--config=$cfg"; break; }
   done
 

@@ -15,6 +15,17 @@ teardown() {
   rm -rf "$WORK"
 }
 
+# Stub binary: records its argv plus the plugin dir and config file it would inherit to $ARGV_FILE.
+make_tflint_stub() {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/tflint" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$@" "PLUGIN_DIR=${TFLINT_PLUGIN_DIR-}" "CONFIG_FILE=${TFLINT_CONFIG_FILE-}" > "$ARGV_FILE"
+echo '{"issues":[]}'
+STUB
+  chmod +x "$WORK/bin/tflint"
+}
+
 # ---------------------------------------------------------------------------
 # No-op paths
 # ---------------------------------------------------------------------------
@@ -175,6 +186,57 @@ STUB
     run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/main.tf"
   [ "$status" -eq 0 ]
   grep -qx -- "--config=/dev/null" "$WORK/argv"
+}
+
+@test "tflint: without HOME it still runs, pinning only the reviewer-root config and plugin dir" {
+  unset TFLINT_MOCK_FILE TFLINT_CONFIG_FILE TFLINT_PLUGIN_DIR
+  make_tflint_stub
+  mkdir -p "$WORK/pr/mod"
+  touch "$WORK/pr/mod/main.tf" "$WORK/.tflint.hcl"
+  cd "$WORK"
+  GITHUB_WORKSPACE="$WORK" ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr env -u HOME bash "$SCRIPT" "$WORK/pr/mod/main.tf"
+  [ "$status" -eq 0 ]
+  grep -qx -- "--config=$WORK/.tflint.hcl" "$WORK/argv"
+  grep -qx -- "PLUGIN_DIR=$WORK/.tflint.d/plugins" "$WORK/argv"
+  rm "$WORK/.tflint.hcl"
+  GITHUB_WORKSPACE="$WORK" HOME="" ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/main.tf"
+  [ "$status" -eq 0 ]
+  grep -qx -- "--config=/dev/null" "$WORK/argv"
+  grep -qx -- "PLUGIN_DIR=$WORK/.tflint.d/plugins" "$WORK/argv"
+}
+
+@test "tflint: relative TFLINT_CONFIG_FILE and TFLINT_PLUGIN_DIR are anchored to the reviewer checkout" {
+  unset TFLINT_MOCK_FILE TFLINT_CONFIG_FILE TFLINT_PLUGIN_DIR
+  make_tflint_stub
+  mkdir -p "$WORK/pr/mod"
+  touch "$WORK/pr/mod/main.tf"
+  cd "$WORK"
+  TFLINT_CONFIG_FILE=conf/tflint.hcl TFLINT_PLUGIN_DIR=plugins HOME="$WORK/home" ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/main.tf"
+  [ "$status" -eq 0 ]
+  grep -qx -- "CONFIG_FILE=$PWD/conf/tflint.hcl" "$WORK/argv"
+  grep -qx -- "PLUGIN_DIR=$PWD/plugins" "$WORK/argv"
+  [ "$(grep -c -- '^--config=' "$WORK/argv")" -eq 0 ]
+  TFLINT_PLUGIN_DIR='~/plugins' HOME="$WORK/home" ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/main.tf"
+  [ "$status" -eq 0 ]
+  grep -qx -- "PLUGIN_DIR=$PWD/~/plugins" "$WORK/argv"
+}
+
+@test "tflint: absolute TFLINT_CONFIG_FILE and TFLINT_PLUGIN_DIR operator overrides are kept as set" {
+  unset TFLINT_MOCK_FILE TFLINT_CONFIG_FILE TFLINT_PLUGIN_DIR
+  make_tflint_stub
+  mkdir -p "$WORK/pr/mod"
+  touch "$WORK/pr/mod/main.tf"
+  cd "$WORK"
+  TFLINT_CONFIG_FILE=/etc/tflint.hcl TFLINT_PLUGIN_DIR=/opt/tflint-plugins HOME="$WORK/home" ARGV_FILE="$WORK/argv" PATH="$WORK/bin:$PATH" \
+    run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/main.tf"
+  [ "$status" -eq 0 ]
+  grep -qx -- "CONFIG_FILE=/etc/tflint.hcl" "$WORK/argv"
+  grep -qx -- "PLUGIN_DIR=/opt/tflint-plugins" "$WORK/argv"
+  [ "$(grep -c -- '^--config=' "$WORK/argv")" -eq 0 ]
 }
 
 # ---------------------------------------------------------------------------

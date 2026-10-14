@@ -78,17 +78,21 @@ else
   # tflint must be run per-directory (it reads the full module in each dir).
   # tflint --chdir emits bare filenames (e.g. "main.tf"), so prepend the dir
   # so json-findings `file` is repo-relative.
-  # --chdir makes tflint load .tflint.hcl and ./.tflint.d/plugins binaries from the reviewed directory.
+  # --chdir makes tflint load .tflint.hcl, ./.tflint.d/plugins and relative TFLINT_CONFIG_FILE / TFLINT_PLUGIN_DIR paths from the reviewed directory (no ~ expansion for either).
   TFLINT_ARGS=(--format=json)
+  case "${TFLINT_CONFIG_FILE:-}" in ""|/*) ;; *) export TFLINT_CONFIG_FILE="$PWD/$TFLINT_CONFIG_FILE" ;; esac
+  case "${TFLINT_PLUGIN_DIR:-}" in ""|/*) ;; *) export TFLINT_PLUGIN_DIR="$PWD/$TFLINT_PLUGIN_DIR" ;; esac
   if [[ -z "${TFLINT_CONFIG_FILE:-}" ]]; then
+    TFLINT_CONFIGS=("${GITHUB_WORKSPACE:-$PWD}"/.tflint.{hcl,json})
+    [[ -n "${HOME:-}" ]] && TFLINT_CONFIGS+=("$HOME"/.tflint.{hcl,json})
     TFLINT_CONFIG=/dev/null
-    for cfg in "${GITHUB_WORKSPACE:-$PWD}"/.tflint.{hcl,json} "$HOME"/.tflint.{hcl,json}; do
+    for cfg in "${TFLINT_CONFIGS[@]}"; do
       [[ -f "$cfg" ]] && { TFLINT_CONFIG="$cfg"; break; }
     done
     TFLINT_ARGS+=(--config="$TFLINT_CONFIG")
   fi
   TRUSTED_PLUGIN_DIR="${GITHUB_WORKSPACE:-$PWD}/.tflint.d/plugins"
-  [[ -d "$TRUSTED_PLUGIN_DIR" ]] || TRUSTED_PLUGIN_DIR="$HOME/.tflint.d/plugins"
+  [[ -d "$TRUSTED_PLUGIN_DIR" || -z "${HOME:-}" ]] || TRUSTED_PLUGIN_DIR="$HOME/.tflint.d/plugins"
   export TFLINT_PLUGIN_DIR="${TFLINT_PLUGIN_DIR:-$TRUSTED_PLUGIN_DIR}"
 
   ALL_ISSUES="[]"
