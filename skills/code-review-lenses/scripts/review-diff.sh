@@ -83,9 +83,12 @@ write_dirty_diff() {
 
   # xargs -r: GNU xargs runs git once on empty input, BSD xargs never does.
   # Files and symlinks only: untracked nested repos list as "dir/" and git add would embed them.
+  # Not the diff file: inside the checkout it lists as untracked and the redirect below truncates it.
   git ls-files -z --others --exclude-standard \
     | while IFS= read -r -d '' path; do
-        if [[ -f "$path" || -L "$path" ]]; then printf '%s\0' "$path"; fi
+        if [[ ( -f "$path" || -L "$path" ) && ! "$path" -ef "$DIFF_FILE" ]]; then
+          printf '%s\0' "$path"
+        fi
       done \
     | GIT_LITERAL_PATHSPECS=1 GIT_INDEX_FILE="$INDEX_DIR/index" xargs -0 -r git add -N -- \
     || die "Cannot add untracked files to the temporary index."

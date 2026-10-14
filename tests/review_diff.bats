@@ -210,3 +210,33 @@ STUB
   [[ "$output" != *REVIEW_MODE* ]]
   [ -z "$(ls -A "$BATS_TEST_TMPDIR/tmp")" ]
 }
+
+@test "review-diff: --diff-file pre-created inside the checkout is not diffed as its own untracked input" {
+  echo changed > "$WORK/a"
+  echo hello > "$WORK/new.txt"
+  : > "$WORK/self.diff"
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$WORK/self.diff'"
+  [ "$status" -eq 0 ]
+  grep -qxF '+changed' "$WORK/self.diff"
+  grep -qxF 'diff --git a/new.txt b/new.txt' "$WORK/self.diff"
+  [ "$(grep -cF self.diff "$WORK/self.diff")" -eq 0 ]
+}
+
+@test "review-diff: --diff-file inside the checkout is excluded however its path is spelled" {
+  mkdir "$WORK/sub"
+  echo hello > "$WORK/new.txt"
+  : > "$WORK/sub/self.diff"
+  ln -s "$WORK" "$BATS_TEST_TMPDIR/link"
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$BATS_TEST_TMPDIR/link/sub/self.diff'"
+  [ "$status" -eq 0 ]
+  grep -qxF '+hello' "$WORK/sub/self.diff"
+  [ "$(grep -cF self.diff "$WORK/sub/self.diff")" -eq 0 ]
+}
+
+@test "review-diff: --diff-file inside the checkout that does not exist yet is written normally" {
+  echo hello > "$WORK/new.txt"
+  run bash -c "cd '$WORK' && bash '$REVIEW' --base main --diff-file '$WORK/self.diff'"
+  [ "$status" -eq 0 ]
+  grep -qxF '+hello' "$WORK/self.diff"
+  [ "$(grep -cF self.diff "$WORK/self.diff")" -eq 0 ]
+}
