@@ -1,29 +1,46 @@
 tests/fixtures/ruff/ruff-findings.json
   s_22d2264024e6d9::t_2e72c4d262abe9 1-13
+  s_22d2264024e6d9::t_26addbc6cf2e18 1-13
 tests/fixtures/eslint/eslint-ignored.json
   s_22d2264024e6d9::t_2e72c4d262abe9 1-19
+  s_22d2264024e6d9::t_7bb7aabb4572b6 1-19
 tests/fixtures/tflint/tflint-module-level.json
   s_22d2264024e6d9::t_2e72c4d262abe9 1-31
+  s_22d2264024e6d9::t_9ece18ef060fe0 1-31
 tests/run_eslint.bats
   s_22d2264024e6d9::t_2e72c4d262abe9 124-143
+  s_22d2264024e6d9::t_30759cf0ab994a 124-143
 skills/code-review-lenses/scripts/run-kube-linter.sh
   s_22d2264024e6d9::t_2e72c4d262abe9 81-82
+  s_22d2264024e6d9::t_e1fc38cc734f60 81-82
 skills/code-review-lenses/scripts/run-ruff.sh
   s_22d2264024e6d9::t_2e72c4d262abe9 44
+  s_22d2264024e6d9::t_3a62bf7d84b333 44
 skills/code-review-lenses/scripts/run-tflint.sh
   s_22d2264024e6d9::t_2e72c4d262abe9 46,60,95-96,111-112,114-117,154,166
+  s_22d2264024e6d9::t_399873b5b5c5ad 46
+  s_22d2264024e6d9::t_85460a4759ffcb 95-96
+  s_22d2264024e6d9::t_f3d3fecc42cfea 60
+  s_22d2264024e6d9::t_d082d55bfa86ab 111-112,114-117
+  s_22d2264024e6d9::t_a2d0b6c2a2371e 154,166
 tests/fixtures/eslint/eslint-parse-error.json
   s_22d2264024e6d9::t_2e72c4d262abe9 1-21
+  s_22d2264024e6d9::t_2b143a9b44f68a 1-21
 tests/run_tflint.bats
   s_22d2264024e6d9::t_2e72c4d262abe9 179-210
+  s_22d2264024e6d9::t_5d713990ffd845 179-210
 tests/run_kube_linter.bats
   s_22d2264024e6d9::t_2e72c4d262abe9 124-155
+  s_22d2264024e6d9::t_c7fa46edd5d7a0 124-155
 tests/fixtures/kubelinter/kubelinter-invalid-object.json
   s_22d2264024e6d9::t_2e72c4d262abe9 1-22
+  s_22d2264024e6d9::t_f9a8e5b17e75ea 1-22
 tests/run_ruff.bats
   s_22d2264024e6d9::t_2e72c4d262abe9 1-41
+  s_22d2264024e6d9::t_ff601cf96cd21b 1-41
 skills/code-review-lenses/scripts/run-eslint.sh
   s_22d2264024e6d9::t_2e72c4d262abe9 145,152,157
+  s_22d2264024e6d9::t_7ec8492cf62339 145,152,157
 ---
 {
   "schema_version": "authorship/3.0.0",
