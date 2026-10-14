@@ -1,0 +1,25 @@
+docs/architecture.md
+  s_22d2264024e6d9::t_6cb17c97a87b22 87
+docs/static-analyzers.md
+  s_22d2264024e6d9::t_6cb17c97a87b22 32
+CHANGELOG.md
+  s_22d2264024e6d9::t_6cb17c97a87b22 52
+skills/code-review-lenses/scripts/fetch-pr-metadata.sh
+  s_22d2264024e6d9::t_6cb17c97a87b22 3-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "419dce2ac2e2cdc085f63482c60ba7b2aedf3f25",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
