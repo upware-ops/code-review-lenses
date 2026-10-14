@@ -84,7 +84,7 @@ Both blocks are always shown locally in the terminal (and optionally `--output-f
 
 ## Severity normalization
 
-Each agent uses its own severity scale. The skill normalizes all findings to a unified Critical/High/Medium/Low scale via the normalization table in `SEVERITY.md`, and merges findings that two agents report in the same file and `category` within 3 lines of each other.
+Each agent uses its own severity scale. The skill normalizes all findings to a unified Critical/High/Medium/Low scale via the normalization table in `SEVERITY.md`, and clusters findings per file and `category` that start within 3 lines of the cluster's first finding (findings with unknown line 0 cluster by file and `category` alone), keeping the highest severity.
 
 CVE findings whose CVSS vector cannot be parsed (CVSS v4.0/v2 vectors, or no severity entry) are emitted as `"High"` as a conservative fallback.
 

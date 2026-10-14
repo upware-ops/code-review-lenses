@@ -29,7 +29,7 @@ In addition to LLM agents, the skill runs deterministic checks when relevant fil
 
 Findings appear in Block B with the tool name as source (e.g., `[shellcheck]`, `[eslint]`).
 
-ESLint, tflint, and golangci-lint load configuration and plugins only from the reviewer checkout (`$GITHUB_WORKSPACE`, else the current directory) or your home directory, so a PR/MR-URL review never runs configs or plugins from the reviewed PR/MR. A local review runs the checkout's own configs: do not run one on an untrusted checkout in an environment that holds secrets.
+ESLint, tflint, and golangci-lint load configuration and plugins only from the reviewer checkout (`$GITHUB_WORKSPACE`, else the current directory) or your home directory (or from `TFLINT_CONFIG_FILE` / `TFLINT_PLUGIN_DIR` when you set them; relative values resolve against the reviewer checkout), so a PR/MR-URL review never runs configs or plugins from the reviewed PR/MR. A local review runs the checkout's own configs: do not run one on an untrusted checkout in an environment that holds secrets.
 
 ## Installing analyzers
 

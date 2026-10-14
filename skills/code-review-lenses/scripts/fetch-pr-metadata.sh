@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fetch-pr-metadata.sh — run PROVIDERS.md "OP: Fetch PR/MR metadata" for a
-# parsed PR/MR URL without printing author-written text: the title is not
-# fetched and the description is written to PR_BODY_FILE.
+# parsed PR/MR URL without printing author-written text: the title is never
+# printed (the GitHub query omits it) and the description goes to PR_BODY_FILE.
 #
 # Usage (after detect-provider.sh --check-url-host succeeded for HOST):
 #   bash fetch-pr-metadata.sh --provider github|gitlab|bitbucket \
