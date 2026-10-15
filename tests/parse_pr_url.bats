@@ -240,3 +240,21 @@ source_url() {
   run bash "$PARSE" "https://example.com:8443/docs"
   [ "$status" -eq 1 ]
 }
+
+@test "parse-pr-url: a repository named after a route segment keeps its slug" {
+  source_url "https://github.com/acme/pull/pull/12"
+  [ "$REPO_SLUG" = "acme/pull" ]
+  [ "$PR_NUMBER" = "12" ]
+  source_url "https://github.com/pull/12/pull/5/files"
+  [ "$REPO_SLUG" = "pull/12" ]
+  [ "$PR_NUMBER" = "5" ]
+  source_url "https://github.com/acme/app/pull/42/commits/0123abc"
+  [ "$REPO_SLUG" = "acme/app" ]
+  [ "$PR_NUMBER" = "42" ]
+  source_url "https://bitbucket.org/team/pull-requests/pull-requests/9"
+  [ "$REPO_SLUG" = "team/pull-requests" ]
+  [ "$PR_NUMBER" = "9" ]
+  source_url "https://gitlab.com/g/merge_requests/-/merge_requests/3/diffs"
+  [ "$REPO_SLUG" = "g/merge_requests" ]
+  [ "$PR_NUMBER" = "3" ]
+}

@@ -92,34 +92,21 @@ while IFS= read -r raw; do
   suffix=""
   slug=""
 
-  if [[ "$path" =~ /-/merge_requests/([1-9][0-9]*)([^/]*) ]]; then
+  # (.*) is greedy, so the last route segment wins: a repository may itself be named pull.
+  if [[ "$path" =~ ^(.*)/-/merge_requests/([1-9][0-9]*)([^/]*)(/.*)?$ ]]; then
     provider=gitlab
-    number="${BASH_REMATCH[1]}"
-    suffix="${BASH_REMATCH[2]}"
-    slug="${path%%/-/merge_requests/*}"
-  elif [[ "$path" =~ /merge_requests/([1-9][0-9]*)([^/]*) ]]; then
+  elif [[ "$path" =~ ^(.*)/merge_requests/([1-9][0-9]*)([^/]*)(/.*)?$ ]]; then
     provider=gitlab
-    number="${BASH_REMATCH[1]}"
-    suffix="${BASH_REMATCH[2]}"
-    slug="${path%%/merge_requests/*}"
-  elif [[ "$path" =~ /pull-requests/([1-9][0-9]*)([^/]*) ]]; then
+  elif [[ "$path" =~ ^(.*)/pull-requests/([1-9][0-9]*)([^/]*)(/.*)?$ ]]; then
     provider=bitbucket
-    number="${BASH_REMATCH[1]}"
-    suffix="${BASH_REMATCH[2]}"
-    slug="${path%%/pull-requests/*}"
-  elif [[ "$path" =~ /pulls/([1-9][0-9]*)([^/]*) ]]; then
+  elif [[ "$path" =~ ^(.*)/pulls?/([1-9][0-9]*)([^/]*)(/.*)?$ ]]; then
     provider=github
-    number="${BASH_REMATCH[1]}"
-    suffix="${BASH_REMATCH[2]}"
-    slug="${path%%/pulls/*}"
-  elif [[ "$path" =~ /pull/([1-9][0-9]*)([^/]*) ]]; then
-    provider=github
-    number="${BASH_REMATCH[1]}"
-    suffix="${BASH_REMATCH[2]}"
-    slug="${path%%/pull/*}"
   else
     continue
   fi
+  slug="${BASH_REMATCH[1]}"
+  number="${BASH_REMATCH[2]}"
+  suffix="${BASH_REMATCH[3]}"
 
   if [[ -n "$suffix" && "$suffix" != .diff && "$suffix" != .patch ]]; then
     echo "Error: parse-pr-url.sh: only /, .diff, or .patch may follow the PR/MR number." >&2
