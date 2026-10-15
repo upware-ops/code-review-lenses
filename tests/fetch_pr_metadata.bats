@@ -13,13 +13,14 @@ setup() {
   cat > "$WORK/bin/stub" <<'EOF'
 #!/bin/sh
 printf '%s\n' "GH_HOST=${GH_HOST:-}" "GITLAB_HOST=${GITLAB_HOST:-}" "$@" > "$ARGV_FILE"
+case "$0" in */curl) cat > "$STDIN_FILE" ;; esac
 cat "$STUB_JSON"
 EOF
   chmod +x "$WORK/bin/stub"
   for cli in gh glab curl; do
     ln -s stub "$WORK/bin/$cli"
   done
-  export PATH="$WORK/bin:$PATH" ARGV_FILE="$WORK/argv" STUB_JSON="$WORK/meta.json"
+  export PATH="$WORK/bin:$PATH" ARGV_FILE="$WORK/argv" STDIN_FILE="$WORK/stdin" STUB_JSON="$WORK/meta.json"
 }
 
 teardown() {
@@ -89,6 +90,28 @@ EOF
   STUB_JSON="$WORK/next.json" fetch --provider bitbucket --host bitbucket.org --repo team/repo --number 9
   [ "$status" -eq 2 ]
   [[ "$stderr" == *CLOSED* ]]
+}
+
+@test "fetch-pr-metadata: Bitbucket credentials reach curl as an escaped stdin config, never in argv" {
+  jq -n '{source: {branch: {name: "feat"}, repository: {full_name: "team/repo"}},
+          destination: {branch: {name: "main"}, repository: {full_name: "team/repo"}},
+          state: "OPEN", description: "x"}' > "$STUB_JSON"
+  BITBUCKET_EMAIL=dev@example.com BITBUCKET_TOKEN=tok3n \
+    fetch --provider bitbucket --host bitbucket.org --repo team/repo --number 9
+  [ "$status" -eq 0 ]
+  eval "$output"
+  rm -f "$PR_BODY_FILE"
+  [ "$(grep -cF -e tok3n -e dev@example.com "$ARGV_FILE")" -eq 0 ]
+  grep -qx -e -K "$ARGV_FILE"
+  grep -qx -e - "$ARGV_FILE"
+  [ "$(cat "$STDIN_FILE")" = 'user = "dev@example.com:tok3n"' ]
+  BITBUCKET_EMAIL=dev@example.com BITBUCKET_TOKEN=$'a"b\\c\nd' \
+    fetch --provider bitbucket --host bitbucket.org --repo team/repo --number 9
+  [ "$status" -eq 0 ]
+  eval "$output"
+  rm -f "$PR_BODY_FILE"
+  [ "$(grep -cF -e 'a"b' -e dev@example.com "$ARGV_FILE")" -eq 0 ]
+  [ "$(cat "$STDIN_FILE")" = 'user = "dev@example.com:a\"b\\c\nd"' ]
 }
 
 @test "fetch-pr-metadata: shell metacharacters in a branch name stay data; invalid names are exit 2" {

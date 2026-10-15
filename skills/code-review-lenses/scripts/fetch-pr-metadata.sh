@@ -58,7 +58,13 @@ case "$PROVIDER" in
       body: .description}'
     ;;
   bitbucket)
-    RAW=$(curl -sf --user "${BITBUCKET_EMAIL:-}:${BITBUCKET_TOKEN:-${BITBUCKET_APP_PASSWORD:-}}" \
+    # curl's --user stays visible in the process list; -K - reads it from stdin instead.
+    CRED="${BITBUCKET_EMAIL:-}:${BITBUCKET_TOKEN:-${BITBUCKET_APP_PASSWORD:-}}"
+    CRED=${CRED//\\/\\\\}
+    CRED=${CRED//\"/\\\"}
+    CRED=${CRED//$'\n'/\\n}
+
+    RAW=$(printf 'user = "%s"\n' "$CRED" | curl -sf -K - \
       "https://api.bitbucket.org/2.0/repositories/${REPO}/pullrequests/${NUMBER}") \
       || die "Bitbucket API request failed."
     MAP='{base: .destination.branch.name, oid: "", head: .source.branch.name,
