@@ -623,3 +623,50 @@ EOF
   [ "$status" -eq 2 ]
   [[ "$output" == *"Bitbucket Cloud only"* ]]
 }
+
+@test "detect-provider: a filesystem origin is PROVIDER=unknown with --fallback unknown, an error without it" {
+  for url in /tmp/repo.git ./repo ../repo file:///tmp/repo.git; do
+    run bash "$DETECT" --remote-url "$url" --fallback unknown
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"PROVIDER=unknown"* ]] || { echo "not unknown: $url" >&2; return 1; }
+  done
+  run -2 bash "$DETECT" --remote-url /tmp/repo.git
+  [[ "$output" == *"Unrecognized remote URL"* ]]
+}
+
+@test "detect-provider: local detection matches GH_HOST directly and probes only with CLI env tokens unset" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/gh" << 'EOF'
+#!/usr/bin/env bash
+printf 'gh %s %s %s %s\n' "${GH_TOKEN-u}" "${GITHUB_TOKEN-u}" "${GH_ENTERPRISE_TOKEN-u}" "${GITHUB_ENTERPRISE_TOKEN-u}" >> "$SEEN_FILE"
+exit 1
+EOF
+  cat > "$WORK/bin/glab" << 'EOF'
+#!/usr/bin/env bash
+printf 'glab %s %s %s %s\n' "${GITLAB_TOKEN-u}" "${GITLAB_ACCESS_TOKEN-u}" "${OAUTH_TOKEN-u}" "${CI_JOB_TOKEN-u}" >> "$SEEN_FILE"
+exit 1
+EOF
+  chmod +x "$WORK/bin/gh" "$WORK/bin/glab"
+  run env PATH="$WORK/bin:$PATH" SEEN_FILE="$WORK/seen" GH_HOST=GHE.Corp.Example GITLAB_HOST= GITLAB_URI= GL_HOST= \
+    bash "$DETECT" --remote-url https://ghe.corp.example/acme/app.git
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PROVIDER=github"* ]]
+  [ ! -e "$WORK/seen" ]
+  run env PATH="$WORK/bin:$PATH" SEEN_FILE="$WORK/seen" GH_HOST= GITLAB_HOST= GITLAB_URI= GL_HOST= \
+    GH_TOKEN=a GITHUB_TOKEN=b GH_ENTERPRISE_TOKEN=c GITHUB_ENTERPRISE_TOKEN=d GITLAB_TOKEN=e GITLAB_ACCESS_TOKEN=f OAUTH_TOKEN=g CI_JOB_TOKEN=h \
+    bash "$DETECT" --remote-url https://git.attacker.example/acme/app.git --fallback unknown
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"PROVIDER=unknown"* ]]
+  [ "$(sort -u "$WORK/seen")" = $'gh u u u u\nglab u u u u' ]
+}
+
+@test "detect-provider: gitlab --check-url-host accepts CI_SERVER_FQDN under glab's CI auto-login" {
+  mkdir -p "$WORK/bin"
+  printf '#!/bin/sh\nexit 1\n' > "$WORK/bin/glab"
+  chmod +x "$WORK/bin/glab"
+  run env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GLAB_ENABLE_CI_AUTOLOGIN=true GITLAB_CI=true CI_JOB_TOKEN=j CI_SERVER_FQDN=gitlab.ci.example \
+    bash "$DETECT" --check-url-host --provider gitlab --host gitlab.ci.example
+  [ "$status" -eq 0 ]
+  run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GLAB_ENABLE_CI_AUTOLOGIN=true GITLAB_CI= CI_JOB_TOKEN=j CI_SERVER_FQDN=gitlab.ci.example \
+    bash "$DETECT" --check-url-host --provider gitlab --host gitlab.ci.example
+}

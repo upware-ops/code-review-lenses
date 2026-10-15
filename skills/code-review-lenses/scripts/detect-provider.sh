@@ -133,9 +133,13 @@ if [[ -n "$PROVIDER_OVERRIDE" ]]; then
   esac
 fi
 
-if [[ "$CHECK_URL_HOST" != true && -z "$REMOTE_URL" ]]; then
-  REMOTE_URL=$(git remote get-url origin 2>/dev/null || true)
-  if [[ -z "$REMOTE_URL" ]]; then
+if [[ "$CHECK_URL_HOST" != true ]]; then
+  [[ -n "$REMOTE_URL" ]] || REMOTE_URL=$(git remote get-url origin 2>/dev/null || true)
+  case "$REMOTE_URL" in
+    ''|/*|./*|../*|file://*) _no_host=true ;;
+    *) _no_host=false ;;
+  esac
+  if [[ "$_no_host" == true ]]; then
     if [[ "$FALLBACK" == "unknown" ]]; then
       emit() { printf '%s=%q\n' "$1" "$2"; }
       emit PROVIDER unknown
@@ -146,7 +150,7 @@ if [[ "$CHECK_URL_HOST" != true && -z "$REMOTE_URL" ]]; then
       emit REPO_SLUG ""
       exit 0
     fi
-    die "Could not read git remote 'origin'. Pass --remote-url."
+    [[ -n "$REMOTE_URL" ]] || die "Could not read git remote 'origin'. Pass --remote-url."
   fi
 fi
 
@@ -246,6 +250,9 @@ if [[ "$CHECK_URL_HOST" == true ]]; then
       if [[ "$_ci_autologin" == true && -n "${CI_JOB_TOKEN:-}" && "$HOST_LC" != "$_ci_host" ]]; then
         die "Refusing glab for host '$CHECK_HOST': CI auto-login would use CI_JOB_TOKEN, which belongs to ${CI_SERVER_FQDN:-the CI server}. Unset GLAB_ENABLE_CI_AUTOLOGIN or CI_JOB_TOKEN."
       fi
+      if [[ "${GLAB_ENABLE_CI_AUTOLOGIN:-}" == true && "${GITLAB_CI:-}" == true && -n "${CI_JOB_TOKEN:-}" && "$HOST_LC" == "$_ci_host" ]]; then
+        exit 0
+      fi
       _gl_cfg=$(gitlab_host_name "${GITLAB_HOST:-${GITLAB_URI:-${GL_HOST:-}}}")
       if [[ "$HOST_LC" == "${_gl_cfg:-gitlab.com}" ]]; then
         exit 0
@@ -298,11 +305,14 @@ else
       ;;
     *)
       _gl_env=$(gitlab_host_name "${GITLAB_HOST:-${GITLAB_URI:-${GL_HOST:-}}}")
+      _gh_env=$(printf '%s' "${GH_HOST:-}" | tr '[:upper:]' '[:lower:]')
       if [[ -n "$_gl_env" && "$_gl_env" == "$HOST_LC" ]]; then
         PROVIDER=gitlab
-      elif glab_lists_host "$HOST_LC"; then
+      elif [[ -n "$_gh_env" && "$_gh_env" == "$HOST_LC" ]]; then
+        PROVIDER=github
+      elif (unset GITLAB_TOKEN GITLAB_ACCESS_TOKEN OAUTH_TOKEN CI_JOB_TOKEN; glab_lists_host "$HOST_LC"); then
         PROVIDER=gitlab
-      elif gh_lists_host "$HOST_LC"; then
+      elif (unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN; gh_lists_host "$HOST_LC"); then
         PROVIDER=github
       elif [[ "$FALLBACK" == "unknown" ]]; then
         PROVIDER=unknown

@@ -36,7 +36,11 @@ A remote is treated as GitLab when:
 1. The hostname is `gitlab.com` or contains `gitlab`
 2. glab's env host (first set of `GITLAB_HOST`, `GITLAB_URI`, `GL_HOST`) equals the hostname
 3. `glab config get host` equals the hostname
-4. `glab auth status --hostname <hostname>` succeeds (other hosts' auth state is ignored)
+4. `glab auth status --hostname <hostname>` succeeds with glab's env tokens unset (other hosts' auth state is ignored)
+
+A local remote is GitHub Enterprise when `GH_HOST` equals its hostname or
+`gh auth status --hostname <hostname>` succeeds with gh's env tokens unset. A
+filesystem origin (a path or `file://` URL) is reviewed with `PROVIDER=unknown`.
 
 An MR URL host is checked by `detect-provider.sh --check-url-host` before any
 `glab` call. It accepts glab's host (`GITLAB_HOST`, `GITLAB_URI` or `GL_HOST`,
