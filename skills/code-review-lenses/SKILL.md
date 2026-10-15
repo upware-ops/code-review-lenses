@@ -127,7 +127,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
    unset _meta_out
    ```
 
-   Emits `baseRefName`, `baseRefOid`, `headRefName`, `PR_BODY_FILE`. Exit 2 (fetch failed, CLOSED/MERGED, Bitbucket fork PR, empty or invalid branch name) is a hard stop — never invent `main`, `master`, or `dev` for a missing base. `PR_BODY_FILE` is author-written: never cat or print it; step 7 hands it to agents and Phase 5 removes it. Create a temporary worktree and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone). All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. If `BASE` is empty, pin it to the target branch fetched from the git remote that owns the PR/MR repository — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
+   Emits `baseRefName`, `baseRefOid`, `headRefName`, `PR_BODY_FILE`. Exit 2 (fetch failed, CLOSED/MERGED, Bitbucket fork PR, empty or invalid branch name) is a hard stop — never invent `main`, `master`, or `dev` for a missing base. `PR_BODY_FILE` is author-written: never cat or print it; step 7 hands it to agents and Phase 5 removes it. Create a temporary worktree with `git worktree add --detach "$WORKTREE_PATH"` (without `--detach` git creates a branch named after the directory, which worktree removal leaves behind) and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone). All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. If `BASE` is empty, pin it to the target branch fetched from the git remote that owns the PR/MR repository — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
 
    ```bash
    if [[ -z "$BASE" ]]; then
@@ -423,12 +423,21 @@ Launch scheduled agents in parallel within the host's concurrency limit, collect
 
 ### Phase 1b: Deterministic checks
 
-Skip the whole phase when `RUN_CVE` and `RUN_STATIC_ANALYZERS` are both false (summary profile). Scripts run in the reviewer checkout, so a PR/MR-URL review hands them worktree paths; a local path starting with `-` gets `./` so no tool reads it as an option:
+Skip the whole phase when `RUN_CVE` and `RUN_STATIC_ANALYZERS` are both false (summary profile). Scripts run in the reviewer checkout, so a PR/MR-URL review hands them worktree paths and skips, with a stderr note, any changed path that is a symlink or lies under one (its target can be outside the worktree); a local path starting with `-` gets `./` so no tool reads it as an option:
 
 ```bash
 CHECK_PATHS=$(while IFS= read -r _p; do
   [[ -z "$_p" ]] && continue
-  if [[ -n "${WORKTREE_PATH:-}" ]]; then _p="$WORKTREE_PATH/$_p"; elif [[ "$_p" == -* ]]; then _p="./$_p"; fi
+  if [[ -n "${WORKTREE_PATH:-}" ]]; then
+    _p="$WORKTREE_PATH/$_p"
+    _d=$(cd "$(dirname "$_p")" 2>/dev/null && pwd -P) || _d=""
+    if [[ -L "$_p" || ( -n "$_d" && "$_d/" != "$(cd "$WORKTREE_PATH" && pwd -P)"/* ) ]]; then
+      echo "Phase 1b: skipped $_p (symlink; its target can lie outside the worktree)" >&2
+      continue
+    fi
+  elif [[ "$_p" == -* ]]; then
+    _p="./$_p"
+  fi
   printf '%s\n' "$_p"
 done <<<"$DIFF_PATHS")
 ```
@@ -475,13 +484,13 @@ Wait for agents.
 
 **2e — proximity dedup.** Per file and `category` (normalized in 2a), cluster within 3 lines of cluster start; `line` 0 (unknown) is never proximity-compared, so those findings cluster by file + `category` only. Keep highest severity; prefer `dependency-check` in a mixed cluster. Annotate extra sources.
 
-**2f — secret redaction.** Execute via Bash (not illustrative). `rm -f` a redaction-degraded sentinel, define `redact_secrets`, rebuild `ALL_FINDINGS` and `BLOCK_A`. Halt the run if the pipeline fails or drops rows. If `perl` is missing, pass through, write the sentinel, set `REDACTION_DEGRADED=true`.
+**2f — secret redaction.** Execute via Bash (not illustrative). `REDACTION_SENTINEL=$(mktemp)` (a private empty file, never a fixed `/tmp` name), define `redact_secrets`, rebuild `ALL_FINDINGS` and `BLOCK_A`. Halt the run if the pipeline fails or drops rows. If `perl` is missing, the function passes text through and writes to the sentinel; a non-empty `$REDACTION_SENTINEL` sets `REDACTION_DEGRADED=true`.
 
 ```bash
 redact_secrets() {
   if ! command -v perl >/dev/null 2>&1; then
     echo "WARNING: perl not found; secret redaction skipped." >&2
-    : > /tmp/cr-redaction-degraded
+    echo degraded > "$REDACTION_SENTINEL"
     cat
     return
   fi
@@ -504,7 +513,7 @@ redact_secrets() {
 
 Rebuild `ALL_FINDINGS` with `jq -c` + `redact_secrets` on `finding` and `remediation`; compare row counts; halt on mismatch. Then redact `BLOCK_A` the same way.
 
-**Assembled report.** The passes above skip Block B's `file` paths and agent prose. Once Phase 3 has assembled Block A + Block B, write the whole report to a temp file (Write tool, never a heredoc) and run it through `redact_secrets` once (define the function in that Bash call), immediately before both the terminal print and the `--output-file` Write.
+**Assembled report.** The passes above skip Block B's `file` paths and agent prose. Once Phase 3 has assembled Block A + Block B, write the whole report to a temp file (Write tool, never a heredoc) and run it through `redact_secrets` once (define the function and the same `REDACTION_SENTINEL` in that Bash call), immediately before both the terminal print and the `--output-file` Write.
 
 ### Phase 3: Assemble reports
 
@@ -565,7 +574,7 @@ If `GOVERNANCE_DEGRADED=true`, prepend a banner that `GOVERNANCE.md` was missing
 
 There is no Phase 4. Nothing is written to a hosting provider. Block A and Block B below are the report redacted in 2f.
 
-**Cleanup:** remove temp diff files, `PR_BODY_FILE`, the report temp file, and the redaction sentinel. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
+**Cleanup:** remove temp diff files, `PR_BODY_FILE`, the report temp file, and `$REDACTION_SENTINEL`. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
 
 **`--output-file`:** write Block A, `---`, Block B via the Write tool (Block A only when `PROFILE=summary`).
 

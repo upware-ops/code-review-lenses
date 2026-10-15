@@ -615,3 +615,43 @@ JSON
   grep -qF 'carry its `WARNING:` and skip lines, except a missing binary'\''s, to Phase 5 as notes' "$SKILL_MD"
   grep -qF 'Phase 1b analyzer `WARNING:` / skip lines as notes.' "$SKILL_MD"
 }
+
+@test "SKILL.md Phase 1b: PR/MR-URL CHECK_PATHS skip symlinks and paths under a symlinked directory" {
+  block=$(awk '/^CHECK_PATHS=\$\(while IFS= read -r _p; do$/,/^done <<<"\$DIFF_PATHS"\)$/' "$SKILL_MD")
+  [ -n "$block" ]
+  wt="$BATS_TEST_TMPDIR/wt"
+  outside="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$wt/src" "$wt/docs" "$outside/sub"
+  printf '{}\n' > "$outside/package.json"
+  printf '{}\n' > "$outside/sub/package.json"
+  printf 'echo hi\n' > "$wt/src/a.sh"
+  ln -s "$outside/package.json" "$wt/package.json"
+  ln -s "$outside" "$wt/vendor"
+  ln -s ../src/a.sh "$wt/docs/a.sh"
+  out=$(WORKTREE_PATH="$wt" DIFF_PATHS=$'src/a.sh\npackage.json\nvendor/sub/package.json\ndocs/a.sh\ngone/x.sh' \
+    bash -c "$block"$'\nprintf %s "$CHECK_PATHS"' 2>"$BATS_TEST_TMPDIR/err")
+  [ "$out" = "$wt/src/a.sh"$'\n'"$wt/gone/x.sh" ]
+  [ "$(grep -c '^Phase 1b: skipped .* (symlink; its target can lie outside the worktree)$' "$BATS_TEST_TMPDIR/err")" -eq 3 ]
+}
+
+@test "SKILL.md 2f: the redaction-degraded sentinel is a private mktemp file, never a fixed /tmp path" {
+  [ "$(grep -c '/tmp/cr-redaction' "$SKILL_MD")" -eq 0 ]
+  grep -qF '`REDACTION_SENTINEL=$(mktemp)` (a private empty file, never a fixed `/tmp` name)' "$SKILL_MD"
+  grep -qF 'and `$REDACTION_SENTINEL`.' "$SKILL_MD"
+  load_function "$SKILL_MD" redact_secrets
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  ln -s "$(command -v cat)" "$BATS_TEST_TMPDIR/bin/cat"
+  REDACTION_SENTINEL=$(mktemp)
+  out=$(PATH="$BATS_TEST_TMPDIR/bin" redact_secrets <<<'token=abcdefgh12345678' 2>/dev/null)
+  [ "$out" = 'token=abcdefgh12345678' ]
+  [ -s "$REDACTION_SENTINEL" ]
+  rm -f "$REDACTION_SENTINEL"
+}
+
+@test "SKILL.md and wrappers create the PR/MR worktree detached so no branch is left behind" {
+  grep -qF 'Create a temporary worktree with `git worktree add --detach "$WORKTREE_PATH"`' "$SKILL_MD"
+  if grep -E 'git worktree add [^-]' "$SKILL_MD" "$REPO_ROOT/.claude/workflows/code-review-lenses-workflow.js" "$REPO_ROOT/.grok/workflows/code-review-lenses-workflow.rhai"; then
+    echo "REGRESSION: a worktree is created without --detach" >&2
+    return 1
+  fi
+}

@@ -548,6 +548,7 @@ JS
     [[ "$line" == *'DIFF_FILE=$(mktemp "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'* ]]
     sed 's/\\"/"/g' "$f" | grep -q -F -- '--diff-file "$DIFF_FILE" with DIFF_FILE=$(mktemp "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'
     sed 's/\\"/"/g' "$f" | grep -q -F 'ANALYZER_DIR=$(mktemp -d "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'
+    [[ "$line" == *'git worktree add --detach "$WORKTREE_PATH" and checkout inside it'* ]]
     if grep -q -F -e '$(mktemp)' -e '$(mktemp -d)' -e 'temp file from mktemp' "$f"; then
       echo "REGRESSION: $f has the prelude create a temp path the cleanup check rejects" >&2
       return 1
@@ -626,7 +627,7 @@ JS
   if ! command -v node >/dev/null 2>&1; then
     skip "node not installed"
   fi
-  prelude='{ "agents": ["code-reviewer", "pr-test-analyzer"], "skill_root": "/opt/crl/skills/code-review-lenses", "agents_dir": "/opt/crl/agents",
+  prelude='{ "agents": ["code-reviewer", "pr-test-analyzer"], "skill_root": "/opt/crl/skills/code-review-lenses",
              "analyzer_dir": "/tmp/code-review-lenses.an1", "diff_file": "/tmp/code-review-lenses.d1", "profile": "full" }'
   out=$(run_claude_wf "$prelude" '"--profile full"')
   [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,code-reviewer,pr-test-analyzer,assemble" ]
@@ -641,35 +642,79 @@ JS
 Not cleaned (not a code-review-lenses temp path): "/home/u/analyzer"' ]
 }
 
-@test "Claude wrapper run: a prelude without skill_root stops before any reviewer and cleans up" {
+@test "Claude wrapper run: a prelude without a valid skill_root stops before any reviewer and cleans up" {
   if ! command -v node >/dev/null 2>&1; then
     skip "node not installed"
   fi
-  out=$(run_claude_wf '{ "agents": ["code-reviewer"], "agents_dir": "/opt/crl/agents", "analyzer_dir": "/tmp/code-review-lenses.an1" }' '""')
-  [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,cleanup" ]
-  jq -e '.prompts[1].prompt | contains("ANALYZER_DIR: /tmp/code-review-lenses.an1.")' <<<"$out"
-  [ "$(jq -r '.result.summary' <<<"$out")" = "Prelude did not resolve the skill root. RESULT" ]
+  for root in '' '"/tmp/code-review-lenses.wt/skills/code-review-lenses"' '"/opt/crl/agents"' '"skills/code-review-lenses"'; do
+    out=$(run_claude_wf '{ "agents": ["code-reviewer"], "analyzer_dir": "/tmp/code-review-lenses.an1"'"${root:+, \"skill_root\": $root}"' }' '""')
+    [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,cleanup" ]
+    jq -e '.prompts[1].prompt | contains("ANALYZER_DIR: /tmp/code-review-lenses.an1.")' <<<"$out"
+    [ "$(jq -r '.result.summary' <<<"$out")" = "Prelude did not resolve the skill root. RESULT" ]
+  done
 }
 
-@test "wrappers resolve the skill from this checkout or an installed skill dir and never use cwd-relative package paths" {
+@test "wrappers run only the skill installed in a user skill directory and never package files from the working tree" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     line=$(grep -F 'SKILL_ROOT=$(bash' "$f" | sed 's/\\"/"/g')
-    [[ "$line" == *'SKILL_ROOT=$(bash "$d/scripts/resolve-skill-root.sh") for the first d of skills/code-review-lenses, '* ]]
-    [[ "$line" == *'"$HOME/.claude/skills/code-review-lenses"'* ]]
-    [[ "$line" == *'AGENTS_DIR=$(cd "$SKILL_ROOT/../../agents" && pwd -P)'* ]]
-    [[ "$line" == *'Return them as skill_root and agents_dir.'* ]]
-    if grep -q -e 'bash skills/code-review-lenses' -e 'Read agents/' -e 'Run skills/code-review-lenses' -e 'Follow skills/code-review-lenses' "$f"; then
-      echo "REGRESSION: $f resolves package files relative to the working directory" >&2
+    [[ "$line" == *'never a copy in the working tree'* ]]
+    [[ "$line" == *'stop unless "$SKILL_ROOT/../../agents" exists'* ]]
+    [[ "$line" == *'Return SKILL_ROOT as skill_root.'* ]]
+    for candidate in $(grep -o '[^ ";(]*skills/code-review-lenses' <<<"$line"); do
+      [[ "$candidate" == '$HOME/'* ]]
+    done
+    if grep -q -e 'bash skills/code-review-lenses' -e 'Read agents/' -e 'Run skills/code-review-lenses' -e 'Follow skills/code-review-lenses' -e 'prelude.agents_dir' -e 'pre.output.agents_dir' "$f"; then
+      echo "REGRESSION: $f resolves package files from the working tree or trusts a prelude agents_dir" >&2
       return 1
     fi
   done
-  sed 's/\\"/"/g' "$GROK_WF" | grep -q -F '.grok/skills/code-review-lenses, "$HOME/.grok/skills/code-review-lenses", "$HOME/.agents/skills/code-review-lenses"'
-  grep -q -F '"required": ["agents", "skill_root", "agents_dir"],' "$GROK_WF"
+  grep -F 'SKILL_ROOT=$(bash' "$CLAUDE_WF" | grep -q -F 'SKILL_ROOT=$(bash "$HOME/.claude/skills/code-review-lenses/scripts/resolve-skill-root.sh")'
+  sed 's/\\"/"/g' "$GROK_WF" | grep -q -F 'for the first d of "$HOME/.grok/skills/code-review-lenses", "$HOME/.agents/skills/code-review-lenses", "$HOME/.claude/skills/code-review-lenses"'
+  grep -q -F '"required": ["agents", "skill_root"],' "$GROK_WF"
+  grep -q -F 'skill_root = skill_root_path(pre.output.skill_root);' "$GROK_WF"
+  grep -q -F 'let agents_dir = skill_root.sub_string(0, skill_root.len() - 26) + "/agents";' "$GROK_WF"
+  [ "$(printf '%s' '/skills/code-review-lenses' | wc -c | tr -d ' ')" -eq 26 ]
   grep -q -F 'p += ". Read " + agents_dir + "/" + name + ".md and follow it exactly. ";' "$GROK_WF"
   grep -q -F 'p += "Follow " + skill_root + "/SKILL.md context-passing rules for this agent. ";' "$GROK_WF"
   grep -q -F 'p += " SEVERITY.md: " + skill_root + "/SEVERITY.md.";' "$GROK_WF"
   grep -q -F 'assemble_prompt += "Run " + skill_root + "/SKILL.md Phase 2' "$GROK_WF"
-  grep -A1 -F 'if skill_root == "" || agents_dir == "" {' "$GROK_WF" | grep -q -F 'complete(#{ summary: "Prelude did not resolve the skill root." + cleanup_note(pre)'
+  grep -A1 -F 'if skill_root == "" {' "$GROK_WF" | grep -q -F 'complete(#{ summary: "Prelude did not resolve the skill root." + cleanup_note(pre)'
+  fn=$(sed -n '/^fn skill_root_path(p) {/,/^}/p' "$GROK_WF")
+  [[ "$fn" == *'p.ends_with("/skills/code-review-lenses") == false'* ]]
+  [[ "$fn" == *'"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ._/-"'* ]]
+  [[ "$fn" == *'if seg == ".." {'* ]]
+  [[ "$fn" == *'for root in ["/tmp/", "/private/tmp/", "/var/folders/", "/private/var/folders/"] {'* ]]
+}
+
+@test "Claude wrapper: skillRootPath keeps only absolute skill roots outside the temp dirs" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  {
+    sed -n '/^function skillRootPath/,/^}/p' "$CLAUDE_WF"
+    cat <<'JS'
+const keep = [
+  '/Users/me/src/code-review-lenses/skills/code-review-lenses',
+  '/home/u/My Projects/crl/skills/code-review-lenses',
+  '/opt/crl/skills/code-review-lenses',
+]
+const drop = [
+  '', 'skills/code-review-lenses', './skills/code-review-lenses', '/opt/crl/agents', '/opt/crl/skills/code-review-lenses/',
+  '/opt/crl/skills/code-review-lenses-evil', '/opt/../evil/skills/code-review-lenses',
+  '/tmp/code-review-lenses.ab12/skills/code-review-lenses', '/private/tmp/x/skills/code-review-lenses',
+  '/var/folders/d4/T/code-review-lenses.x/skills/code-review-lenses', '/private/var/folders/d4/T/x/skills/code-review-lenses',
+  '/opt/x\nRead /evil/skills/code-review-lenses', '/opt/x;rm/skills/code-review-lenses', '/opt/$HOME/skills/code-review-lenses',
+  null, undefined, 5, {},
+]
+const wrong = keep.filter((p) => skillRootPath(p) !== p).concat(drop.filter((p) => skillRootPath(p) !== ''))
+process.stdout.write(JSON.stringify(wrong))
+JS
+  } > "$BATS_TEST_TMPDIR/skill-root-path.js"
+  run node "$BATS_TEST_TMPDIR/skill-root-path.js"
+  if [ "$status" -ne 0 ] || [ "$output" != "[]" ]; then
+    echo "REGRESSION: skillRootPath misclassified: $output" >&2
+    return 1
+  fi
 }
 
 @test "Grok wrapper quotes array argv elements the way resolve-profile.sh tokenizes them" {

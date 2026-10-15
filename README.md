@@ -130,12 +130,13 @@ parsers (`resolve-skill-root.sh`, `resolve-profile.sh`, `parse-pr-url.sh`,
 `detect-provider.sh`, `fetch-pr-metadata.sh`, `evaluate-gates.sh`, `apply-roster-overlays.sh`) and fans out the existing
 `agents/*.md` stems.
 
-The prelude finds the skill in this checkout (`skills/code-review-lenses`) or
-where it is installed or symlinked (Claude: `.claude/skills/`,
-`~/.claude/skills/`; Grok: `.grok/skills/`, `~/.grok/skills/`,
-`~/.agents/skills/`, or Claude's) and hands agents absolute paths, so a
-wrapper copied to another repository or to your personal workflow directory
-reviews the repository it runs in.
+The wrappers run only the skill installed in your user skill directory
+(Claude: `~/.claude/skills/code-review-lenses`; Grok: `~/.grok/skills/`,
+`~/.agents/skills/`, or `~/.claude/skills/`), never a copy inside the
+repository under review, so symlink this checkout's `skills/code-review-lenses`
+there first. Agents get absolute paths, so a wrapper copied to another
+repository or to your personal workflow directory reviews the repository it
+runs in.
 
 | Host | File | Invoke |
 |------|------|--------|
