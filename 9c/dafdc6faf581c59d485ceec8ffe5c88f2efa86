@@ -1,25 +1,45 @@
 skills/code-review-lenses/scripts/apply-roster-overlays.sh
   s_22d2264024e6d9::t_d8200c3815b479 19-21,24-26,69-71,84-94,142-143,147-150
+  s_22d2264024e6d9::t_ff91482cd0f9b9 142-143,147-150
+  s_22d2264024e6d9::t_a3f9d37b126eb0 84-94
+  s_22d2264024e6d9::t_0b92fbd5f3b878 69-71
+  s_22d2264024e6d9::t_ca8bbc0e69102e 19-21,24-26
 skills/code-review-lenses/scripts/evaluate-gates.sh
   s_22d2264024e6d9::t_d8200c3815b479 3,21-23,38-40,96-120,125-127
+  s_22d2264024e6d9::t_95cfbaa5607f63 3
+  s_22d2264024e6d9::t_f4ccc352b77288 97-102,105-120,125-127
+  s_22d2264024e6d9::t_46c20e028674c4 96
+  s_22d2264024e6d9::t_ddbe622bf1c04e 21-23,38-40
+  s_22d2264024e6d9::t_b0ab3e57ae0192 103-104
 docs/architecture.md
   s_22d2264024e6d9::t_d8200c3815b479 101-103
+  s_22d2264024e6d9::t_2ebc64c2b515ef 101-103
 skills/code-review-lenses/SKILL.md
   s_22d2264024e6d9::t_d8200c3815b479 292-294,307-310,341-342,349,424,427-429
   s_22d2264024e6d9::t_96885bab1ce9ad 601
+  s_22d2264024e6d9::t_1dd2827fa97e22 424,427-429
+  s_22d2264024e6d9::t_56fa6473837769 292-294
+  s_22d2264024e6d9::t_c3747cc0aee6e7 307-310
+  s_22d2264024e6d9::t_0c328109836ebd 341-342
+  s_22d2264024e6d9::t_861deed0a15964 349
 tests/resolve_profile.bats
   s_22d2264024e6d9::t_d8200c3815b479 10,349-466
+  s_22d2264024e6d9::t_cc143a5f5aeaaf 349-466
+  s_22d2264024e6d9::t_250c4702b99fe6 10
 .claude/workflows/code-review-lenses-workflow.js
   s_22d2264024e6d9::t_96885bab1ce9ad 138,146
 tests/evaluate_gates.bats
   s_22d2264024e6d9::t_d8200c3815b479 42-44,180-284
   s_22d2264024e6d9::t_b258014144b20e 285
+  s_22d2264024e6d9::t_36097635e26ee7 180-285
+  s_22d2264024e6d9::t_2a9e897a1ff9e1 42-44
 CHANGELOG.md
   s_22d2264024e6d9::t_ec19afebba66a2 55
 .grok/workflows/code-review-lenses-workflow.rhai
   s_22d2264024e6d9::t_96885bab1ce9ad 227,234
 tests/orchestration_contracts.bats
   s_22d2264024e6d9::t_d8200c3815b479 123-137
+  s_22d2264024e6d9::t_0b795dc7ac44c7 123-137
 tests/workflow_wrappers.bats
   s_22d2264024e6d9::t_2a3bf7f979b781 844-854
 ---
