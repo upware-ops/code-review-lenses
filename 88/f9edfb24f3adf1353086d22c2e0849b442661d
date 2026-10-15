@@ -1,0 +1,25 @@
+README.md
+  s_22d2264024e6d9::t_6eb7618f177b34 141-145
+.grok/workflows/code-review-lenses-workflow.rhai
+  s_22d2264024e6d9::t_3f30f368db2b48 468,509,511,521,527-536
+tests/workflow_wrappers.bats
+  s_22d2264024e6d9::t_d03de27aa841da 164,170,280,290,395-397,406-416,603,711
+CHANGELOG.md
+  s_22d2264024e6d9::t_6eb7618f177b34 56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "88f9edfb24f3adf1353086d22c2e0849b442661d",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
