@@ -686,7 +686,7 @@ JSON
 
 @test "SKILL.md: worktree symlinks, suppression predicates, specialist prose and issue-linker's PR_NUMBER" {
   grep -qF 'then `find "$WORKTREE_PATH" -type l -print -delete`: agents read files there and a PR symlink can point outside it' "$SKILL_MD"
-  grep -qF 'every hard stop from here on runs Phase 5 cleanup first' "$SKILL_MD"
+  grep -qF 'whenever a block exits non-zero, run the Phase 5 cleanup (`git worktree remove --force "$WORKTREE_PATH"` from the reviewer checkout' "$SKILL_MD"
   grep -qF 'A rule matches only when every predicate it sets matches: `file` and `pattern` together when it sets both' "$SKILL_MD"
   if grep -qF 'Match `file` and/or `pattern`' "$SKILL_MD"; then
     echo "REGRESSION: a suppression with both file and pattern could match on either alone" >&2
@@ -699,4 +699,13 @@ JSON
     sed 's/\\"/"/g' "$f" | grep -qF 'then find "$WORKTREE_PATH" -type l -print -delete (a PR symlink can point outside the worktree; keep the printed paths for step 7)'
     grep -qF 'and the symlinks removed after checkout, in' "$f"
   done
+}
+
+@test "SKILL.md: a reviewer's brief clean confirmation counts as clean, not as missing results" {
+  grep -qF -- '- A reply that only states the agent found no issues (code-reviewer is told to confirm a clean review in a brief summary rather than print `NONE`) → clean, omit from Block B.' "$SKILL_MD"
+  grep -qF 'confirm the code meets standards with a brief summary' "$REPO_ROOT/agents/code-reviewer.md"
+  if grep -qF 'Empty / missing headers (and not NONE)' "$SKILL_MD"; then
+    echo "REGRESSION: a contract-compliant clean reply is reported as no results" >&2
+    return 1
+  fi
 }
