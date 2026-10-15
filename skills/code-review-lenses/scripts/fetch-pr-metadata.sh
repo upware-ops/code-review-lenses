@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # fetch-pr-metadata.sh — run PROVIDERS.md "OP: Fetch PR/MR metadata" for a
 # parsed PR/MR URL without printing author-written text: the title is never
-# printed (the GitHub query omits it) and the description goes to PR_BODY_FILE.
+# printed (the GitHub query omits it), the description goes to PR_BODY_FILE and
+# the author-chosen source branch name to HEAD_REF_FILE.
 #
 # Usage (after detect-provider.sh --check-url-host succeeded for HOST):
 #   bash fetch-pr-metadata.sh --provider github|gitlab|bitbucket \
 #     --host <HOST> --repo <REPO_SLUG> --number <PR_NUMBER>
 #
 # Output (exit 0): KEY=value lines safe to eval —
-#   baseRefName baseRefOid headRefName PR_BODY_FILE
+#   baseRefName baseRefOid HEAD_REF_FILE PR_BODY_FILE
 # Exit 2: missing/invalid argument, fetch failed, PR/MR closed or merged,
 #         Bitbucket fork PR, or a branch name / base SHA that fails validation.
 
@@ -96,6 +97,8 @@ git check-ref-format "refs/heads/$HEAD_REF" || die "invalid source branch name."
 
 PR_BODY_FILE=$(mktemp)
 jq -j '.body // ""' <<<"$META" > "$PR_BODY_FILE"
+HEAD_REF_FILE=$(mktemp)
+printf '%s' "$HEAD_REF" > "$HEAD_REF_FILE"
 
 emit() {
   printf '%s=%q\n' "$1" "$2"
@@ -103,5 +106,5 @@ emit() {
 
 emit baseRefName "$BASE_REF"
 emit baseRefOid "$BASE_OID"
-emit headRefName "$HEAD_REF"
+emit HEAD_REF_FILE "$HEAD_REF_FILE"
 emit PR_BODY_FILE "$PR_BODY_FILE"

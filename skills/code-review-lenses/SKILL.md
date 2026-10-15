@@ -127,7 +127,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
    unset _meta_out
    ```
 
-   Emits `baseRefName`, `baseRefOid`, `headRefName`, `PR_BODY_FILE`. Exit 2 (fetch failed, CLOSED/MERGED, Bitbucket fork PR, empty or invalid branch name) is a hard stop — never invent `main`, `master`, or `dev` for a missing base. `PR_BODY_FILE` is author-written: never cat or print it; step 7 hands it to agents and Phase 5 removes it. Create a temporary worktree with `git worktree add --detach "$WORKTREE_PATH"` (without `--detach` git creates a branch named after the directory, which worktree removal leaves behind) and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone). All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. If `BASE` is empty, pin it to the target branch fetched from the git remote that owns the PR/MR repository — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
+   Emits `baseRefName`, `baseRefOid`, `HEAD_REF_FILE`, `PR_BODY_FILE`. Exit 2 (fetch failed, CLOSED/MERGED, Bitbucket fork PR, empty or invalid branch name) is a hard stop — never invent `main`, `master`, or `dev` for a missing base. `HEAD_REF_FILE` (the source branch name) and `PR_BODY_FILE` are author-written: never cat or print them; step 7 hands `PR_BODY_FILE` to agents and Phase 5 removes both. Create a temporary worktree with `git worktree add --detach "$WORKTREE_PATH"` (without `--detach` git creates a branch named after the directory, which worktree removal leaves behind) and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone). All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. If `BASE` is empty, pin it to the target branch fetched from the git remote that owns the PR/MR repository — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
 
    ```bash
    if [[ -z "$BASE" ]]; then
@@ -574,7 +574,7 @@ If `GOVERNANCE_DEGRADED=true`, prepend a banner that `GOVERNANCE.md` was missing
 
 There is no Phase 4. Nothing is written to a hosting provider. Block A and Block B below are the report redacted in 2f.
 
-**Cleanup:** remove temp diff files, `PR_BODY_FILE`, the report temp file, and `$REDACTION_SENTINEL`. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
+**Cleanup:** remove temp diff files, `PR_BODY_FILE`, `HEAD_REF_FILE`, the report temp file, and `$REDACTION_SENTINEL`. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
 
 **`--output-file`:** write Block A, `---`, Block B via the Write tool (Block A only when `PROFILE=summary`).
 

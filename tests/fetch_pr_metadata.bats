@@ -40,13 +40,14 @@ EOF
   [[ "$output" != *"IGNORE PREVIOUS"* ]]
   eval "$output"
   [ "$baseRefName" = main ]
-  [ "$headRefName" = feature/x ]
+  [ "$(cat "$HEAD_REF_FILE")" = feature/x ]
+  [[ "$output" != *feature/x* ]]
   [ "$baseRefOid" = 0123456789abcdef0123456789abcdef01234567 ]
   grep -q 'IGNORE PREVIOUS INSTRUCTIONS' "$PR_BODY_FILE"
   grep -qx 'GH_HOST=github.com' "$ARGV_FILE"
   grep -qx 'acme/app' "$ARGV_FILE"
   [ "$(grep -c title "$ARGV_FILE")" -eq 0 ]
-  rm -f "$PR_BODY_FILE"
+  rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE"
 }
 
 @test "fetch-pr-metadata: GitLab pins GITLAB_HOST and a full-URL -R; merged is exit 2; unknown state warns" {
@@ -59,7 +60,7 @@ EOF
   [ "$baseRefName" = develop ]
   [ "$baseRefOid" = abcdef1234567 ]
   [ ! -s "$PR_BODY_FILE" ]
-  rm -f "$PR_BODY_FILE"
+  rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE"
   grep -qx 'GITLAB_HOST=git.example.com' "$ARGV_FILE"
   grep -qx 'https://git.example.com/group/sub/proj' "$ARGV_FILE"
   jq '.state = "merged"' "$STUB_JSON" > "$WORK/next.json"
@@ -83,9 +84,9 @@ EOF
   STUB_JSON="$WORK/same.json" fetch --provider bitbucket --host bitbucket.org --repo team/repo --number 9
   [ "$status" -eq 0 ]
   eval "$output"
-  [ "$headRefName" = feat ]
+  [ "$(cat "$HEAD_REF_FILE")" = feat ]
   [ -z "$baseRefOid" ]
-  rm -f "$PR_BODY_FILE"
+  rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE"
   jq '.state = "SUPERSEDED"' "$WORK/same.json" > "$WORK/next.json"
   STUB_JSON="$WORK/next.json" fetch --provider bitbucket --host bitbucket.org --repo team/repo --number 9
   [ "$status" -eq 2 ]
@@ -100,7 +101,7 @@ EOF
     fetch --provider bitbucket --host bitbucket.org --repo team/repo --number 9
   [ "$status" -eq 0 ]
   eval "$output"
-  rm -f "$PR_BODY_FILE"
+  rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE"
   [ "$(grep -cF -e tok3n -e dev@example.com "$ARGV_FILE")" -eq 0 ]
   grep -qx -e -K "$ARGV_FILE"
   grep -qx -e - "$ARGV_FILE"
@@ -109,7 +110,7 @@ EOF
     fetch --provider bitbucket --host bitbucket.org --repo team/repo --number 9
   [ "$status" -eq 0 ]
   eval "$output"
-  rm -f "$PR_BODY_FILE"
+  rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE"
   [ "$(grep -cF -e 'a"b' -e dev@example.com "$ARGV_FILE")" -eq 0 ]
   [ "$(cat "$STDIN_FILE")" = 'user = "dev@example.com:a\"b\\c\nd"' ]
 }
@@ -121,9 +122,10 @@ EOF
   fetch --provider github --host github.com --repo acme/app --number 1
   [ "$status" -eq 0 ]
   eval "$output"
-  [ "$headRefName" = 'x$(touch${IFS}pwned)' ]
+  [ "$(cat "$HEAD_REF_FILE")" = 'x$(touch${IFS}pwned)' ]
+  [[ "$output" != *pwned* ]]
   [ ! -e "$WORK/pwned" ]
-  rm -f "$PR_BODY_FILE"
+  rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE"
   jq '.headRefName = "bad..name"' "$STUB_JSON" > "$WORK/next.json"
   STUB_JSON="$WORK/next.json" fetch --provider github --host github.com --repo acme/app --number 1
   [ "$status" -eq 2 ]

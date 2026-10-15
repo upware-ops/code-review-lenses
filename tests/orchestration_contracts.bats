@@ -400,7 +400,11 @@ skill_line() { grep -F -- "$1" "$SKILL_MD"; }
   grep -qF '_meta_out=$(bash "$SCRIPTS_DIR/fetch-pr-metadata.sh" --provider "$PROVIDER" --host "$HOST" --repo "$REPO_SLUG" --number "$PR_NUMBER") || exit $?' "$SKILL_MD"
   grep -qF 'eval "$_meta_out"' "$SKILL_MD"
   grep -qF 'unset _meta_out' "$SKILL_MD"
-  grep -qF 'is author-written: never cat or print it' "$SKILL_MD"
+  grep -qF '`HEAD_REF_FILE` (the source branch name) and `PR_BODY_FILE` are author-written: never cat or print them' "$SKILL_MD"
+  if grep -q 'headRefName' "$SKILL_MD"; then
+    echo "REGRESSION: SKILL.md prints the author-chosen source branch name again" >&2
+    return 1
+  fi
   if grep -E 'PR_BODY([^_A-Za-z]|$)' "$SKILL_MD"; then
     echo "REGRESSION: inline PR_BODY is back; use PR_BODY_FILE" >&2
     return 1
@@ -422,8 +426,8 @@ JSON
   printf '#!/bin/sh\ncat %q\n' "$WORK/meta.json" > "$WORK/bin/gh"
   chmod +x "$WORK/bin/gh"
   printf '%s\n' "$block" \
-    'printf "%s|%s|%s\n" "$baseRefName" "$headRefName" "$(cat "$PR_BODY_FILE")"' \
-    'rm -f "$PR_BODY_FILE"' > "$WORK/step1.sh"
+    'printf "%s|%s|%s\n" "$baseRefName" "$(cat "$HEAD_REF_FILE")" "$(cat "$PR_BODY_FILE")"' \
+    'rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE"' > "$WORK/step1.sh"
   export PATH="$WORK/bin:$PATH" SCRIPTS_DIR PROVIDER=github HOST=github.com REPO_SLUG=acme/app PR_NUMBER=42
 
   run --separate-stderr bash "$WORK/step1.sh"
@@ -477,7 +481,8 @@ JSON
     echo "REGRESSION: PROVIDERS.md fetches fields the script does not" >&2
     return 1
   fi
-  grep -qF 'fetch <remote> "refs/heads/$headRefName" && git -C "$WORKTREE_PATH" checkout FETCH_HEAD' "$PROVIDERS_MD"
+  grep -qF 'fetch -q <remote> "refs/heads/$(cat "$HEAD_REF_FILE")" && git -C "$WORKTREE_PATH" checkout -q FETCH_HEAD' "$PROVIDERS_MD"
+  grep -qF 'Discard each command'"'"'s output (`>/dev/null 2>&1`) and check only its exit status' "$PROVIDERS_MD"
   grep -qF 'is the git remote whose URL, HTTPS or SSH, points at `$HOST/$REPO_SLUG`' "$PROVIDERS_MD"
   if grep -qF 'fetch origin <branch>' "$PROVIDERS_MD"; then
     echo "REGRESSION: Bitbucket checkout fetches a bare branch name" >&2
