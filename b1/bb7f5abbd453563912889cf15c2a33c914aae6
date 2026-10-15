@@ -2,10 +2,16 @@ CHANGELOG.md
   s_22d2264024e6d9::t_bd03fe52fced37 47
 skills/code-review-lenses/PROVIDERS.md
   s_22d2264024e6d9::t_42e0361c623e56 21
+  s_22d2264024e6d9::t_e92321b465421e 21
 skills/code-review-lenses/scripts/fetch-pr-metadata.sh
   s_22d2264024e6d9::t_9fe9ae9f2e15cc 61-67
+  s_22d2264024e6d9::t_86f99c5c82778b 65
+  s_22d2264024e6d9::t_9a563974267f93 61-62,64,66-67
+  s_22d2264024e6d9::t_df90d44118b4e4 63
 tests/fetch_pr_metadata.bats
   s_22d2264024e6d9::t_d3a04a4d654a15 16,23,95-116
+  s_22d2264024e6d9::t_29c695f33e4106 16,23
+  s_22d2264024e6d9::t_576313d191be2f 95-116
 ---
 {
   "schema_version": "authorship/3.0.0",
