@@ -79,14 +79,15 @@ fi
 
 # Run shellcheck on each file, collect JSON output
 FINDINGS="[]"
+EXIT_CODE=0
 for file in "${SHELL_FILES[@]}"; do
   # Run shellcheck with JSON output (-f json1) at warning severity
   SC_EC=0
   SC_OUTPUT=$(shellcheck -f json1 -S warning -- "$file" 2>/dev/null) || SC_EC=$?
   if [[ "$SC_EC" -ge 2 ]]; then
     echo "WARNING: shellcheck failed on ${file} (exit ${SC_EC}); not treating as zero findings." >&2
-    echo "[]"
-    exit 1
+    EXIT_CODE=1
+    continue
   fi
   [[ -z "$SC_OUTPUT" ]] && continue
 
@@ -102,11 +103,12 @@ for file in "${SHELL_FILES[@]}"; do
     }]
   ' 2>/dev/null) || {
     echo "WARNING: jq failed to parse shellcheck output for ${file}." >&2
-    echo "[]"
-    exit 1
+    EXIT_CODE=1
+    continue
   }
 
   FINDINGS=$(printf '%s\n%s' "$FINDINGS" "$FILE_FINDINGS" | jq -s '.[0] + .[1]')
 done
 
 printf '%s\n' "$FINDINGS"
+exit "$EXIT_CODE"

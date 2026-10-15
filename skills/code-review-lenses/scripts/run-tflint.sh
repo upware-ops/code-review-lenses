@@ -67,6 +67,7 @@ if [[ ${#TF_FILES[@]} -eq 0 ]]; then
   exit 0
 fi
 
+EXIT_CODE=0
 if [[ -n "${TFLINT_MOCK_FILE:-}" ]]; then
   if [[ ! -r "$TFLINT_MOCK_FILE" ]]; then
     echo "WARNING: TFLINT_MOCK_FILE '${TFLINT_MOCK_FILE}' is not readable." >&2
@@ -106,8 +107,8 @@ else
     if [[ "$DIR_EC" -ne 0 && "$DIR_EC" -ne 2 ]] || { [[ "$DIR_EC" -ne 0 ]] && [[ -z "$DIR_OUTPUT" ]]; }; then
       echo "WARNING: tflint failed in '${dir}' (exit ${DIR_EC}): $(cat "$DIR_STDERR")" >&2
       rm -f "$DIR_STDERR"
-      echo "[]"
-      exit 1
+      EXIT_CODE=1
+      continue
     fi
     rm -f "$DIR_STDERR"
     if [[ -n "$DIR_OUTPUT" ]]; then
@@ -122,8 +123,8 @@ else
         )]
       ' 2>/dev/null) || {
         echo "WARNING: tflint JSON from '${dir}' could not be parsed." >&2
-        echo "[]"
-        exit 1
+        EXIT_CODE=1
+        continue
       }
       ALL_ISSUES=$(printf '%s\n%s' "$ALL_ISSUES" "$DIR_ISSUES" | jq -s 'add // []' 2>/dev/null) || {
         echo "WARNING: tflint issue merge failed." >&2
@@ -184,3 +185,4 @@ FINDINGS=$(echo "$TFLINT_OUTPUT" | jq -r --arg first "${TF_FILES[0]}" '
 }
 
 echo "${FINDINGS:-[]}"
+exit "$EXIT_CODE"

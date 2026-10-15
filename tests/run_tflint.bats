@@ -270,3 +270,21 @@ STUB
     map([.file, .line]) == [["versions.tf", 0], ["main.tf", 8], ["infra/network.tf", 0], ["infra/main.tf", 8]]
   ' >/dev/null
 }
+
+@test "tflint: a failing directory is exit 1 and still emits the other directories' findings" {
+  unset TFLINT_MOCK_FILE TFLINT_CONFIG_FILE TFLINT_PLUGIN_DIR
+  mkdir -p "$WORK/bin" "$WORK/good" "$WORK/bad"
+  cat > "$WORK/bin/tflint" <<'STUB'
+#!/bin/sh
+case "$1" in --chdir=bad) echo boom >&2; exit 3 ;; esac
+echo '{"issues":[{"rule":{"name":"terraform_unused_declarations","severity":"warning","link":""},"message":"unused","range":{"filename":"main.tf","start":{"line":3}}}],"errors":[]}'
+exit 2
+STUB
+  chmod +x "$WORK/bin/tflint"
+  touch "$WORK/good/main.tf" "$WORK/bad/main.tf"
+  cd "$WORK"
+  HOME="$WORK/home" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' good/main.tf bad/main.tf)"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e 'map([.file, .line]) == [["good/main.tf", 3]]' >/dev/null
+  [[ "$stderr" == *"tflint failed in 'bad' (exit 3)"* ]]
+}
