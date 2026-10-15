@@ -980,17 +980,20 @@ EOF
   [ "$(grep -c 'skipped requirements include .*: outside the review root' <<<"$stderr")" -eq 3 ]
 }
 
-@test "cve-check: an include that reaches outside the review root through a symlink is refused with a note" {
+@test "cve-check: a symlinked include file or one that reaches outside the review root is refused with a note; an in-root directory symlink is followed" {
   make_curl_shim
   mkdir "$WORK/root"
   printf '%s\n' 'leak==9.9.9' > "$WORK/outside.txt"
   printf '%s\n' 'inside==1.0.0' > "$WORK/root/inside.txt"
+  mkdir "$WORK/root/sub"
+  printf '%s\n' 'nested==2.0.0' > "$WORK/root/sub/nested.txt"
   ln -s "$WORK/outside.txt" "$WORK/root/link.txt"
   ln -s "$WORK" "$WORK/root/linkdir"
-  printf '%s\n' '-r inside.txt' '-r link.txt' '-r linkdir/outside.txt' > "$WORK/root/requirements.txt"
+  ln -s "$WORK/root/sub" "$WORK/root/insidedir"
+  printf '%s\n' '-r inside.txt' '-r link.txt' '-r linkdir/outside.txt' '-r insidedir/nested.txt' > "$WORK/root/requirements.txt"
   WORKTREE_PATH="$WORK/root" run --separate-stderr "$SCRIPT" "$WORK/root/requirements.txt"
   [ "$status" -eq 0 ]
-  [ "$(queried_packages)" = "inside@1.0.0" ]
+  [ "$(queried_packages | sort)" = $'inside@1.0.0\nnested@2.0.0' ]
   grep -q 'skipped requirements include link.txt in .*: a symlink' <<<"$stderr"
   grep -q 'skipped requirements include linkdir/outside.txt in .*: outside the review root' <<<"$stderr"
 }
