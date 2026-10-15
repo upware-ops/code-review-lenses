@@ -128,6 +128,84 @@ EOF
   [[ "$output" == *"Go	example.com/safe	2.0.0"* ]]
 }
 
+@test "parse_go_mod: a versioned replace does not apply to another required version" {
+  load_function "$SCRIPT" parse_go_mod
+  cat > "$WORK/go.mod" <<'EOF'
+module example.com/app
+
+go 1.22
+
+require example.com/one v1.5.0
+
+require (
+	example.com/two v1.5.0
+)
+
+replace example.com/one v1.0.0 => example.com/fork-one v1.2.3
+
+replace (
+	example.com/two v1.0.0 => example.com/fork-two v1.2.3
+)
+EOF
+  run parse_go_mod "$WORK/go.mod"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'Go\texample.com/one\t1.5.0\nGo\texample.com/two\t1.5.0' ]
+}
+
+@test "parse_go_mod: a versionless replace applies to any required version" {
+  load_function "$SCRIPT" parse_go_mod
+  cat > "$WORK/go.mod" <<'EOF'
+module example.com/app
+
+go 1.22
+
+require example.com/one v1.5.0
+
+require (
+	example.com/two v1.5.0
+)
+
+replace example.com/one => example.com/fork-one v2.0.0
+
+replace example.com/one v1.0.0 => example.com/other v9.9.9
+
+replace (
+	example.com/two => example.com/fork-two v2.0.0
+	example.com/two v1.0.0 => example.com/other v9.9.9
+)
+EOF
+  run parse_go_mod "$WORK/go.mod"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'Go\texample.com/fork-one\t2.0.0\nGo\texample.com/fork-two\t2.0.0' ]
+}
+
+@test "parse_go_mod: a versioned replace applies to its exact version ahead of a versionless one" {
+  load_function "$SCRIPT" parse_go_mod
+  cat > "$WORK/go.mod" <<'EOF'
+module example.com/app
+
+go 1.22
+
+require example.com/one v1.0.0
+
+require (
+	example.com/two v1.0.0
+)
+
+replace example.com/one v1.0.0 => example.com/fork-one v1.2.3
+
+replace example.com/one => example.com/other v9.9.9
+
+replace (
+	example.com/two v1.0.0 => example.com/fork-two v1.2.3
+	example.com/two => example.com/other v9.9.9
+)
+EOF
+  run parse_go_mod "$WORK/go.mod"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'Go\texample.com/fork-one\t1.2.3\nGo\texample.com/fork-two\t1.2.3' ]
+}
+
 # ---------------------------------------------------------------------------
 # No-op paths
 # ---------------------------------------------------------------------------
@@ -459,6 +537,33 @@ EOF
   run --separate-stderr "$SCRIPT" "$WORK/package.json"
   [ "$status" -eq 0 ]
   jq -e '.queries == [{"version":"4.17.20","package":{"name":"lodash","ecosystem":"npm"}}]' "$SHIM_BODY" >/dev/null
+}
+
+@test "cve-check: optionalDependencies are queried at their exact version or the package-lock.json version" {
+  make_curl_shim
+  printf '%s\n' '{"optionalDependencies":{"fsevents":"2.3.2","chokidar":"^3.5.0"}}' > "$WORK/package.json"
+  printf '%s\n' '{"lockfileVersion":3,"packages":{"":{},"node_modules/chokidar":{"version":"3.5.3"}}}' \
+    > "$WORK/package-lock.json"
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  jq -e '.queries == [
+    {"version":"2.3.2","package":{"name":"fsevents","ecosystem":"npm"}},
+    {"version":"3.5.3","package":{"name":"chokidar","ecosystem":"npm"}}]' "$SHIM_BODY" >/dev/null
+  [[ "$stderr" != *"skipped ranged"* ]]
+}
+
+@test "cve-check: an optionalDependencies spec overrides the same name in dependencies" {
+  make_curl_shim
+  printf '%s\n' '{"dependencies":{"lib":"1.0.0","ranged":"1.0.0","other":"3.0.0"},"optionalDependencies":{"lib":"2.0.0","ranged":"^1.0.0"}}' \
+    > "$WORK/package.json"
+  printf '%s\n' '{"lockfileVersion":3,"packages":{"":{},"node_modules/ranged":{"version":"1.4.0"}}}' \
+    > "$WORK/package-lock.json"
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  jq -e '.queries == [
+    {"version":"2.0.0","package":{"name":"lib","ecosystem":"npm"}},
+    {"version":"1.4.0","package":{"name":"ranged","ecosystem":"npm"}},
+    {"version":"3.0.0","package":{"name":"other","ecosystem":"npm"}}]' "$SHIM_BODY" >/dev/null
 }
 
 @test "cve-check: ranged Composer dependency is queried at the composer.lock version" {
