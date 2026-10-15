@@ -742,7 +742,7 @@ RESULT Not cleaned (not a code-review-lenses temp path): "/home/u/analyzer"' ]
   done
   grep -F 'SKILL_ROOT=$(bash' "$CLAUDE_WF" | grep -q -F 'SKILL_ROOT=$(bash "$HOME/.claude/skills/code-review-lenses/scripts/resolve-skill-root.sh")'
   sed 's/\\"/"/g' "$GROK_WF" | grep -q -F 'for the first d of "$HOME/.grok/skills/code-review-lenses", "$HOME/.agents/skills/code-review-lenses", "$HOME/.claude/skills/code-review-lenses"'
-  grep -q -F '"required": ["agents", "skill_root"],' "$GROK_WF"
+  grep -q -F '"required": ["agents", "skill_root", "cve_check_failed", "analyzer_failed"],' "$GROK_WF"
   grep -q -F 'skill_root = skill_root_path(pre.output.skill_root);' "$GROK_WF"
   grep -q -F 'let agents_dir = skill_root.sub_string(0, skill_root.len() - 26) + "/agents";' "$GROK_WF"
   [ "$(printf '%s' '/skills/code-review-lenses' | wc -c | tr -d ' ')" -eq 26 ]
@@ -859,6 +859,11 @@ JS
 }
 
 @test "wrappers treat a missing CVE or analyzer status as a failed check" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q -F 'Whether or not step 7 runs, return cve_check_failed and analyzer_failed booleans (false for a check that was not scheduled or had nothing to scan).' "$f"
+  done
+  grep -q -F "required: ['agents', 'skill_root', 'cve_check_failed', 'analyzer_failed']," "$CLAUDE_WF"
+  grep -q -F '"required": ["agents", "skill_root", "cve_check_failed", "analyzer_failed"],' "$GROK_WF"
   grep -q -F "'CVE_CHECK_FAILED=' + String(prelude.cve_check_failed !== false) + '. ANALYZER_FAILED=' + String(prelude.analyzer_failed !== false) + '." "$CLAUDE_WF"
   grep -A1 -F 'if pre.output != () && pre.output.cve_check_failed == false {' "$GROK_WF" | grep -q -F 'assemble_prompt += "false";'
   grep -A1 -F 'if pre.output != () && pre.output.analyzer_failed == false {' "$GROK_WF" | grep -q -F 'assemble_prompt += "false";'

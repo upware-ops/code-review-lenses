@@ -138,7 +138,7 @@ const prelude = await agent(
     '   Local: bash "$SCRIPTS_DIR/review-diff.sh" --base "$BASE" --diff-file "$DIFF_FILE" with DIFF_FILE=$(mktemp /tmp/code-review-lenses.XXXXXX) (committed → BASE...HEAD; dirty → tracked + untracked files and symlinks). empty → stop. Return that file as diff_file in every mode: reviewers read the diff from it, since git diff misses untracked files.',
     '6. DIFF_FILE=... DIFF_PATHS=... bash "$SCRIPTS_DIR/evaluate-gates.sh": capture stdout, honor $?, then eval. Non-zero is a hard stop (do not keep all-true defaults). Then DIFF_FILE DIFF_PATHS GATE_CODE_OR_INFRA GATE_SECURITY_PATTERNS bash "$SCRIPTS_DIR/classify-diff.sh": capture then eval (emits TIER ARCH_PROMOTED SECURITY_PROMOTED DOCS_ONLY LOW_RISK_CONFIG). Then those env vars plus GATE_ERROR_PATTERNS GATE_CONTROL_FLOW GATE_TEST_PATHS GATE_COMMENT_CHANGES GATE_TYPE_DEFINITIONS PROVIDER bash "$SCRIPTS_DIR/apply-roster-overlays.sh" --from-file <same temp file>. Honor RUN_*. Overlay does not emit GUIDANCE — keep GUIDANCE_REST.',
     '7. If RUN_CVE or RUN_STATIC_ANALYZERS is true: ANALYZER_DIR=$(mktemp -d /tmp/code-review-lenses.XXXXXX); build CHECK_PATHS as SKILL.md Phase 1b with that block\'s stderr, and the symlinks removed after checkout, in "$ANALYZER_DIR/check-paths.err", then run matching "$SCRIPTS_DIR/run-*.sh" with each script\'s stdout in "$ANALYZER_DIR/<script>.json" and its stderr in "$ANALYZER_DIR/<script>.err" (CVE check included).',
-    '   Never read, cat, or print those files: analyzer output carries file names and code from the reviewed change. Return ANALYZER_DIR as analyzer_dir. A non-zero exit is ANALYZER_FAILED (CVE check: CVE_CHECK_FAILED), not a clean scan. Return cve_check_failed and analyzer_failed booleans.',
+    '   Never read, cat, or print those files: analyzer output carries file names and code from the reviewed change. Return ANALYZER_DIR as analyzer_dir. A non-zero exit is ANALYZER_FAILED (CVE check: CVE_CHECK_FAILED), not a clean scan. Whether or not step 7 runs, return cve_check_failed and analyzer_failed booleans (false for a check that was not scheduled or had nothing to scan).',
     '8. governance = verbatim text of "$SKILL_ROOT/GOVERNANCE.md" (SKILL.md Phase 0b step 12; "" if missing). security_policy = SKILL.md Phase 0b step 13 (8 KB cap, reviewer checkout, never $WORKTREE_PATH; "" if none).',
     '9. provider, repo_slug and host = PROVIDER, REPO_SLUG and HOST from steps 2–3 (from the URL for a URL review, from detect-provider.sh for a local review; empty only when PROVIDER=unknown). pr_number = PR_NUMBER from step 2 (empty for a local review). classification = { TIER, ARCH_PROMOTED, SECURITY_PROMOTED, DOCS_ONLY, LOW_RISK_CONFIG, LINES_CHANGED, FILES_CHANGED } as classify-diff.sh emitted them in step 6. models = { stem: its MODEL_<STEM> value } for each returned stem whose value is not inherit.',
     '10. Before returning, rm -f every temp file you created except diff_file and analyzer_dir, and rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE" if set.',
@@ -155,7 +155,7 @@ const prelude = await agent(
     label: 'prelude',
     schema: {
       type: 'object',
-      required: ['agents', 'skill_root'],
+      required: ['agents', 'skill_root', 'cve_check_failed', 'analyzer_failed'],
       properties: {
         profile: { type: 'string' },
         agents: { type: 'array', items: { type: 'string' } },
