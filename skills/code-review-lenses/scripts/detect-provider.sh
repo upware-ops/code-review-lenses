@@ -239,7 +239,11 @@ if [[ "$CHECK_URL_HOST" == true ]]; then
       ;;
     gitlab)
       _ci_host=$(printf '%s' "${CI_SERVER_FQDN:-}" | tr '[:upper:]' '[:lower:]')
-      if [[ "${GLAB_ENABLE_CI_AUTOLOGIN:-}" == true && -n "${CI_JOB_TOKEN:-}" && "$HOST_LC" != "$_ci_host" ]]; then
+      case "${GLAB_ENABLE_CI_AUTOLOGIN:-}" in
+        ''|0|f|F|false|FALSE|False) _ci_autologin=false ;;
+        *) _ci_autologin=true ;;
+      esac
+      if [[ "$_ci_autologin" == true && -n "${CI_JOB_TOKEN:-}" && "$HOST_LC" != "$_ci_host" ]]; then
         die "Refusing glab for host '$CHECK_HOST': CI auto-login would use CI_JOB_TOKEN, which belongs to ${CI_SERVER_FQDN:-the CI server}. Unset GLAB_ENABLE_CI_AUTOLOGIN or CI_JOB_TOKEN."
       fi
       _gl_cfg=$(gitlab_host_name "${GITLAB_HOST:-${GITLAB_URI:-${GL_HOST:-}}}")

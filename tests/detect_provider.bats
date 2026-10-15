@@ -552,9 +552,16 @@ exit 0
 EOF
   chmod +x "$WORK/bin/glab"
   for host in git.other.example gitlab.com; do
-    run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GLAB_ENABLE_CI_AUTOLOGIN=true CI_JOB_TOKEN=j CI_SERVER_FQDN=GitLab.CI.Example \
-      bash "$DETECT" --check-url-host --provider gitlab --host "$host"
-    [[ "$output" == *"CI_JOB_TOKEN, which belongs to GitLab.CI.Example"* ]]
+    for on in true 1 t TRUE True yes; do
+      run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GLAB_ENABLE_CI_AUTOLOGIN="$on" CI_JOB_TOKEN=j CI_SERVER_FQDN=GitLab.CI.Example \
+        bash "$DETECT" --check-url-host --provider gitlab --host "$host"
+      [[ "$output" == *"CI_JOB_TOKEN, which belongs to GitLab.CI.Example"* ]]
+    done
+  done
+  for off in 0 f false FALSE False; do
+    run env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GLAB_ENABLE_CI_AUTOLOGIN="$off" CI_JOB_TOKEN=j CI_SERVER_FQDN=gitlab.ci.example \
+      bash "$DETECT" --check-url-host --provider gitlab --host git.other.example
+    [ "$status" -eq 0 ]
   done
   run env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GLAB_ENABLE_CI_AUTOLOGIN=true CI_JOB_TOKEN=j CI_SERVER_FQDN=GitLab.CI.Example \
     bash "$DETECT" --check-url-host --provider gitlab --host gitlab.ci.example
