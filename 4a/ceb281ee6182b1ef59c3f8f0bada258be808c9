@@ -1,0 +1,60 @@
+skills/code-review-lenses/PROVIDERS.md
+  s_22d2264024e6d9::t_d210f6752839c2 33
+  s_22d2264024e6d9::t_f8b227397749aa 30-32
+  s_22d2264024e6d9::t_3d008082ef47b4 29
+.grok/workflows/code-review-lenses-workflow.rhai
+  s_22d2264024e6d9::t_fe6523fa04cae0 396
+  s_22d2264024e6d9::t_ecf640b84efc88 237
+tests/workflow_wrappers.bats
+  s_22d2264024e6d9::t_4755d4a597e40e 605
+  s_22d2264024e6d9::t_4bb477e36f0319 606-616
+  s_22d2264024e6d9::t_36b153bfffc5f3 597
+  s_22d2264024e6d9::t_7e6eb2ab38ec31 620,622
+  s_22d2264024e6d9::t_3f715781c4ed84 663-664
+  s_22d2264024e6d9::t_9bebc7db2bc9c6 586-587
+  s_22d2264024e6d9::t_63464fa44474e3 588
+  s_22d2264024e6d9::t_948fc465f537ec 617-619
+  s_22d2264024e6d9::t_3b4f01aaff83fe 623-624
+.claude/workflows/code-review-lenses-workflow.js
+  s_22d2264024e6d9::t_a9e4ac119a36ba 279
+  s_22d2264024e6d9::t_cdf0726c955f4b 137
+tests/resolve_pr_base.bats
+  s_22d2264024e6d9::t_ae8e7587fbd7ce 227
+  s_22d2264024e6d9::t_0af833fc82c0c4 213-226,228-229
+skills/code-review-lenses/scripts/resolve-pr-base.sh
+  s_22d2264024e6d9::t_cc2cf9e667b110 115-116
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_77073cc555660b 212
+  s_22d2264024e6d9::t_5b7a711b5954ef 132
+  s_22d2264024e6d9::t_47ad3b0dc1234a 130-131,133-145
+CHANGELOG.md
+  s_22d2264024e6d9::t_470bb2b6521635 57
+tests/orchestration_contracts.bats
+  s_22d2264024e6d9::t_6549fce72977f2 832,837
+  s_22d2264024e6d9::t_2a92fd7a7e4097 904-912
+  s_22d2264024e6d9::t_2b28a92240937e 720-721
+  s_22d2264024e6d9::t_0cca6eb3411aec 747
+  s_22d2264024e6d9::t_025d3e6cd5b6f2 779
+  s_22d2264024e6d9::t_53bb5813f85849 302
+  s_22d2264024e6d9::t_3b0855f499429d 785,790,795,804
+  s_22d2264024e6d9::t_518c72bc7e7947 24-26
+  s_22d2264024e6d9::t_438e3067fd6440 546
+  s_22d2264024e6d9::t_104ac138f0dc15 758-759
+  s_22d2264024e6d9::t_a7692220458276 772-778,780-784,786-789,791-794,796-803,805-831,833-836,838-903
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "4aceb281ee6182b1ef59c3f8f0bada258be808c9",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
