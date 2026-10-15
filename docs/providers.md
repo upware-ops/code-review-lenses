@@ -47,7 +47,7 @@ other host is refused: set `GITLAB_HOST` to the MR's host or unset the token.
 A matching `origin` or `glab config get host` is not enough.
 
 Nested groups stay in the project slug (`group/sub/project`).
-`glab mr view` / `glab mr checkout` are used for an MR URL.
+`glab mr view` fetches MR metadata; the checkout fetches `refs/merge-requests/<N>/head` from the git remote for the MR's project and checks it out detached, so no local branch is left behind.
 
 ## GitHub
 

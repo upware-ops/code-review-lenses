@@ -251,7 +251,6 @@ teardown() {
   grep -q "OP: Fetch PR/MR metadata" "$PROVIDERS_MD"
   grep -q "OP: Checkout PR/MR branch" "$PROVIDERS_MD"
   grep -q "mr view" "$PROVIDERS_MD"
-  grep -q "mr checkout" "$PROVIDERS_MD"
   if grep -q "OP: Post\|OP: Create PR\|OP: Stage draft" "$PROVIDERS_MD"; then
     echo "REGRESSION: write OP still in PROVIDERS.md" >&2
     return 1
@@ -278,7 +277,11 @@ teardown() {
 
 @test "PROVIDERS.md: GitLab OPs pin GITLAB_HOST and a full-URL -R to the detected host/slug" {
   grep -q 'GITLAB_HOST="$HOST" glab mr view <N> -R "https://$HOST/$REPO_SLUG"' "$PROVIDERS_MD"
-  grep -q 'GITLAB_HOST="$HOST" glab mr checkout <N> -R "https://$HOST/$REPO_SLUG"' "$PROVIDERS_MD"
+  grep -qF 'git -C "$WORKTREE_PATH" fetch -q <remote> "refs/merge-requests/$PR_NUMBER/head" && git -C "$WORKTREE_PATH" checkout -q FETCH_HEAD' "$PROVIDERS_MD"
+  if grep -q 'glab mr checkout <N>' "$PROVIDERS_MD"; then
+    echo "REGRESSION: glab mr checkout attaches the worktree to the MR source branch and leaves it behind" >&2
+    return 1
+  fi
   grep -q 'diff_refs.base_sha→baseRefOid' "$PROVIDERS_MD"
   if grep -q 'glab --hostname' "$PROVIDERS_MD"; then
     echo "REGRESSION: glab has no global --hostname flag (Unknown flag: --hostname)" >&2

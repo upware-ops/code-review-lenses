@@ -27,7 +27,7 @@ If the provider response has no body/description or the value is null/empty, set
 Run every command **inside** the temporary worktree created in Phase 0b. Do not checkout in the parent clone. Discard each command's output (`>/dev/null 2>&1`) and check only its exit status: checkout output can echo author-chosen branch names.
 
 - **github:** `(cd "$WORKTREE_PATH" && GH_HOST="$HOST" gh pr checkout "$PR_NUMBER" --repo "$REPO_SLUG" --detach)` (detached, so a PR branch already checked out in another worktree does not block it)
-- **gitlab:** Same host-auth check as fetch, then `(cd "$WORKTREE_PATH" && GITLAB_HOST="$HOST" glab mr checkout <N> -R "https://$HOST/$REPO_SLUG")`
+- **gitlab:** `git -C "$WORKTREE_PATH" fetch -q <remote> "refs/merge-requests/$PR_NUMBER/head" && git -C "$WORKTREE_PATH" checkout -q FETCH_HEAD`, with `<remote>` chosen as for Bitbucket below. GitLab keeps that ref for every open MR, fork MRs included, and the detached checkout leaves no local branch behind (`glab mr checkout` would create or reuse the source branch).
 - **bitbucket:** `git -C "$WORKTREE_PATH" fetch -q <remote> "refs/heads/$(cat "$HEAD_REF_FILE")" && git -C "$WORKTREE_PATH" checkout -q FETCH_HEAD`, where `<remote>` is the git remote whose URL, HTTPS or SSH, points at `$HOST/$REPO_SLUG` (`origin` first, as `resolve-pr-base.sh` picks it; stop if none) (`HEAD_REF_FILE` from the metadata step; a `refs/heads/` refspec cannot be read as a git option)
 
 ## GitLab host notes
@@ -38,5 +38,5 @@ contains `gitlab`, equals glab's env host (first set of `GITLAB_HOST`,
 `glab config get host`, or `glab auth status --hostname <host>`
 exits 0 (per host: the bare command exits 1 if any configured host fails).
 Nested groups stay in `REPO_SLUG` (`group/sub/project`).
-Every `glab` OP above pins `GITLAB_HOST="$HOST"` and `-R "https://$HOST/$REPO_SLUG"`.
+The `glab` OP above pins `GITLAB_HOST="$HOST"` and `-R "https://$HOST/$REPO_SLUG"`.
 `glab` must already be logged in to that host; this skill does not run `glab auth login`.
