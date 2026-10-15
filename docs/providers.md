@@ -19,7 +19,7 @@ analysis. Nothing is posted.
 | Feature | GitHub / GHE | GitLab | Bitbucket |
 |---------|:---:|:---:|:---:|
 | Auto-detection | Yes | Yes (any `glab` host) | Yes |
-| PR/MR URL checkout | Yes (`gh`) | Yes (`glab`) | Yes (`git` + `curl` metadata) |
+| PR/MR URL checkout | Yes (`gh`) | Yes (`glab` metadata + `git` checkout from a remote for the MR's project) | Yes (`curl` metadata + `git` checkout from a remote for the PR's repository) |
 | Issue cross-reference | Yes | No | No |
 | Create / comment / review post | No | No | No |
 

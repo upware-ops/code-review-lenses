@@ -163,7 +163,7 @@ JSON `{ "arguments": "--profile deep https://github.com/acme/app/pull/42" }` is 
 | Feature | GitHub | GitLab | Bitbucket |
 |---------|:---:|:---:|:---:|
 | Auto-detection | Yes | Yes (any `glab` host) | Yes |
-| PR/MR URL checkout | Yes (`gh`) | Yes (`glab`) | Yes (`curl`) |
+| PR/MR URL checkout | Yes (`gh`) | Yes (`glab` + `git`) | Yes (`curl` + `git`) |
 | Issue cross-reference | Yes | No | No |
 | Post / create PR | No | No | No |
 
