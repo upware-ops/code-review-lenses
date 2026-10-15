@@ -1,0 +1,34 @@
+tests/run_cve_check.bats
+  s_22d2264024e6d9::t_d4d2e7a2a66a0f 417-429
+  s_22d2264024e6d9::t_648cb5fdddd1e3 394-416
+  s_22d2264024e6d9::t_6de9a15eef5845 66-67
+  s_22d2264024e6d9::t_373c45e1d7d6e1 84
+  s_22d2264024e6d9::t_b283940ef3f891 577,583,585
+  s_22d2264024e6d9::t_dcd29726449312 578-582,584,586-616
+tests/orchestration_contracts.bats
+  s_22d2264024e6d9::t_a19b6b592bf5c8 472-489
+skills/code-review-lenses/scripts/run-cve-check.sh
+  s_22d2264024e6d9::t_fa9e6309085e45 17-18,334,338-351,675-683
+  s_22d2264024e6d9::t_375cebe73d927e 684
+  s_22d2264024e6d9::t_433b7ce9632285 685,712,720,724,738,747,751
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_a19b6b592bf5c8 458-459,599
+CHANGELOG.md
+  s_22d2264024e6d9::t_e3e1246a032b64 54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "362f4d41d6822252d55c3f9ae4af104e1e297884",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
