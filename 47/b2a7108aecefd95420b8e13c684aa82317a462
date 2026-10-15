@@ -1,0 +1,32 @@
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_a0a7139fdd238a 137,140-141,145-146
+CHANGELOG.md
+  s_22d2264024e6d9::t_a0a7139fdd238a 57
+skills/code-review-lenses/PROVIDERS.md
+  s_22d2264024e6d9::t_a0a7139fdd238a 29,31
+.claude/workflows/code-review-lenses-workflow.js
+  s_22d2264024e6d9::t_a0a7139fdd238a 137
+tests/orchestration_contracts.bats
+  s_22d2264024e6d9::t_a0a7139fdd238a 284-288,883,903-906
+  s_22d2264024e6d9::t_e86cc33851e44d 763
+.grok/workflows/code-review-lenses-workflow.rhai
+  s_22d2264024e6d9::t_a0a7139fdd238a 243
+tests/workflow_wrappers.bats
+  s_22d2264024e6d9::t_a0a7139fdd238a 616-619
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "47b2a7108aecefd95420b8e13c684aa82317a462",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
