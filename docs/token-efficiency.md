@@ -13,9 +13,9 @@ The skill uses a tiered context-passing strategy to keep the agent fleet cheap.
 
 | Diff size | Strategy |
 |-----------|---------|
-| **TIER=tiny** (<50 lines AND ≤3 files) | Full diff inline; hunters and comment/type agents skipped; architecture/security only if promoted |
-| **Small** (<300 lines) | Full diff inline to scheduled agents |
-| **Medium/large** (300+ lines) | Custom agents get a file manifest and read `git diff <base>...HEAD -- <file>`. Triggered conditional agents get the full diff. Lockfiles and vendor dirs are excluded from the manifest |
+| **TIER=tiny** (<50 lines AND ≤3 files AND a diff of at most 64 KB) | Full diff inline; hunters and comment/type agents skipped; architecture/security only if promoted |
+| **Small** (<300 lines AND a diff of at most 64 KB) | Full diff inline to scheduled agents |
+| **Medium/large** (300+ lines, or a diff over 64 KB) | Custom agents get a file manifest and read `git diff <base>...HEAD -- <file>`. Triggered conditional agents get the full diff. Lockfiles and vendor dirs are excluded from the manifest |
 
 ## Profiles as the cost control
 

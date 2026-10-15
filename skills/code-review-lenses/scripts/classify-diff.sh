@@ -27,12 +27,15 @@ fi
 
 FILES_CHANGED=$(printf '%s\n' "${DIFF_PATHS-}" | sed '/^$/d' | wc -l | tr -d ' ')
 LINES_CHANGED=$(awk '/^diff /{h=1} /^@@/{h=0} !h && /^[+-]/{n++} END{print n+0}' "$DIFF_FILE")
+DIFF_BYTES=$(wc -c < "$DIFF_FILE" | tr -d ' ')
 
 TIER=medium
-if [[ "$LINES_CHANGED" -lt 50 && "$FILES_CHANGED" -le 3 ]]; then
-  TIER=tiny
-elif [[ "$LINES_CHANGED" -lt 300 ]]; then
-  TIER=small
+if [[ "$DIFF_BYTES" -le 65536 ]]; then
+  if [[ "$LINES_CHANGED" -lt 50 && "$FILES_CHANGED" -le 3 ]]; then
+    TIER=tiny
+  elif [[ "$LINES_CHANGED" -lt 300 ]]; then
+    TIER=small
+  fi
 fi
 
 INFRA_PATH_PATTERN='(^|/)(Dockerfile|\.nvmrc|\.node-version|\.ddev/|\.github/workflows/|\.github/actions/|\.github/dependabot\.ya?ml|\.claude/workflows/|\.grok/workflows/|\.gitlab-ci\.yml|bitbucket-pipelines\.yml|lagoon/|helm/|k8s/|kubernetes/|terraform/|docker-compose|compose\.ya?ml)'

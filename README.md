@@ -30,7 +30,7 @@ flag (mutually exclusive with `--profile`) that runs only the summarizer.
 `--quick`, `--security-only`, and `--depth` were removed; the parser rejects them
 and points at `--profile`.
 
-Auto-selected **TIER=tiny** (<50 lines and ≤3 files) still skips hunters and
+Auto-selected **TIER=tiny** (<50 lines, ≤3 files and a diff of at most 64 KB) still skips hunters and
 comment/type agents, and only promotes architecture/security when infra or
 auth/dep-manifest paths appear. `--profile security` still runs security-reviewer
 at tiny tier.

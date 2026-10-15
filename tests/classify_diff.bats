@@ -23,6 +23,23 @@ teardown() {
   [[ "$SECURITY_PROMOTED" == "false" ]]
 }
 
+@test "classify-diff: a diff over 64 KB is medium however few lines it changes" {
+  : > "$WORK/diff"
+  : > "$WORK/paths"
+  for i in $(seq 1 600); do
+    printf 'diff --git a/old/file%s.go b/new/file%s.go\nsimilarity index 100%%\nrename from old/file%s.go\nrename to new/file%s.go\n' "$i" "$i" "$i" "$i" >> "$WORK/diff"
+    printf 'new/file%s.go\n' "$i" >> "$WORK/paths"
+  done
+  _cls=$(DIFF_FILE="$WORK/diff" DIFF_PATHS="$(cat "$WORK/paths")" bash "$CLS")
+  eval "$_cls"
+  [ "$TIER" = "medium" ]
+
+  { printf '%s\n+' '+++ b/app.min.js'; head -c 70000 /dev/zero | tr '\0' x; printf '\n'; } > "$WORK/diff"
+  _cls=$(DIFF_FILE="$WORK/diff" DIFF_PATHS='app.min.js' bash "$CLS")
+  eval "$_cls"
+  [ "$TIER" = "medium" ]
+}
+
 @test "classify-diff: tiny + Dockerfile promotes architecture" {
   printf '%s\n' 'Dockerfile' > "$WORK/paths"
   printf '%s\n' '+++ a/Dockerfile' '+FROM x' > "$WORK/diff"
