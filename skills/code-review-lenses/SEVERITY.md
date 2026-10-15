@@ -13,7 +13,7 @@ unified Critical/High/Medium/Low scale.
 | architecture-reviewer, security-reviewer, adversarial-general | Critical/High/Medium/Low via json-findings | pass through |
 | blind-hunter, edge-case-hunter | Critical/High/Medium/Low via json-findings | pass through |
 | dependency-check (parsed CVSS) | Critical/High/Medium/Low | pass through (identity mapping) |
-| dependency-check (CVSS unparsed / v4 / v2) | High | maps to High (conservative) |
+| dependency-check (CVSS missing / unparsed / v4 / v2) | High | maps to High (conservative) |
 | shellcheck | error/warning (info and style are not emitted) | High / Medium (emitted; pass through) |
 | semgrep | ERROR/WARNING/other (INFO) | High / Medium / Low (emitted; pass through) |
 | trufflehog | verified/unverified/unverified-test | Critical / High / Low (emitted; pass through) |

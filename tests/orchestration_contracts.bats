@@ -643,6 +643,7 @@ JSON
   [ "$(grep -c '/tmp/cr-redaction' "$SKILL_MD")" -eq 0 ]
   grep -qF '`REDACTION_SENTINEL=$(mktemp)` (a private empty file, never a fixed `/tmp` name)' "$SKILL_MD"
   grep -qF 'and `$REDACTION_SENTINEL`.' "$SKILL_MD"
+  grep -qF 'a non-empty sentinel file (`[[ -s "$REDACTION_SENTINEL" ]]`) sets `REDACTION_DEGRADED=true`' "$SKILL_MD"
   load_function "$SKILL_MD" redact_secrets
   mkdir -p "$BATS_TEST_TMPDIR/bin"
   ln -s "$(command -v cat)" "$BATS_TEST_TMPDIR/bin/cat"
@@ -655,7 +656,7 @@ JSON
 
 @test "SKILL.md and wrappers create the PR/MR worktree detached so no branch is left behind" {
   grep -qF 'Create a temporary worktree with `git worktree add --detach "$WORKTREE_PATH"`' "$SKILL_MD"
-  if grep -E 'git worktree add [^-]' "$SKILL_MD" "$REPO_ROOT/.claude/workflows/code-review-lenses-workflow.js" "$REPO_ROOT/.grok/workflows/code-review-lenses-workflow.rhai"; then
+  if grep -h 'git worktree add' "$SKILL_MD" "$REPO_ROOT/.claude/workflows/code-review-lenses-workflow.js" "$REPO_ROOT/.grok/workflows/code-review-lenses-workflow.rhai" | grep -v -- 'git worktree add --detach'; then
     echo "REGRESSION: a worktree is created without --detach" >&2
     return 1
   fi

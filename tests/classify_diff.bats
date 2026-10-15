@@ -52,7 +52,7 @@ teardown() {
 
 @test "classify-diff: small-tier deployment and CI yaml is not LOW_RISK_CONFIG" {
   seq 1 60 | sed 's/^/+x: /' > "$WORK/diff"
-  for path in docker-compose.yml compose.yaml .github/workflows/ci.yml helm/values.yaml; do
+  for path in docker-compose.yml compose.yaml .github/workflows/ci.yml .github/actions/setup/action.yml .github/dependabot.yml helm/values.yaml; do
     _cls=$(DIFF_FILE="$WORK/diff" DIFF_PATHS="$path" GATE_SECURITY_PATTERNS=false bash "$CLS")
     eval "$_cls"
     [[ "$TIER" == "small" ]] || { echo "not small: $path" >&2; return 1; }

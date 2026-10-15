@@ -69,7 +69,7 @@ Supported manifest files:
 - `requirements*.txt` — Python pip (`==` / `===` pins only)
 - `composer.json` — PHP Composer (ranges resolved from `composer.lock`)
 
-CVE findings include severity (CVSS-mapped to Critical/High/Medium/Low), CVE ID, affected package and version, and a remediation note with the smallest fixed version above the installed one. Findings whose CVSS cannot be parsed (v4, v2, unknown format) are emitted as `"High"` as a conservative fallback.
+CVE findings include severity (CVSS-mapped to Critical/High/Medium/Low), CVE ID, affected package and version, and a remediation note with the smallest fixed version above the installed one. Findings whose CVSS is missing or cannot be parsed (v4, v2, unknown format) are emitted as `"High"` as a conservative fallback.
 
 The `dependency-check` runs in `quick`, `security`, `full`, and `deep` when manifest files changed. It is skipped only for `--summary-only`.
 

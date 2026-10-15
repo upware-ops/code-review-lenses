@@ -484,7 +484,7 @@ Wait for agents.
 
 **2e — proximity dedup.** Per file and `category` (normalized in 2a), cluster within 3 lines of cluster start; `line` 0 (unknown) is never proximity-compared, so those findings cluster by file + `category` only. Keep highest severity; prefer `dependency-check` in a mixed cluster. Annotate extra sources.
 
-**2f — secret redaction.** Execute via Bash (not illustrative). `REDACTION_SENTINEL=$(mktemp)` (a private empty file, never a fixed `/tmp` name), define `redact_secrets`, rebuild `ALL_FINDINGS` and `BLOCK_A`. Halt the run if the pipeline fails or drops rows. If `perl` is missing, the function passes text through and writes to the sentinel; a non-empty `$REDACTION_SENTINEL` sets `REDACTION_DEGRADED=true`.
+**2f — secret redaction.** Execute via Bash (not illustrative). `REDACTION_SENTINEL=$(mktemp)` (a private empty file, never a fixed `/tmp` name), define `redact_secrets`, rebuild `ALL_FINDINGS` and `BLOCK_A`. Halt the run if the pipeline fails or drops rows. If `perl` is missing, the function passes text through and writes to the sentinel; a non-empty sentinel file (`[[ -s "$REDACTION_SENTINEL" ]]`) sets `REDACTION_DEGRADED=true`.
 
 ```bash
 redact_secrets() {

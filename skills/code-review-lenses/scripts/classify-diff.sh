@@ -35,7 +35,7 @@ elif [[ "$LINES_CHANGED" -lt 300 ]]; then
   TIER=small
 fi
 
-INFRA_PATH_PATTERN='(^|/)(Dockerfile|\.nvmrc|\.node-version|\.ddev/|\.github/workflows/|\.claude/workflows/|\.grok/workflows/|\.gitlab-ci\.yml|bitbucket-pipelines\.yml|lagoon/|helm/|k8s/|kubernetes/|terraform/|docker-compose|compose\.ya?ml)'
+INFRA_PATH_PATTERN='(^|/)(Dockerfile|\.nvmrc|\.node-version|\.ddev/|\.github/workflows/|\.github/actions/|\.github/dependabot\.ya?ml|\.claude/workflows/|\.grok/workflows/|\.gitlab-ci\.yml|bitbucket-pipelines\.yml|lagoon/|helm/|k8s/|kubernetes/|terraform/|docker-compose|compose\.ya?ml)'
 
 ARCH_PROMOTED=false
 SECURITY_PROMOTED=false

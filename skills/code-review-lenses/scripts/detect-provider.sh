@@ -17,7 +17,8 @@
 # --hostname HOST` succeeds (origin or `glab config get host` match is not
 # enough). An env token the CLI would send to HOST but that belongs to another
 # host is a refusal (gh enterprise tokens belong to GH_HOST, GITLAB_TOKEN /
-# GITLAB_ACCESS_TOKEN / OAUTH_TOKEN to glab's host), so the later gh/glab calls
+# GITLAB_ACCESS_TOKEN / OAUTH_TOKEN to glab's host, a CI auto-login
+# CI_JOB_TOKEN to CI_SERVER_FQDN), so the later gh/glab calls
 # use the credential the check accepted. Bitbucket: Cloud hosts only.
 # Exit 0 if allowed, 2 if refused.
 # Does not emit a roster. Never run on local PROVIDER=unknown.
@@ -237,6 +238,10 @@ if [[ "$CHECK_URL_HOST" == true ]]; then
       die "Refusing gh for host '$CHECK_HOST' (not github.com / *.github.com / *.ghe.com, not GH_HOST and not on gh auth status). Run: gh auth login --hostname $CHECK_HOST"
       ;;
     gitlab)
+      _ci_host=$(printf '%s' "${CI_SERVER_FQDN:-}" | tr '[:upper:]' '[:lower:]')
+      if [[ "${GLAB_ENABLE_CI_AUTOLOGIN:-}" == true && -n "${CI_JOB_TOKEN:-}" && "$HOST_LC" != "$_ci_host" ]]; then
+        die "Refusing glab for host '$CHECK_HOST': CI auto-login would use CI_JOB_TOKEN, which belongs to ${CI_SERVER_FQDN:-the CI server}. Unset GLAB_ENABLE_CI_AUTOLOGIN or CI_JOB_TOKEN."
+      fi
       _gl_cfg=$(gitlab_host_name "${GITLAB_HOST:-${GITLAB_URI:-${GL_HOST:-}}}")
       if [[ "$HOST_LC" == "${_gl_cfg:-gitlab.com}" ]]; then
         exit 0

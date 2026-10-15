@@ -58,8 +58,9 @@ GitHub (including Enterprise).
 `*.ghe.com`, `GH_HOST` equal to the URL host, or a host where
 `gh auth status --hostname <host> --active` succeeds with the env tokens unset.
 gh sends `GH_ENTERPRISE_TOKEN` / `GITHUB_ENTERPRISE_TOKEN` to every GitHub
-Enterprise Server host, so while one is set, a host other than `GH_HOST` is
-refused. A matching `origin` is not enough.
+Enterprise Server host (never to github.com or `*.ghe.com`), so while one is
+set, a GitHub Enterprise Server host other than `GH_HOST` is refused. A
+matching `origin` is not enough.
 
 ## Bitbucket
 

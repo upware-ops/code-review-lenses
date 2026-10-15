@@ -544,6 +544,26 @@ EOF
   [ "$(cat "$WORK/seen")" = $'GH_TOKEN=unset\nGITHUB_TOKEN=unset\nGH_ENTERPRISE_TOKEN=unset\nGITHUB_ENTERPRISE_TOKEN=unset' ]
 }
 
+@test "detect-provider: gitlab --check-url-host refuses any host but CI_SERVER_FQDN while CI auto-login has a job token" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/glab" << 'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$WORK/bin/glab"
+  for host in git.other.example gitlab.com; do
+    run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GLAB_ENABLE_CI_AUTOLOGIN=true CI_JOB_TOKEN=j CI_SERVER_FQDN=GitLab.CI.Example \
+      bash "$DETECT" --check-url-host --provider gitlab --host "$host"
+    [[ "$output" == *"CI_JOB_TOKEN, which belongs to GitLab.CI.Example"* ]]
+  done
+  run env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GLAB_ENABLE_CI_AUTOLOGIN=true CI_JOB_TOKEN=j CI_SERVER_FQDN=GitLab.CI.Example \
+    bash "$DETECT" --check-url-host --provider gitlab --host gitlab.ci.example
+  [ "$status" -eq 0 ]
+  run env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GLAB_ENABLE_CI_AUTOLOGIN= CI_JOB_TOKEN=j CI_SERVER_FQDN=gitlab.ci.example \
+    bash "$DETECT" --check-url-host --provider gitlab --host git.other.example
+  [ "$status" -eq 0 ]
+}
+
 @test "detect-provider: github --check-url-host refuses a GHES host with stored credentials while an enterprise token for GH_HOST is set" {
   mkdir -p "$WORK/bin"
   cat > "$WORK/bin/gh" << 'EOF'
