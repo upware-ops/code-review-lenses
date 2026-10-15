@@ -53,6 +53,14 @@ recommended_fix() {
   echo "$output" | jq -r '.[0].remediation | capture("^Upgrade \\S+ to (?<v>\\S+) or later").v // "none"'
 }
 
+# Adds another affected package (ecosystem $1, name $2, fixed in $3) to the record mock_advisory wrote.
+add_affected() {
+  jq --arg eco "$1" --arg name "$2" --arg fixed "$3" \
+    '.affected += [{package: {name: $name, ecosystem: $eco}, ranges: [{type: "ECOSYSTEM", events: [{introduced: "0"}, {fixed: $fixed}]}]}]' \
+    "$WORK/records/GHSA-test-ver.json" > "$WORK/records/updated.json"
+  mv "$WORK/records/updated.json" "$WORK/records/GHSA-test-ver.json"
+}
+
 # curl stand-in on PATH. Logs "<method> <url>" to $SHIM_LOG, saves the last POST body to
 # $SHIM_BODY, answers POST from $SHIM_BATCH (default: no vulnerabilities) and GET .../<id>
 # from $SHIM_VULNS_DIR/<id>.json (exit 22 when missing, like --fail-with-body on a 404).
@@ -82,6 +90,11 @@ exit 22
 EOF
   chmod +x "$WORK/bin/curl"
   export PATH="$WORK/bin:$PATH" SHIM_LOG="$WORK/curl.log" SHIM_BODY="$WORK/body.json"
+}
+
+# "name@version" for each query of the last request recorded by make_curl_shim, in order.
+queried_packages() {
+  jq -r '.queries[] | "\(.package.name)@\(.version)"' "$SHIM_BODY"
 }
 
 # ---------------------------------------------------------------------------
@@ -416,6 +429,49 @@ EOF
   [[ "$output" != *"9.9.9"* ]]
 }
 
+@test "cve-check: a PyPI requirement takes its fix from the advisory entry with the same PEP 503 normalized name" {
+  mock_advisory PyPI flask-cors 3.0.5
+  add_affected PyPI other-pkg 3.0.1
+  add_affected npm flask-cors 3.0.2
+  local spelling
+  for spelling in flask-cors Flask-Cors Flask_Cors flask.cors FLASK__CORS Flask.-_Cors; do
+    printf '%s==3.0.0\n' "$spelling" > "$WORK/requirements.txt"
+    run_mocked "$WORK/requirements.txt"
+    [ "$status" -eq 0 ]
+    [ "$(recommended_fix)" = "3.0.5" ] || { echo "$spelling: recommended $(recommended_fix)" >&2; false; }
+  done
+}
+
+@test "cve-check: no fix is recommended when no affected entry matches the queried package" {
+  mock_advisory PyPI django 3.2.13
+  add_affected PyPI other-pkg 9.9.9
+  printf 'requests==2.0.0\n' > "$WORK/requirements.txt"
+  run_mocked "$WORK/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$(recommended_fix)" = "none" ]
+  echo "$output" | jq -e '.[0].remediation | startswith("No fixed version published yet.")' >/dev/null
+}
+
+@test "cve-check: Go, npm and Packagist names match the advisory entry exactly" {
+  mock_advisory Go example.com/lib 1.2.4
+  printf '%s\n' 'module example.com/app' '' 'go 1.22' '' 'require example.com/Lib v1.2.3' > "$WORK/go.mod"
+  run_mocked "$WORK/go.mod"
+  [ "$status" -eq 0 ]
+  [ "$(recommended_fix)" = "none" ]
+
+  mock_advisory npm lib 1.2.4
+  printf '%s\n' '{"dependencies":{"Lib":"1.2.3"}}' > "$WORK/package.json"
+  run_mocked "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(recommended_fix)" = "none" ]
+
+  mock_advisory Packagist vendor/lib 1.2.4
+  printf '%s\n' '{"require":{"Vendor/Lib":"1.2.3"}}' > "$WORK/composer.json"
+  run_mocked "$WORK/composer.json"
+  [ "$status" -eq 0 ]
+  [ "$(recommended_fix)" = "none" ]
+}
+
 # ---------------------------------------------------------------------------
 # Version ordering: pre-releases sort below their release, .post above it
 # ---------------------------------------------------------------------------
@@ -566,6 +622,56 @@ EOF
     {"version":"3.0.0","package":{"name":"other","ecosystem":"npm"}}]' "$SHIM_BODY" >/dev/null
 }
 
+@test "cve-check: an exact npm alias is queried under the package it points to, scoped or not" {
+  make_curl_shim
+  printf '%s\n' '{"dependencies":{"kpg":"npm:pkg@1.0.0","scoped":"npm:@scope/pkg@=2.0.0","ranged":"npm:pkg@^3.0.0"},"devDependencies":{"devalias":"npm:devpkg@v4.1.0"}}' \
+    > "$WORK/package.json"
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = $'pkg@1.0.0\n@scope/pkg@2.0.0\ndevpkg@4.1.0' ]
+  grep -qF 'skipped ranged dependencies no lockfile resolves: 1 in' <<<"$stderr"
+}
+
+@test "cve-check: a ranged npm alias is queried at the package-lock.json version (lockfileVersion 3)" {
+  make_curl_shim
+  printf '%s\n' '{"dependencies":{"kpg":"npm:pkg@^1.0.0","scoped":"npm:@scope/pkg@~1.2","bare":"npm:other"}}' > "$WORK/package.json"
+  cat > "$WORK/package-lock.json" <<'EOF'
+{"lockfileVersion":3,"packages":{"":{},
+ "node_modules/kpg":{"name":"pkg","version":"1.4.2"},
+ "node_modules/scoped":{"name":"@scope/pkg","version":"1.2.9"},
+ "node_modules/bare":{"name":"other","version":"7.0.0"}}}
+EOF
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = $'pkg@1.4.2\n@scope/pkg@1.2.9\nother@7.0.0' ]
+  [ "$(grep -c 'skipped ranged' <<<"$stderr")" -eq 0 ]
+}
+
+@test "cve-check: a ranged npm alias is queried at the version package-lock.json lockfileVersion 1 records as npm:<name>@<version>" {
+  make_curl_shim
+  printf '%s\n' '{"dependencies":{"kpg":"npm:pkg@^1.0.0","scoped":"npm:@scope/pkg@~1.2","bare":"npm:other"}}' > "$WORK/package.json"
+  cat > "$WORK/package-lock.json" <<'EOF'
+{"lockfileVersion":1,"dependencies":{
+ "kpg":{"version":"npm:pkg@1.4.2"},"scoped":{"version":"npm:@scope/pkg@1.2.9"},"bare":{"version":"npm:other@7.0.0"}}}
+EOF
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = $'pkg@1.4.2\n@scope/pkg@1.2.9\nother@7.0.0' ]
+  [ "$(grep -c 'skipped ranged' <<<"$stderr")" -eq 0 ]
+}
+
+@test "cve-check: an npm alias finding names the manifest entry and takes its fix from the package it points to" {
+  make_curl_shim
+  mock_advisory npm pkg 1.0.1
+  printf '%s\n' '{' '  "dependencies": {' '    "kpg": "npm:pkg@1.0.0"' '  }' '}' > "$WORK/package.json"
+  SHIM_BATCH="$WORK/batch.json" SHIM_VULNS_DIR="$WORK/records" run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = "pkg@1.0.0" ]
+  echo "$output" | jq -e '.[0].finding | endswith("Affects kpg@1.0.0.")' >/dev/null
+  echo "$output" | jq -e '.[0].remediation | startswith("Upgrade kpg to 1.0.1 or later.")' >/dev/null
+  echo "$output" | jq -e '.[0].line == 3' >/dev/null
+}
+
 @test "cve-check: ranged Composer dependency is queried at the composer.lock version" {
   make_curl_shim
   printf '%s\n' '{"require":{"php":">=8.1","guzzlehttp/guzzle":"^7.0"},"require-dev":{"monolog/monolog":"~2.5|^3.0"}}' \
@@ -628,13 +734,13 @@ EOF
   make_curl_shim
   cat > "$WORK/package.json" <<'EOF'
 {"dependencies":{"reg":"*","f":"file:../x","l":"link:../y","w":"workspace:*","g":"git+https://example.com/r.git",
- "h":"github:org/repo","u":"https://example.com/p.tgz","n":"npm:other@^1.0.0","s":"org/repo","p":"../local"}}
+ "h":"github:org/repo","u":"https://example.com/p.tgz","s":"org/repo","p":"../local"}}
 EOF
   cat > "$WORK/package-lock.json" <<'EOF'
 {"lockfileVersion":3,"packages":{"":{},"node_modules/reg":{"version":"1.0.0"},
  "node_modules/f":{"version":"9.9.9"},"node_modules/l":{"version":"9.9.9"},"node_modules/w":{"version":"9.9.9"},
  "node_modules/g":{"version":"9.9.9"},"node_modules/h":{"version":"9.9.9"},"node_modules/u":{"version":"9.9.9"},
- "node_modules/n":{"version":"9.9.9"},"node_modules/s":{"version":"9.9.9"},"node_modules/p":{"version":"9.9.9"}}}
+ "node_modules/s":{"version":"9.9.9"},"node_modules/p":{"version":"9.9.9"}}}
 EOF
   run --separate-stderr "$SCRIPT" "$WORK/package.json"
   [ "$status" -eq 0 ]
@@ -729,6 +835,110 @@ EOF
   [ "$status" -eq 0 ]
   jq -e '.queries == [{"version":"3.2","package":{"name":"Django","ecosystem":"PyPI"}}]' "$SHIM_BODY" >/dev/null
   echo "$output" | jq -e '.[0].remediation | startswith("Upgrade Django to 3.2.13 or later.")' >/dev/null
+}
+
+@test "cve-check: -r and --requirement includes of a requirements file are queried too, -c constraints are not" {
+  make_curl_shim
+  mkdir "$WORK/root"
+  printf '%s\n' 'top==1.0.0' '-r short.txt' '-rglued.txt' '--requirement long.txt' '--requirement=longeq.txt' \
+    '-r commented.txt # why' '-c constraints.txt' '--constraint=constraints2.txt' > "$WORK/root/requirements.txt"
+  local f
+  for f in short glued long longeq commented; do printf '%s==2.0.0\n' "$f" > "$WORK/root/$f.txt"; done
+  printf '%s\n' 'constrained==9.9.9' > "$WORK/root/constraints.txt"
+  printf '%s\n' 'constrained2==9.9.9' > "$WORK/root/constraints2.txt"
+  WORKTREE_PATH="$WORK/root" run --separate-stderr "$SCRIPT" "$WORK/root/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = $'top@1.0.0\nshort@2.0.0\nglued@2.0.0\nlong@2.0.0\nlongeq@2.0.0\ncommented@2.0.0' ]
+  [ "$(grep -c 'skipped requirements include' <<<"$stderr")" -eq 0 ]
+}
+
+@test "cve-check: a nested include resolves against the directory of the file that includes it" {
+  make_curl_shim
+  mkdir -p "$WORK/root/deps"
+  printf '%s\n' '-r deps/dev.txt' > "$WORK/root/requirements.txt"
+  printf '%s\n' 'dev==1.0.0' '-r ../base.txt' '-r local.txt' > "$WORK/root/deps/dev.txt"
+  printf '%s\n' 'base==2.0.0' > "$WORK/root/base.txt"
+  printf '%s\n' 'local==3.0.0' > "$WORK/root/deps/local.txt"
+  printf '%s\n' 'decoy==9.9.9' > "$WORK/root/local.txt"
+  WORKTREE_PATH="$WORK/root" run --separate-stderr "$SCRIPT" "$WORK/root/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = $'dev@1.0.0\nbase@2.0.0\nlocal@3.0.0' ]
+}
+
+@test "cve-check: a finding in an included file points at that file and the line of its pin" {
+  make_curl_shim
+  mkdir "$WORK/root"
+  printf '%s\n' '-r base.txt' > "$WORK/root/requirements.txt"
+  printf '%s\n' '# pins' 'flask==2.3.3' > "$WORK/root/base.txt"
+  mock_advisory PyPI flask 2.3.4
+  SHIM_BATCH="$WORK/batch.json" SHIM_VULNS_DIR="$WORK/records" WORKTREE_PATH="$WORK/root" \
+    run --separate-stderr "$SCRIPT" "$WORK/root/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$(echo "$output" | jq -r '.[0].file')" = "$WORK/root/base.txt" ]
+  echo "$output" | jq -e '.[0].line == 2' >/dev/null
+}
+
+@test "cve-check: an include cycle is read once and noted" {
+  make_curl_shim
+  mkdir "$WORK/root"
+  printf '%s\n' 'a-pkg==1.0.0' '-r requirements-b.txt' > "$WORK/root/requirements-a.txt"
+  printf '%s\n' 'b-pkg==2.0.0' '-r requirements-a.txt' > "$WORK/root/requirements-b.txt"
+  printf '%s\n' 'self-pkg==3.0.0' '-r requirements-self.txt' > "$WORK/root/requirements-self.txt"
+  WORKTREE_PATH="$WORK/root" run --separate-stderr "$SCRIPT" "$WORK/root/requirements-a.txt"$'\n'"$WORK/root/requirements-self.txt"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages | sort)" = $'a-pkg@1.0.0\nb-pkg@2.0.0\nself-pkg@3.0.0' ]
+  [ "$(grep -c 'skipped requirements include .*: already checked' <<<"$stderr")" -eq 2 ]
+}
+
+@test "cve-check: an include that leaves the review root through .. or an absolute path is refused with a note" {
+  make_curl_shim
+  mkdir -p "$WORK/root/sub"
+  printf '%s\n' 'leak==9.9.9' > "$WORK/outside.txt"
+  printf '%s\n' 'inside==1.0.0' > "$WORK/root/inside.txt"
+  printf '%s\n' '-r inside.txt' '-r ../outside.txt' '-r sub/../../outside.txt' "-r $WORK/outside.txt" > "$WORK/root/requirements.txt"
+  WORKTREE_PATH="$WORK/root" run --separate-stderr "$SCRIPT" "$WORK/root/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = "inside@1.0.0" ]
+  [ "$(grep -c 'skipped requirements include .*: outside the review root' <<<"$stderr")" -eq 3 ]
+}
+
+@test "cve-check: an include that reaches outside the review root through a symlink is refused with a note" {
+  make_curl_shim
+  mkdir "$WORK/root"
+  printf '%s\n' 'leak==9.9.9' > "$WORK/outside.txt"
+  printf '%s\n' 'inside==1.0.0' > "$WORK/root/inside.txt"
+  ln -s "$WORK/outside.txt" "$WORK/root/link.txt"
+  ln -s "$WORK" "$WORK/root/linkdir"
+  printf '%s\n' '-r inside.txt' '-r link.txt' '-r linkdir/outside.txt' > "$WORK/root/requirements.txt"
+  WORKTREE_PATH="$WORK/root" run --separate-stderr "$SCRIPT" "$WORK/root/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = "inside@1.0.0" ]
+  grep -q 'skipped requirements include link.txt in .*: a symlink' <<<"$stderr"
+  grep -q 'skipped requirements include linkdir/outside.txt in .*: outside the review root' <<<"$stderr"
+}
+
+@test "cve-check: a missing, URL or directory include is noted without failing the check" {
+  make_curl_shim
+  mkdir -p "$WORK/root/subdir"
+  printf '%s\n' 'top==1.0.0' '-r missing.txt' '-r https://example.invalid/r.txt' '-r subdir' > "$WORK/root/requirements.txt"
+  WORKTREE_PATH="$WORK/root" run --separate-stderr "$SCRIPT" "$WORK/root/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = "top@1.0.0" ]
+  [ "$(grep -c 'skipped requirements include .*: not a readable file' <<<"$stderr")" -eq 3 ]
+  [ "$(grep -c 'example.invalid' "$SHIM_LOG")" -eq 0 ]
+}
+
+@test "cve-check: without WORKTREE_PATH the review root is the current directory" {
+  make_curl_shim
+  mkdir -p "$WORK/root/sub"
+  printf '%s\n' 'leak==9.9.9' > "$WORK/outside.txt"
+  printf '%s\n' 'inside==1.0.0' > "$WORK/root/sub/inside.txt"
+  printf '%s\n' '-r sub/inside.txt' '-r ../outside.txt' > "$WORK/root/requirements.txt"
+  cd "$WORK/root"
+  WORKTREE_PATH= run --separate-stderr "$SCRIPT" requirements.txt
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = "inside@1.0.0" ]
+  grep -qF 'skipped requirements include ../outside.txt in requirements.txt: outside the review root' <<<"$stderr"
 }
 
 @test "cve-check: changed lockfiles alone check the manifests beside them" {

@@ -65,8 +65,8 @@ Only exact versions are queried. Ranged npm and Composer dependencies are checke
 
 Supported manifest files:
 - `go.mod` — Go modules (handles `replace` directives)
-- `package.json` — npm/Node.js (ranges resolved from `package-lock.json`)
-- `requirements*.txt` — Python pip (`==` / `===` pins only)
+- `package.json` — npm/Node.js (ranges resolved from `package-lock.json`; `npm:` aliases are queried under the package they point to)
+- `requirements*.txt` — Python pip (`==` / `===` pins only; `-r` / `--requirement` includes are followed while they stay inside the review root, other includes get one stderr note)
 - `composer.json` — PHP Composer (ranges resolved from `composer.lock`)
 
 CVE findings include severity (CVSS-mapped to Critical/High/Medium/Low), CVE ID, affected package and version, and a remediation note with the smallest fixed version above the installed one. Findings whose CVSS is missing or cannot be parsed (v4, v2, unknown format) are emitted as `"High"` as a conservative fallback.

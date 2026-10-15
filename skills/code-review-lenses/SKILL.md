@@ -449,7 +449,7 @@ CVE_SCRIPT="$SCRIPTS_DIR/run-cve-check.sh"
 CVE_JSON="[]"
 CVE_CHECK_FAILED=false
 if [[ -x "$CVE_SCRIPT" ]]; then
-  CVE_JSON=$(bash "$CVE_SCRIPT" <<<"$CHECK_PATHS") || {
+  CVE_JSON=$(WORKTREE_PATH="${WORKTREE_PATH:-}" bash "$CVE_SCRIPT" <<<"$CHECK_PATHS") || {
     echo "WARNING: run-cve-check.sh failed; CVE findings skipped." >&2
     CVE_JSON="[]"
     CVE_CHECK_FAILED=true
