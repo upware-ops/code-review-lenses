@@ -61,7 +61,8 @@ add_affected() {
   mv "$WORK/records/updated.json" "$WORK/records/GHSA-test-ver.json"
 }
 
-# curl stand-in on PATH. Logs "<method> <url>" to $SHIM_LOG, saves the last POST body to
+# curl stand-in on PATH. Logs "<method> <url>" to $SHIM_LOG and the length of every argument to
+# $SHIM_ARGLENS, saves the last POST body (from -d, or --data-binary as @- on stdin or @file) to
 # $SHIM_BODY, answers POST from $SHIM_BATCH (default: no vulnerabilities) and GET .../<id>
 # from $SHIM_VULNS_DIR/<id>.json (exit 22 when missing, like --fail-with-body on a 404). With
 # $SHIM_FAIL_POST=N, the Nth POST and every later one exit 22 like --fail-with-body on a 5xx.
@@ -70,10 +71,12 @@ make_curl_shim() {
   cat > "$WORK/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 method=GET url="" body=""
+for a in "$@"; do printf '%s\n' "${#a}" >> "$SHIM_ARGLENS"; done
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -X) method="$2"; shift 2 ;;
     -d) body="$2"; shift 2 ;;
+    --data-binary) if [[ "$2" == @- ]]; then body=$(cat); else body=$(cat "${2#@}"); fi; shift 2 ;;
     http*) url="$1"; shift ;;
     *) shift ;;
   esac
@@ -91,7 +94,20 @@ echo '{"code":5,"message":"Vulnerability not found"}'
 exit 22
 EOF
   chmod +x "$WORK/bin/curl"
-  export PATH="$WORK/bin:$PATH" SHIM_LOG="$WORK/curl.log" SHIM_BODY="$WORK/body.json"
+  export PATH="$WORK/bin:$PATH" SHIM_LOG="$WORK/curl.log" SHIM_BODY="$WORK/body.json" SHIM_ARGLENS="$WORK/curl-arglens"
+}
+
+# jq stand-in on PATH (after make_curl_shim) that logs the length of every argument to
+# $WORK/jq-arglens, then runs the real jq.
+make_jq_arg_shim() {
+  local real
+  real=$(command -v jq)
+  cat > "$WORK/bin/jq" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do printf '%s\n' "\${#a}" >> "$WORK/jq-arglens"; done
+exec "$real" "\$@"
+EOF
+  chmod +x "$WORK/bin/jq"
 }
 
 # "name@version" for each query of the last request recorded by make_curl_shim, in order.
@@ -287,6 +303,14 @@ EOF
   [ -z "$output" ]
 }
 
+@test "parse_requirements_txt: whitespace around the package token is stripped, tabs and form feeds included" {
+  load_function "$SCRIPT" parse_requirements_txt
+  printf '\tDjango==4.2.0\n \t flask == 2.3.3 \t\n\fPyYAML==6.0\n\vJinja2\t[i18n]\t===3.1.2 ; python_version >= "3"\n' > "$WORK/requirements.txt"
+  run parse_requirements_txt "$WORK/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'PyPI\tDjango\t4.2.0\nPyPI\tflask\t2.3.3\nPyPI\tPyYAML\t6.0\nPyPI\tJinja2\t3.1.2' ]
+}
+
 @test "cve-check: OSV results length mismatch is exit 1 with empty array" {
   cp "$CVE_FIX/go.mod.replace-before-require" "$WORK/go.mod"
   OSV_MOCK_FILE="$CVE_FIX/osv-batch-mismatch.json" run --separate-stderr "$SCRIPT" "$WORK/go.mod"
@@ -389,6 +413,18 @@ EOF
   [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
   [[ "$stderr" == *"unexpected record for GHSA-xxxx-critical"* ]]
+}
+
+@test "cve-check: a batch body past 128 KiB reaches curl on stdin and no jq or curl argument is that long" {
+  make_curl_shim
+  make_jq_arg_shim
+  jq -n '{dependencies: ([range(4) | {key: ("p\(.)" + ("x" * 40000)), value: "1.0.0"}] | from_entries)}' > "$WORK/package.json"
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(wc -c < "$SHIM_BODY" | tr -d ' ')" -gt 131072 ]
+  jq -e '.queries | length == 4 and all(.[]; (.package.name | length) == 40002)' "$SHIM_BODY" >/dev/null
+  [ "$(sort -n "$SHIM_ARGLENS" | tail -1)" -lt 4096 ]
+  [ "$(sort -n "$WORK/jq-arglens" | tail -1)" -lt 100000 ]
 }
 
 # ---------------------------------------------------------------------------
@@ -714,6 +750,34 @@ EOF
     {"version":"3.0.0","package":{"name":"other","ecosystem":"npm"}}]' "$SHIM_BODY" >/dev/null
 }
 
+@test "cve-check: a peer-only npm dependency is queried at its package-lock.json version and reported as a production dependency" {
+  make_curl_shim
+  mock_advisory npm peer-a 1.4.3
+  printf '%s\n' '{' '  "peerDependencies": {' '    "peer-a": "^1.0.0"' '  }' '}' > "$WORK/package.json"
+  printf '%s\n' '{"lockfileVersion":3,"packages":{"":{},"node_modules/peer-a":{"version":"1.4.2","peer":true}}}' \
+    > "$WORK/package-lock.json"
+  SHIM_BATCH="$WORK/batch.json" SHIM_VULNS_DIR="$WORK/records" run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = "peer-a@1.4.2" ]
+  echo "$output" | jq -e '.[0].finding | endswith("Affects peer-a@1.4.2.")' >/dev/null
+  echo "$output" | jq -e '.[0].remediation | startswith("Upgrade peer-a to 1.4.3 or later.")' >/dev/null
+  echo "$output" | jq -e '.[0].line == 3' >/dev/null
+}
+
+@test "cve-check: npm peers skip optional ones and the names another section declares" {
+  make_curl_shim
+  cat > "$WORK/package.json" <<'EOF'
+{"dependencies":{"both":"1.0.0"},
+ "optionalDependencies":{"opt-and-peer":"4.0.0"},
+ "devDependencies":{"dev-and-peer":"3.0.0"},
+ "peerDependencies":{"both":"9.9.9","opt-and-peer":"9.9.9","dev-and-peer":"9.9.9","only-peer":"5.0.0","optional-peer":"6.0.0"},
+ "peerDependenciesMeta":{"optional-peer":{"optional":true},"only-peer":"not an object"}}
+EOF
+  run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = $'both@1.0.0\nopt-and-peer@4.0.0\nonly-peer@5.0.0\ndev-and-peer@3.0.0' ]
+}
+
 @test "cve-check: an exact npm alias is queried under the package it points to, scoped or not" {
   make_curl_shim
   printf '%s\n' '{"dependencies":{"kpg":"npm:pkg@1.0.0","scoped":"npm:@scope/pkg@=2.0.0","ranged":"npm:pkg@^3.0.0"},"devDependencies":{"devalias":"npm:devpkg@v4.1.0"}}' \
@@ -917,6 +981,14 @@ EOF
     {"version":"2.3.3","package":{"name":"flask","ecosystem":"PyPI"}},
     {"version":"1.0.0","package":{"name":"pinned","ecosystem":"PyPI"}}]' "$SHIM_BODY" >/dev/null
   [[ "$stderr" == *": 4 in "* ]]
+}
+
+@test "cve-check: requirements lines indented with a tab, vertical tab or form feed are queried under their clean name" {
+  make_curl_shim
+  printf '\tDjango==4.2.0\n\vflask==2.3.3\n\fPyYAML==6.0\n' > "$WORK/requirements.txt"
+  run --separate-stderr "$SCRIPT" "$WORK/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = $'Django@4.2.0\nflask@2.3.3\nPyYAML@6.0' ]
 }
 
 @test "cve-check: requirements pin is matched to the lowercased PyPI name OSV returns" {

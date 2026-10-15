@@ -65,7 +65,7 @@ Only exact versions are queried. Ranged npm and Composer dependencies are checke
 
 Supported manifest files:
 - `go.mod` — Go modules (handles `replace` directives)
-- `package.json` — npm/Node.js (ranges resolved from `package-lock.json`; `npm:` aliases are queried under the package they point to)
+- `package.json` — npm/Node.js (ranges resolved from `package-lock.json`; `npm:` aliases are queried under the package they point to; non-optional `peerDependencies` are checked as production dependencies)
 - `requirements*.txt` — Python pip (`==` / `===` pins only; `-r` / `--requirement` includes are followed while they stay inside the review root, other includes get one stderr note)
 - `composer.json` — PHP Composer (ranges resolved from `composer.lock`)
 
