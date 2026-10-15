@@ -10,7 +10,7 @@
 # If --provider is passed, auto-detection is skipped (host/slug still parsed).
 # --fallback unknown: emit PROVIDER=unknown instead of dying when the remote
 # is missing or the host cannot be classified (local branch review).
-# --check-url-host: after parse-pr-url only. GitHub: github.com / *.github.com /
+# --check-url-host: after parse-pr-url only. GitHub: github.com /
 # *.ghe.com, GH_HOST equal to HOST, or `gh auth status --hostname HOST --active`
 # succeeds (origin match is not enough). GitLab: glab's host (first set of
 # GITLAB_HOST, GITLAB_URI, GL_HOST, else gitlab.com) or `glab auth status
@@ -221,7 +221,7 @@ if [[ "$CHECK_URL_HOST" == true ]]; then
   case "$PROVIDER_OVERRIDE" in
     github)
       case "$HOST_LC" in
-        github.com|*.github.com|*.ghe.com)
+        github.com|*.ghe.com)
           exit 0
           ;;
       esac
@@ -235,7 +235,7 @@ if [[ "$CHECK_URL_HOST" == true ]]; then
       if (unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN; gh_lists_host "$HOST_LC"); then
         exit 0
       fi
-      die "Refusing gh for host '$CHECK_HOST' (not github.com / *.github.com / *.ghe.com, not GH_HOST and not on gh auth status). Run: gh auth login --hostname $CHECK_HOST"
+      die "Refusing gh for host '$CHECK_HOST' (not github.com / *.ghe.com, not GH_HOST and not on gh auth status). Run: gh auth login --hostname $CHECK_HOST"
       ;;
     gitlab)
       _ci_host=$(printf '%s' "${CI_SERVER_FQDN:-}" | tr '[:upper:]' '[:lower:]')

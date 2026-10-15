@@ -50,6 +50,15 @@ source_url() {
   fi
 }
 
+@test "parse-pr-url: www.github.com is normalized to github.com" {
+  source_url "https://oauth2:s3cret@WWW.GitHub.com/acme/app/pull/42"
+  [[ "$HOST" == "github.com" ]]
+  [[ "$REPO_SLUG" == "acme/app" ]]
+  [[ "$PR_URL" == "https://github.com/acme/app/pull/42" ]]
+  run -2 bash "$PARSE" "http://www.github.com/acme/app/pull/42"
+  [[ "$output" == *"refused http:// PR/MR URL"* ]]
+}
+
 @test "parse-pr-url: GitHub Enterprise /pull/ on a custom host" {
   source_url "https://git.company.com/org/repo/pull/42/files"
   [[ "$PROVIDER" == "github" ]]

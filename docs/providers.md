@@ -54,8 +54,7 @@ Nested groups stay in the project slug (`group/sub/project`).
 Requires [gh](https://cli.github.com/). A `…/pull/<N>` URL on any host is
 GitHub (including Enterprise).
 
-`detect-provider.sh --check-url-host` accepts github.com / `*.github.com` /
-`*.ghe.com`, `GH_HOST` equal to the URL host, or a host where
+`detect-provider.sh --check-url-host` accepts github.com, `*.ghe.com`, `GH_HOST` equal to the URL host, or a host where
 `gh auth status --hostname <host> --active` succeeds with the env tokens unset.
 gh sends `GH_ENTERPRISE_TOKEN` / `GITHUB_ENTERPRISE_TOKEN` to every GitHub
 Enterprise Server host (never to github.com or `*.ghe.com`), so while one is

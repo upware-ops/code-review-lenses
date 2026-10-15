@@ -77,6 +77,10 @@ while IFS= read -r raw; do
   rest="${rest#*@}"
   host="${rest%%/*}"
   host=$(printf '%s' "$host" | tr '[:upper:]' '[:lower:]')
+  if [[ "$host" == www.github.com ]]; then
+    host=github.com
+    clean="${clean%%://*}://github.com/${rest#*/}"
+  fi
   if [[ "$rest" == */* ]]; then
     path="/${rest#*/}"
   else

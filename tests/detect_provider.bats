@@ -232,6 +232,17 @@ EOF
   [[ "$output" == *"Could not extract a valid repository slug"* ]]
 }
 
+@test "detect-provider: --check-url-host does not accept other *.github.com hosts by name" {
+  mkdir -p "$WORK/bin"
+  printf '#!/bin/sh\nexit 1\n' > "$WORK/bin/gh"
+  chmod +x "$WORK/bin/gh"
+  run -2 env PATH="$WORK/bin:$PATH" GH_HOST= bash "$DETECT" --check-url-host --provider github --host www.github.com
+  [[ "$output" == *"Refusing gh for host 'www.github.com'"* ]]
+  run -2 env PATH="$WORK/bin:$PATH" GH_HOST= bash "$DETECT" --check-url-host --provider github --host gist.github.com
+  run env PATH="$WORK/bin:$PATH" GH_HOST= bash "$DETECT" --check-url-host --provider github --host acme.ghe.com
+  [ "$status" -eq 0 ]
+}
+
 @test "detect-provider: --check-url-host allows github.com" {
   run bash "$DETECT" --check-url-host --provider github --host github.com
   [ "$status" -eq 0 ]
