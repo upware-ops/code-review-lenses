@@ -469,6 +469,24 @@ JSON
   lacks "$output" 'PR/MR description:'
 }
 
+@test "SKILL.md: the CVE block keeps the findings a failing run-cve-check.sh printed" {
+  command -v jq >/dev/null 2>&1 || skip "jq not available"
+  block=$(skill_block 'CVE_SCRIPT=')
+  [ -n "$block" ]
+  mkdir -p "$WORK/scripts"
+  printf '%s\n' "$block" 'printf "%s|%s\n" "$CVE_JSON" "$CVE_CHECK_FAILED"' > "$WORK/cve.sh"
+
+  printf '#!/bin/sh\necho %s\nexit 1\n' "'[{\"file\":\"package.json\"}]'" > "$WORK/scripts/run-cve-check.sh"
+  chmod +x "$WORK/scripts/run-cve-check.sh"
+  SCRIPTS_DIR="$WORK/scripts" CHECK_PATHS=package.json run --separate-stderr bash "$WORK/cve.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = '[{"file":"package.json"}]|true' ]
+
+  printf '#!/bin/sh\nexit 1\n' > "$WORK/scripts/run-cve-check.sh"
+  SCRIPTS_DIR="$WORK/scripts" CHECK_PATHS=package.json run --separate-stderr bash "$WORK/cve.sh"
+  [ "$output" = '[]|true' ]
+}
+
 @test "SKILL.md: Phase 5 cleanup removes PR_BODY_FILE and the report temp file" {
   has "$(skill_line '**Cleanup:**')" '`PR_BODY_FILE`'
   has "$(skill_line '**Cleanup:**')" 'the report temp file'

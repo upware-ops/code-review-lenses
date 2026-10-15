@@ -63,7 +63,8 @@ add_affected() {
 
 # curl stand-in on PATH. Logs "<method> <url>" to $SHIM_LOG, saves the last POST body to
 # $SHIM_BODY, answers POST from $SHIM_BATCH (default: no vulnerabilities) and GET .../<id>
-# from $SHIM_VULNS_DIR/<id>.json (exit 22 when missing, like --fail-with-body on a 404).
+# from $SHIM_VULNS_DIR/<id>.json (exit 22 when missing, like --fail-with-body on a 404). With
+# $SHIM_FAIL_POST=N, the Nth POST and every later one exit 22 like --fail-with-body on a 5xx.
 make_curl_shim() {
   mkdir -p "$WORK/bin"
   cat > "$WORK/bin/curl" <<'EOF'
@@ -80,6 +81,7 @@ done
 printf '%s %s\n' "$method" "$url" >> "$SHIM_LOG"
 if [[ "$method" == POST ]]; then
   printf '%s\n' "$body" > "$SHIM_BODY"
+  if [[ -n "${SHIM_FAIL_POST:-}" && "$(grep -c '^POST ' "$SHIM_LOG")" -ge "$SHIM_FAIL_POST" ]]; then echo '{"code":13,"message":"Internal error"}'; exit 22; fi
   if [[ -n "${SHIM_BATCH:-}" ]]; then cat "$SHIM_BATCH"; else printf '%s' "$body" | jq -c '{results: [.queries[] | {}]}'; fi
   exit 0
 fi
@@ -390,6 +392,42 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Batches: a failure after earlier batches keeps their findings, and still fails
+# ---------------------------------------------------------------------------
+
+# 1001 exact npm dependencies make two batches; lib0 (first batch) has one advisory, the rest none.
+two_batches_with_a_finding_in_the_first() {
+  mock_advisory npm lib0 1.0.1
+  jq -n '{dependencies: ([range(1001) | {key: "lib\(.)", value: "1.0.0"}] | from_entries)}' > "$WORK/package.json"
+  jq -n '{results: ([{vulns: [{id: "GHSA-test-ver", modified: "2025-06-01T00:00:00Z"}]}] + [range(999) | {}])}' > "$WORK/batch1000.json"
+}
+
+@test "cve-check: a failing second batch request still reports the findings of the first batch" {
+  make_curl_shim
+  two_batches_with_a_finding_in_the_first
+  SHIM_BATCH="$WORK/batch1000.json" SHIM_VULNS_DIR="$WORK/records" SHIM_FAIL_POST=2 \
+    run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 1 ]
+  [ "$(grep -c '^POST ' "$SHIM_LOG")" -eq 2 ]
+  echo "$output" | jq -e 'length == 1 and (.[0].finding | endswith("Affects lib0@1.0.0."))' >/dev/null
+  grep -qF 'OSV batch API request failed' <<<"$stderr"
+  grep -qF 'WARNING: CVE check incomplete' <<<"$stderr"
+}
+
+@test "cve-check: a malformed advisory record after a finding in the same batch keeps that finding" {
+  make_curl_shim
+  mock_advisory npm lib0 1.0.1
+  jq '.id = "GHSA-bad" | .severity = [{score: "7.5"}]' "$WORK/records/GHSA-test-ver.json" > "$WORK/records/GHSA-bad.json"
+  printf '%s\n' '{"dependencies":{"lib0":"1.0.0","lib1":"1.0.0"}}' > "$WORK/package.json"
+  jq -n '{results: [{vulns: [{id: "GHSA-test-ver"}]}, {vulns: [{id: "GHSA-bad"}]}]}' > "$WORK/batch2.json"
+  SHIM_BATCH="$WORK/batch2.json" SHIM_VULNS_DIR="$WORK/records" run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e 'length == 1 and (.[0].finding | endswith("Affects lib0@1.0.0."))' >/dev/null
+  grep -qF 'Failed to parse OSV findings for npm/lib1@1.0.0' <<<"$stderr"
+  grep -qF 'WARNING: CVE check incomplete' <<<"$stderr"
+}
+
+# ---------------------------------------------------------------------------
 # Advisory fields: CVE alias fallback and fixed-version selection
 # ---------------------------------------------------------------------------
 
@@ -534,6 +572,46 @@ EOF
   printf 'lib==1.2.post1\n' > "$WORK/requirements.txt"
   run_mocked "$WORK/requirements.txt"
   [ "$(recommended_fix)" = "1.2.1" ]
+}
+
+@test "cve-check: an installed npm beta is below a release candidate fix of the same release" {
+  mock_advisory npm lib 2.0.0-rc.1
+  printf '%s\n' '{"dependencies":{"lib":"2.0.0-beta.2"}}' > "$WORK/package.json"
+  run_mocked "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$(recommended_fix)" = "2.0.0-rc.1" ]
+}
+
+@test "cve-check: an installed PEP 440 beta is below a release candidate fix of the same release" {
+  mock_advisory PyPI lib 1.0rc1
+  printf 'lib==1.0b2\n' > "$WORK/requirements.txt"
+  run_mocked "$WORK/requirements.txt"
+  [ "$status" -eq 0 ]
+  [ "$(recommended_fix)" = "1.0rc1" ]
+}
+
+@test "cve-check: semver pre-release identifiers are ordered per semver 2.0.0 section 11" {
+  local chain=(1.0.0-alpha 1.0.0-alpha.1 1.0.0-alpha.beta 1.0.0-beta 1.0.0-beta.2 1.0.0-beta.11 1.0.0-rc.1 1.0.0)
+  mock_advisory npm lib "${chain[@]}"
+  local i
+  for (( i=0; i<${#chain[@]}-1; i++ )); do
+    printf '{"dependencies":{"lib":"%s"}}\n' "${chain[$i]}" > "$WORK/package.json"
+    run_mocked "$WORK/package.json"
+    [ "$status" -eq 0 ]
+    [ "$(recommended_fix)" = "${chain[$((i + 1))]}" ] || { echo "installed ${chain[$i]}: recommended $(recommended_fix)" >&2; false; }
+  done
+}
+
+@test "cve-check: PEP 440 classes are ordered dev < a < b < rc < release < post" {
+  local chain=(1.0.dev1 1.0a1 1.0b1 1.0b2 1.0rc1 1.0 1.0.post1)
+  mock_advisory PyPI lib "${chain[@]}"
+  local i
+  for (( i=0; i<${#chain[@]}-1; i++ )); do
+    printf 'lib==%s\n' "${chain[$i]}" > "$WORK/requirements.txt"
+    run_mocked "$WORK/requirements.txt"
+    [ "$status" -eq 0 ]
+    [ "$(recommended_fix)" = "${chain[$((i + 1))]}" ] || { echo "installed ${chain[$i]}: recommended $(recommended_fix)" >&2; false; }
+  done
 }
 
 @test "cve-check: a leading v, V or = and build metadata are ignored when comparing versions" {

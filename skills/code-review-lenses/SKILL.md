@@ -455,8 +455,8 @@ CVE_JSON="[]"
 CVE_CHECK_FAILED=false
 if [[ -x "$CVE_SCRIPT" ]]; then
   CVE_JSON=$(WORKTREE_PATH="${WORKTREE_PATH:-}" bash "$CVE_SCRIPT" <<<"$CHECK_PATHS") || {
-    echo "WARNING: run-cve-check.sh failed; CVE findings skipped." >&2
-    CVE_JSON="[]"
+    echo "WARNING: run-cve-check.sh failed; CVE findings may be incomplete." >&2
+    jq -e 'type == "array"' <<<"$CVE_JSON" >/dev/null 2>&1 || CVE_JSON="[]"
     CVE_CHECK_FAILED=true
   }
 else
@@ -596,7 +596,7 @@ There is no Phase 4. Nothing is written to a hosting provider. Block A and Block
 6. Token table: Agent, Model (or `inherit`), Tokens, Tools. Use `unavailable` for counts the host does not expose. No host-specific price column.
 7. Critical/High → "Address Critical/High findings before requesting review."
 8. Agent failures → "Review incomplete — <N> agent(s) failed."
-9. `CVE_CHECK_FAILED=true` → CVE check did not run. `ANALYZER_FAILED=true` → a static analyzer crashed or exited non-zero (not a silent clean scan).
+9. `CVE_CHECK_FAILED=true` → CVE check did not run or did not finish (any CVE findings are partial). `ANALYZER_FAILED=true` → a static analyzer crashed or exited non-zero (not a silent clean scan).
 10. `NO_SUPPRESS=true` / `MIN_CONFIDENCE` drops as notes. Unused or uninterpreted `GUIDANCE` as a note. Phase 1b analyzer `WARNING:` / skip lines as notes.
 11. `PROFILE` not `summary`, no findings, and no failures → "No significant issues found."
 
