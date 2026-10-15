@@ -251,12 +251,18 @@ if pre == () || pre.success == false {
 }
 
 let allowed = ["pr-summarizer", "code-reviewer", "architecture-reviewer", "security-reviewer", "blind-hunter", "edge-case-hunter", "adversarial-general", "issue-linker", "silent-failure-hunter", "pr-test-analyzer", "comment-analyzer", "type-design-analyzer"];
+let url_review = pre.output != () && pre.output.worktree_path != () && pre.output.worktree_path != "";
+let linker_skip = "";
 let names = [];
 if pre.output != () && pre.output.agents != () {
     for cand in pre.output.agents {
         for a in allowed {
             if cand == a {
-                names.push(cand);
+                if url_review && cand == "issue-linker" {
+                    linker_skip = " issue-linker (PR/MR-URL review: the Grok wrapper does not give a shell-capable agent the PR author's commit messages).";
+                } else {
+                    names.push(cand);
+                }
             }
         }
     }
@@ -503,6 +509,7 @@ if governance == "" {
 }
 assemble_prompt += ". Skip reasons: ";
 assemble_prompt += skip_reasons;
+assemble_prompt += linker_skip;
 assemble_prompt += ". Guidance: ";
 assemble_prompt += guidance;
 if profile == "summary" {

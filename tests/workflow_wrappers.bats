@@ -596,6 +596,15 @@ JS
   fi
 }
 
+@test "Grok wrapper skips issue-linker in PR/MR-URL reviews and reports why" {
+  grep -q -F 'let url_review = pre.output != () && pre.output.worktree_path != () && pre.output.worktree_path != "";' "$GROK_WF"
+  grep -B1 -F 'linker_skip = " issue-linker (PR/MR-URL review: the Grok wrapper does not give a shell-capable agent the PR author' "$GROK_WF" | grep -q -F 'if url_review && cand == "issue-linker" {'
+  grep -A1 -F 'assemble_prompt += skip_reasons;' "$GROK_WF" | grep -q -F 'assemble_prompt += linker_skip;'
+  names_line=$(grep -n -F 'if url_review && cand == "issue-linker" {' "$GROK_WF" | cut -d: -f1)
+  empty_line=$(grep -n -F 'if names.len() == 0 {' "$GROK_WF" | cut -d: -f1)
+  [[ "$names_line" -lt "$empty_line" ]]
+}
+
 @test "Grok review jobs run read-only and only issue-linker keeps execute" {
   grep -q -F 'let capability = "read-only";' "$GROK_WF"
   grep -B1 -F 'capability = "execute";' "$GROK_WF" | grep -q -F 'if name == "issue-linker" {'
