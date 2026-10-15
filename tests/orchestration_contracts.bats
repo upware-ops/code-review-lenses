@@ -664,3 +664,39 @@ JSON
     return 1
   fi
 }
+
+@test "SKILL.md Phase 0b: a base-resolution failure after checkout removes the worktree and the author-text files" {
+  block=$(awk '/^   if \[\[ -z "\$BASE" \]\]; then$/{p=1} p{print} p&&/^   fi$/{exit}' "$SKILL_MD")
+  [ -n "$block" ]
+  git init -q "$WORK/repo"
+  git -C "$WORK/repo" -c user.email=t@e -c user.name=t commit -q --allow-empty -m init
+  git -C "$WORK/repo" worktree add -q --detach "$WORK/wt"
+  mkdir -p "$WORK/scripts"
+  printf '#!/usr/bin/env bash\necho "Error: no git remote for the PR repository." >&2\nexit 2\n' > "$WORK/scripts/resolve-pr-base.sh"
+  printf 'body' > "$WORK/body"
+  printf 'feature/x' > "$WORK/head"
+  cd "$WORK/repo"
+  run env BASE= WORKTREE_PATH="$WORK/wt" SCRIPTS_DIR="$WORK/scripts" PR_BODY_FILE="$WORK/body" HEAD_REF_FILE="$WORK/head" \
+    baseRefName=main baseRefOid= PROVIDER=github HOST=github.com REPO_SLUG=acme/app bash -c "$block"
+  [ "$status" -eq 2 ]
+  [ ! -e "$WORK/wt" ]
+  [ "$(git -C "$WORK/repo" worktree list | grep -c -F "$WORK/wt")" -eq 0 ]
+  [ ! -e "$WORK/body" ] && [ ! -e "$WORK/head" ]
+}
+
+@test "SKILL.md: worktree symlinks, suppression predicates, specialist prose and issue-linker's PR_NUMBER" {
+  grep -qF 'then `find "$WORKTREE_PATH" -type l -print -delete`: agents read files there and a PR symlink can point outside it' "$SKILL_MD"
+  grep -qF 'every hard stop from here on runs Phase 5 cleanup first' "$SKILL_MD"
+  grep -qF 'A rule matches only when every predicate it sets matches: `file` and `pattern` together when it sets both' "$SKILL_MD"
+  if grep -qF 'Match `file` and/or `pattern`' "$SKILL_MD"; then
+    echo "REGRESSION: a suppression with both file and pattern could match on either alone" >&2
+    return 1
+  fi
+  grep -qF 'These three sections never restate findings: findings appear only in the severity sections above, after Phase 2 filtering' "$SKILL_MD"
+  grep -qF 'for a PR/MR-URL review pass `PR_NUMBER` instead of a branch, since the detached worktree has none' "$SKILL_MD"
+  grep -qF 'gh pr view <PR_NUMBER> -R "$HOST/$REPO_SLUG" --json headRefName --jq .headRefName' "$REPO_ROOT/agents/issue-linker.md"
+  for f in "$REPO_ROOT/.claude/workflows/code-review-lenses-workflow.js" "$REPO_ROOT/.grok/workflows/code-review-lenses-workflow.rhai"; do
+    sed 's/\\"/"/g' "$f" | grep -qF 'then find "$WORKTREE_PATH" -type l -print -delete (a PR symlink can point outside the worktree; keep the printed paths for step 7)'
+    grep -qF 'and the symlinks removed after checkout, in' "$f"
+  done
+}

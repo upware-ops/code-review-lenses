@@ -127,11 +127,16 @@ Run a full local review of all changes on the current branch (or a specified PR/
    unset _meta_out
    ```
 
-   Emits `baseRefName`, `baseRefOid`, `HEAD_REF_FILE`, `PR_BODY_FILE`. Exit 2 (fetch failed, CLOSED/MERGED, Bitbucket fork PR, empty or invalid branch name) is a hard stop — never invent `main`, `master`, or `dev` for a missing base. `HEAD_REF_FILE` (the source branch name) and `PR_BODY_FILE` are author-written: never cat or print them; step 7 hands `PR_BODY_FILE` to agents and Phase 5 removes both. Create a temporary worktree with `git worktree add --detach "$WORKTREE_PATH"` (without `--detach` git creates a branch named after the directory, which worktree removal leaves behind) and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone). All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. If `BASE` is empty, pin it to the target branch fetched from the git remote that owns the PR/MR repository — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
+   Emits `baseRefName`, `baseRefOid`, `HEAD_REF_FILE`, `PR_BODY_FILE`. Exit 2 (fetch failed, CLOSED/MERGED, Bitbucket fork PR, empty or invalid branch name) is a hard stop — never invent `main`, `master`, or `dev` for a missing base. `HEAD_REF_FILE` (the source branch name) and `PR_BODY_FILE` are author-written: never cat or print them; step 7 hands `PR_BODY_FILE` to agents and Phase 5 removes both. Create a temporary worktree with `git worktree add --detach "$WORKTREE_PATH"` (without `--detach` git creates a branch named after the directory, which worktree removal leaves behind) and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone), then `find "$WORKTREE_PATH" -type l -print -delete`: agents read files there and a PR symlink can point outside it; keep the printed paths as Phase 5 notes. All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup; every hard stop from here on runs Phase 5 cleanup first. If `BASE` is empty, pin it to the target branch fetched from the git remote that owns the PR/MR repository — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
 
    ```bash
    if [[ -z "$BASE" ]]; then
-     _base_out=$(cd "$WORKTREE_PATH" && bash "$SCRIPTS_DIR/resolve-pr-base.sh" --ref "$baseRefName" --provider-base "$baseRefOid" --provider "$PROVIDER" --host "$HOST" --repo "$REPO_SLUG") || exit $?
+     _base_out=$(cd "$WORKTREE_PATH" && bash "$SCRIPTS_DIR/resolve-pr-base.sh" --ref "$baseRefName" --provider-base "$baseRefOid" --provider "$PROVIDER" --host "$HOST" --repo "$REPO_SLUG") || {
+       _base_rc=$?
+       git worktree remove --force "$WORKTREE_PATH"
+       rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE"
+       exit "$_base_rc"
+     }
      eval "$_base_out"
      unset _base_out
    fi
@@ -417,7 +422,7 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 
 pr-test-analyzer, type-design-analyzer, and comment-analyzer: also pass the path of `$SKILL_ROOT/SEVERITY.md` and add to the task: "End your reply with a fenced json-findings block: a JSON array of {severity, confidence, category, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name)."
 
-**issue-linker** when `RUN_ISSUE_LINKER=true` (GitHub only after overlay). Pass commit log, branch, manifest, and labelled `REPO_SLUG`, `HOST`, `PROVIDER`; it pins every `gh` call to `$HOST/$REPO_SLUG`.
+**issue-linker** when `RUN_ISSUE_LINKER=true` (GitHub only after overlay). Pass commit log, branch, manifest, and labelled `REPO_SLUG`, `HOST`, `PROVIDER`; for a PR/MR-URL review pass `PR_NUMBER` instead of a branch, since the detached worktree has none. It pins every `gh` call to `$HOST/$REPO_SLUG`.
 
 Launch scheduled agents in parallel within the host's concurrency limit, collecting completed results before launching the remaining agents. Track skips for Phase 5.
 
@@ -480,7 +485,7 @@ Wait for agents.
 
 **2c — confidence.** Drop findings with `confidence < MIN_CONFIDENCE` (default 75; 0 disables). Before suppressions.
 
-**2d — suppressions** unless `NO_SUPPRESS=true`. Match `file` and/or `pattern`. Verify-gated rules (max 20 calls): `github-release`, `npm`, `pypi`, `go-module`, `cargo`, `docker-hub`, `ruby-org`. 2xx → suppress; 404 or error → keep (fail-open).
+**2d — suppressions** unless `NO_SUPPRESS=true`. A rule matches only when every predicate it sets matches: `file` and `pattern` together when it sets both, the one it sets otherwise. Verify-gated rules (max 20 calls): `github-release`, `npm`, `pypi`, `go-module`, `cargo`, `docker-hub`, `ruby-org`. 2xx → suppress; 404 or error → keep (fail-open).
 
 **2e — proximity dedup.** Per file and `category` (normalized in 2a), cluster within 3 lines of cluster start; `line` 0 (unknown) is never proximity-compared, so those findings cluster by file + `category` only. Keep highest severity; prefer `dependency-check` in a mixed cluster. Annotate extra sources.
 
@@ -557,13 +562,15 @@ If `GOVERNANCE_DEGRADED=true`, prepend a banner that `GOVERNANCE.md` was missing
 (same shape)
 
 ### Architectural Insights
-<architecture-reviewer; omit if skipped/NONE>
+<architecture-reviewer assessment prose only; omit if skipped/NONE>
 
 ### Security Analysis
-<security-reviewer; omit if skipped/NONE>
+<security-reviewer assessment prose only; omit if skipped/NONE>
 
 ### Adversarial Analysis
 <adversarial-general Most Critical Gap; omit if skipped/NONE>
+
+These three sections never restate findings: findings appear only in the severity sections above, after Phase 2 filtering, so one dropped by `MIN_CONFIDENCE` or a suppression never resurfaces here.
 
 ### Positive Observations
 

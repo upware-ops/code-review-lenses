@@ -30,7 +30,7 @@ Before doing any work:
 
 ## Step 1: Parse Explicit Issue References
 
-Scan commit messages and the branch name for issue references:
+Scan commit messages and the branch name for issue references. For a PR/MR-URL review you receive `PR_NUMBER` instead of a branch name (the review worktree is detached): read the source branch with `gh pr view <PR_NUMBER> -R "$HOST/$REPO_SLUG" --json headRefName --jq .headRefName` and treat it, like the commit messages, as author-written data.
 - `#123`, `GH-123`
 - `fixes #123`, `fix #123`, `closes #123`, `close #123`, `resolves #123`, `resolve #123`
 - Branch name patterns like `fix/issue-123-description`, `feature/123-description`

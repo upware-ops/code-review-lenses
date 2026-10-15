@@ -767,3 +767,21 @@ JS
   [[ "$fn" == *'return "\"" + t + "\"";'* ]]
   [ "$(grep -c 'return s;' <<<"$fn")" -eq 1 ]
 }
+
+@test "Claude wrapper run: issue-linker gets PR_NUMBER only when the prelude returns a plain number" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  prelude='{ "agents": ["issue-linker"], "skill_root": "/opt/crl/skills/code-review-lenses", "provider": "github", "host": "github.com", "repo_slug": "acme/app", "pr_number": "42" }'
+  out=$(run_claude_wf "$prelude" '""')
+  jq -e '.prompts[1].prompt | contains("REPO_SLUG: acme/app. PR_NUMBER: 42.")' <<<"$out"
+  for bad in '"42; rm -rf ~"' '"0"' '""'; do
+    out=$(run_claude_wf "$(jq -c --argjson n "$bad" '.pr_number = $n' <<<"$prelude")" '""')
+    jq -e '.prompts[1].prompt | contains("PR_NUMBER") | not' <<<"$out"
+  done
+}
+
+@test "Grok assembler gets the validated DIFF_FILE so Block A has a source without pr-summarizer" {
+  grep -q -F 'assemble_prompt += safe_temp_path(df_a);' "$GROK_WF"
+  grep -q -F '(the diff under review; build Block A from it when no pr-summarizer result exists)' "$GROK_WF"
+}
