@@ -328,7 +328,7 @@ setup() {
       return 1
     fi
   done
-  grep -q -F 'return { agent: n, result: reviews[i] }' "$CLAUDE_WF"
+  grep -q -F 'return { agent: n, result: reviews[i] == null || reviews[i].success === false ? null : reviews[i] }' "$CLAUDE_WF"
   grep -q -F 'JSON.stringify(agentResults)' "$CLAUDE_WF"
   grep -q -F 'agent_results.push(#{ agent: names[ri], result: res });' "$GROK_WF"
   grep -q -F 'json_encode(agent_results)' "$GROK_WF"
@@ -980,4 +980,31 @@ JS
   for line in 'note = " Clean up leftover worktree and temp files:";' 'note += sep + "git worktree remove --force " + wt;' 'note += sep + "rm -f " + df;' 'note += sep + "rm -rf " + ad;'; do
     grep -q -F "$line" "$GROK_WF"
   done
+}
+
+@test "Claude wrapper run: a failed reviewer reaches the assembler as a null result" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  {
+    printf 'globalThis.PRELUDE = %s\n' '{ "agents": ["code-reviewer", "pr-test-analyzer"], "skill_root": "/opt/crl/skills/code-review-lenses", "diff_file": "/tmp/code-review-lenses.d1", "cve_check_failed": false, "analyzer_failed": false }'
+    printf 'globalThis.args = ""\n'
+    cat <<'JS'
+const prompts = []
+globalThis.agent = async (prompt, opts) => {
+  prompts.push({ label: opts && opts.label, prompt: prompt })
+  if (opts && opts.label === 'prelude') return PRELUDE
+  if (opts && opts.label === 'code-reviewer') return { success: false }
+  return 'RESULT'
+}
+globalThis.pipeline = async (items, fn) => Promise.all(items.map((x) => fn(x)))
+;(async () => {
+JS
+    sed 's/^export const meta/const meta/' "$CLAUDE_WF"
+    cat <<'JS'
+})().then((r) => process.stdout.write(JSON.stringify({ result: r, prompts: prompts })))
+JS
+  } > "$BATS_TEST_TMPDIR/wf-fail.js"
+  out=$(node "$BATS_TEST_TMPDIR/wf-fail.js")
+  jq -e '[.prompts[] | select(.label == "assemble")][0].prompt | contains("[{\"agent\":\"code-reviewer\",\"result\":null},{\"agent\":\"pr-test-analyzer\",\"result\":\"RESULT\"}]")' <<<"$out"
 }

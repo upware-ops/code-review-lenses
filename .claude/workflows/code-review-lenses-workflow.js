@@ -302,7 +302,7 @@ const reviews = await pipeline(names, function (name) {
 })
 
 const agentResults = names.map(function (n, i) {
-  return { agent: n, result: reviews[i] }
+  return { agent: n, result: reviews[i] == null || reviews[i].success === false ? null : reviews[i] }
 })
 
 const assembled = await agent(
