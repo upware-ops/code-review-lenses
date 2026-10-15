@@ -1,0 +1,63 @@
+.grok/workflows/code-review-lenses-workflow.rhai
+  s_22d2264024e6d9::t_1d73cec8ce3a56 245
+  s_22d2264024e6d9::t_eade7c7b6dfa2b 281
+docs/providers.md
+  s_22d2264024e6d9::t_cd3f47d3bde1e9 23
+AGENTS.md
+  s_22d2264024e6d9::t_085154a3e9d397 34-37
+CHANGELOG.md
+  s_22d2264024e6d9::t_a9d7592328b644 56
+.claude/workflows/code-review-lenses-workflow.js
+  s_22d2264024e6d9::t_310eec7a1a4d9e 143
+  s_22d2264024e6d9::t_3d2e6831476046 139
+  s_22d2264024e6d9::t_97a16512353462 146
+  s_22d2264024e6d9::t_d28d1858831919 286
+tests/resolve_profile.bats
+  s_22d2264024e6d9::t_3aa8b4a00389ea 12
+  s_22d2264024e6d9::t_f5b98ba413e0fa 292-327
+skills/code-review-lenses/scripts/apply-roster-overlays.sh
+  s_22d2264024e6d9::t_3ae2bd4f51595b 74
+  s_22d2264024e6d9::t_a1dfbf24322f2e 159-162
+  s_22d2264024e6d9::t_01addd841df0ce 23
+tests/workflow_wrappers.bats
+  s_22d2264024e6d9::t_f97b053d385085 653-659,661
+  s_22d2264024e6d9::t_d7a3bfa4cb5e52 943
+  s_22d2264024e6d9::t_e84ac2076b66ff 895,901-903
+  s_22d2264024e6d9::t_85bd9bd1c1b3f1 652
+README.md
+  s_22d2264024e6d9::t_bf74fa34b907c4 144
+  s_22d2264024e6d9::t_a00f26edf6b85f 167
+  s_22d2264024e6d9::t_6bcebe86cecbb1 186
+  s_22d2264024e6d9::t_6dcf00e08047ce 197-199
+  s_22d2264024e6d9::t_d4cbfb5d31903b 200
+docs/agents.md
+  s_22d2264024e6d9::t_c2deb74d6901a5 24
+  s_22d2264024e6d9::t_010fdf0c0d053d 33-36
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_6d06460a45d23a 452
+  s_22d2264024e6d9::t_22e3a25cf279fa 362
+skills/code-review-lenses/HELP.md
+  s_22d2264024e6d9::t_5c9683400017db 44
+tests/orchestration_contracts.bats
+  s_22d2264024e6d9::t_a7f034b3d8da72 574-591
+  s_22d2264024e6d9::t_63484588b684e5 767
+agents/issue-linker.md
+  s_22d2264024e6d9::t_039be838f6220d 22
+  s_22d2264024e6d9::t_42c3a397a582a0 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "80379ccce3332ee1043a5daac532bf54a64b3ca3",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
