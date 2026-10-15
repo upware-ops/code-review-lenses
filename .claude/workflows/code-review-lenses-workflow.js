@@ -10,8 +10,7 @@ export const meta = {
 function argvWord(s) {
   if (!/[\s'"]/.test(s)) return s
   if (s.indexOf("'") === -1) return "'" + s + "'"
-  if (s.indexOf('"') === -1) return '"' + s + '"'
-  return s
+  return '"' + s.replace(/[\\"]/g, '\\$&') + '"'
 }
 
 function rawArgv(value) {

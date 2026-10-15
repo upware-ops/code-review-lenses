@@ -158,6 +158,14 @@ EOF
   [[ "$GUIDANCE" == "focus" ]]
 }
 
+@test "resolve-profile: --from-file decodes \\\" and \\\\ inside double quotes only" {
+  printf '%s\n' '--output-file "Bob'"'"'s \"review report\".md" focus "a\\b" "C:\temp" '"'"'x\"y'"'"'' > "$WORK/args"
+  _out=$(bash "$PROFILE_SCRIPT" --from-file "$WORK/args")
+  eval "$_out"
+  [[ "$OUTPUT_FILE" == 'Bob'"'"'s "review report".md' ]]
+  [[ "$GUIDANCE" == 'focus a\b C:\temp x\"y' ]]
+}
+
 @test "resolve-profile: --from-file keeps stray quotes literal" {
   printf '%s\n' "--profile quick focus on the user's session" > "$WORK/args"
   _out=$(bash "$PROFILE_SCRIPT" --from-file "$WORK/args")

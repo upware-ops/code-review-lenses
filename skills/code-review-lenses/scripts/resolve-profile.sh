@@ -109,7 +109,10 @@ if [[ "${1:-}" == --from-file || "${1:-}" == --from-file=* ]]; then
   for (( _i = 0; _i < ${#_line}; _i++ )); do
     _c="${_line:_i:1}"
     if [[ -n "$_quote" ]]; then
-      if [[ "$_c" == "$_quote" ]]; then
+      if [[ "$_quote" == '"' && "$_c" == "\\" && ( "${_line:_i+1:1}" == '"' || "${_line:_i+1:1}" == "\\" ) ]]; then
+        _i=$(( _i + 1 ))
+        _tok+="${_line:_i:1}"
+      elif [[ "$_c" == "$_quote" ]]; then
         _quote=""
       else
         _tok+="$_c"

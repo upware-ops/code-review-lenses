@@ -628,6 +628,13 @@ JS
   eval "$(bash "${SCRIPTS_DIR}/resolve-profile.sh" --from-file "$BATS_TEST_TMPDIR/argv.txt")"
   [ "$OUTPUT_FILE" = "review report.md" ]
   [ "$GUIDANCE" = "focus on \"auth\" don't" ]
+
+  out=$(run_claude_wf '{ "agents": [] }' '["--output-file", "Bob'\''s \"review report\" \\ v2.md", "both '\'' and \" here"]')
+  argv=$(jq -r '.prompts[0].prompt' <<<"$out" | sed -n '/^<invoke-argv>$/,/^<\/invoke-argv>$/p' | sed '1d;$d')
+  printf '%s' "$argv" > "$BATS_TEST_TMPDIR/argv.txt"
+  eval "$(bash "${SCRIPTS_DIR}/resolve-profile.sh" --from-file "$BATS_TEST_TMPDIR/argv.txt")"
+  [ "$OUTPUT_FILE" = 'Bob'\''s "review report" \ v2.md' ]
+  [ "$GUIDANCE" = 'both '\'' and " here' ]
 }
 
 @test "Claude wrapper run: reviewers and the assembler get the prelude's absolute skill paths and only a validated ANALYZER_DIR" {
@@ -734,5 +741,8 @@ JS
   fn=$(sed -n '/^fn argv_word(s) {/,/^}/p' "$GROK_WF")
   [[ "$fn" == *'if " \t\n\r'"'"'\"".contains(ch) {'* ]]
   [[ "$fn" == *'return "'"'"'" + s + "'"'"'";'* ]]
-  [[ "$fn" == *'return "\"" + s + "\"";'* ]]
+  [[ "$fn" == *'t.replace("\\", "\\\\");'* ]]
+  [[ "$fn" == *'t.replace("\"", "\\\"");'* ]]
+  [[ "$fn" == *'return "\"" + t + "\"";'* ]]
+  [ "$(grep -c 'return s;' <<<"$fn")" -eq 1 ]
 }

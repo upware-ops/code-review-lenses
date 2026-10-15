@@ -174,10 +174,10 @@ fn argv_word(s) {
     if s.contains("'") == false {
         return "'" + s + "'";
     }
-    if s.contains("\"") == false {
-        return "\"" + s + "\"";
-    }
-    return s;
+    let t = s;
+    t.replace("\\", "\\\\");
+    t.replace("\"", "\\\"");
+    return "\"" + t + "\"";
 }
 
 let raw = "";
