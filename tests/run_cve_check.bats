@@ -841,6 +841,30 @@ EOF
     {"version":"3.5.0","package":{"name":"monolog/monolog","ecosystem":"Packagist"}}]' "$SHIM_BODY" >/dev/null
 }
 
+@test "cve-check: a Composer package declared only in require-dev is reported as a dev dependency" {
+  make_curl_shim
+  mock_advisory Packagist vendor/dev 2.4.1
+  printf '%s\n' '{"require":{"vendor/prod":"1.0.0"},"require-dev":{"vendor/dev":"^2.0"}}' > "$WORK/composer.json"
+  printf '%s\n' '{"packages":[],"packages-dev":[{"name":"vendor/dev","version":"2.4.0"}]}' > "$WORK/composer.lock"
+  jq -n '{results: [{vulns: [{id: "GHSA-test-ver"}]}, {vulns: [{id: "GHSA-test-ver"}]}]}' > "$WORK/batch2.json"
+  SHIM_BATCH="$WORK/batch2.json" SHIM_VULNS_DIR="$WORK/records" run --separate-stderr "$SCRIPT" "$WORK/composer.json"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = $'vendor/prod@1.0.0\nvendor/dev@2.4.0' ]
+  echo "$output" | jq -e 'length == 2 and (.[0].finding | endswith("Affects vendor/prod@1.0.0.")) and (.[1].finding | endswith("Affects vendor/dev@2.4.0 (dev dependency)."))' >/dev/null
+}
+
+@test "cve-check: a Composer package in both require and require-dev is queried once, at the require-dev constraint, and reported as production" {
+  make_curl_shim
+  mock_advisory Packagist vendor/both 1.2.1
+  printf '%s\n' '{"require":{"vendor/both":"^1.0","vendor/prod":"1.0.0"},"require-dev":{"vendor/both":"1.2.0","vendor/dev":"2.0.0"}}' > "$WORK/composer.json"
+  jq -n '{results: [{vulns: [{id: "GHSA-test-ver"}]}, {vulns: [{id: "GHSA-test-ver"}]}, {vulns: [{id: "GHSA-test-ver"}]}]}' > "$WORK/batch3.json"
+  SHIM_BATCH="$WORK/batch3.json" SHIM_VULNS_DIR="$WORK/records" run --separate-stderr "$SCRIPT" "$WORK/composer.json"
+  [ "$status" -eq 0 ]
+  [ "$(queried_packages)" = $'vendor/both@1.2.0\nvendor/prod@1.0.0\nvendor/dev@2.0.0' ]
+  echo "$output" | jq -e '[.[].finding | capture("(?<tail>Affects .*)$").tail] == ["Affects vendor/both@1.2.0.", "Affects vendor/prod@1.0.0.", "Affects vendor/dev@2.0.0 (dev dependency)."]' >/dev/null
+  echo "$output" | jq -e '.[0].remediation | startswith("Upgrade vendor/both to 1.2.1 or later.")' >/dev/null
+}
+
 @test "cve-check: Composer platform packages are skipped but php-prefixed vendors are queried" {
   make_curl_shim
   cat > "$WORK/composer.json" <<'EOF'
