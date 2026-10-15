@@ -100,7 +100,7 @@ Before launching agents, Phase 1 evaluates grep-based bash gates against the dif
 | `GATE_CODE_OR_INFRA=false` | Sets `DOCS_ONLY`. On `PROFILE=full` only, `DOCS_ONLY` skips `architecture-reviewer`, even when `ARCH_PROMOTED`. `--profile deep` keeps architecture. |
 | `GATE_TEST_PATHS=false` | Skip `pr-test-analyzer` (no changed path matches the test-path globs) |
 | `GATE_COMMENT_CHANGES=false` | Skip `comment-analyzer` (no added or removed line starts with a comment marker) |
-| `GATE_TYPE_DEFINITIONS=false` | Skip `type-design-analyzer` (no changed line contains `type ... struct`, `interface `, `class `, or `enum `) |
+| `GATE_TYPE_DEFINITIONS=false` | Skip `type-design-analyzer` (no changed line contains `type ... struct`, a `type X =` alias, `struct `, `interface `, `class `, or `enum `) |
 
 ## Contributing
 

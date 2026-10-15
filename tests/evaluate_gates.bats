@@ -235,7 +235,8 @@ gate_value() {
 
 @test "gates: added or removed type definitions trigger GATE_TYPE_DEFINITIONS" {
   for line in '+type Foo struct {' '+type Pair[K comparable, V any] struct {' '+type Reader interface {' \
-    '-export interface Bar {' '+public class Baz' '+class Foo:' '+  enum Color { Red }' '-pub enum Kind {'; do
+    '-export interface Bar {' '+public class Baz' '+class Foo:' '+  enum Color { Red }' '-pub enum Kind {' \
+    '+type UserId = string' '+export type Box<T> = { value: T }' '+pub struct User {}' '-struct Point { x: i32 }' '+typedef struct {'; do
     run_gates "$line" "src/a.go"
     [ "$status" -eq 0 ]
     [ "$(gate_value GATE_TYPE_DEFINITIONS)" = "true" ] || { echo "not a type definition: $line" >&2; return 1; }
@@ -243,7 +244,8 @@ gate_value() {
 }
 
 @test "gates: near-miss words and file headers do not trigger GATE_TYPE_DEFINITIONS" {
-  for line in '+superclass Foo' '+interfaces are listed' '+typedef struct {' '+base_class = 1' '+enums = []' '+x := 1'; do
+  for line in '+superclass Foo' '+interfaces are listed' '+base_class = 1' '+enums = []' '+x := 1' \
+    '+const type = 1' '+the type system is fine' '+destruct x' '+structure = 1'; do
     run_gates "$line" "src/a.go"
     [ "$status" -eq 0 ]
     [ "$(gate_value GATE_TYPE_DEFINITIONS)" = "false" ] || { echo "type definition: $line" >&2; return 1; }

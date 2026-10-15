@@ -113,7 +113,7 @@ if [[ -n "$_changed_lines" ]]; then
   if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed on changed lines" >&2; exit 1; fi
   if [[ $_rc -eq 0 ]]; then GATE_COMMENT_CHANGES=true; fi
   _rc=0
-  grep -qE '\btype .* struct\b|\binterface |\bclass |\benum ' <<< "$_changed_lines" || _rc=$?
+  grep -qE '\btype .* struct\b|\btype [A-Za-z_][A-Za-z0-9_]*(<[^>]*>)?[[:space:]]*=|\bstruct |\binterface |\bclass |\benum ' <<< "$_changed_lines" || _rc=$?
   if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed on changed lines" >&2; exit 1; fi
   if [[ $_rc -eq 0 ]]; then GATE_TYPE_DEFINITIONS=true; fi
 fi

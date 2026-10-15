@@ -426,7 +426,7 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 - **silent-failure-hunter** — `GATE_ERROR_PATTERNS=true`. Full diff.
 - **pr-test-analyzer** — test paths (`*_test.go`, `test_*.py`, `*.test.ts`, `*.spec.ts`, `spec/`, `__tests__/`, `test/`, `tests/`, `*_test.*`, `*.test.*`, `*.spec.*`, `*_spec.rb`, `*Test.java`, `*Tests.cs`, `src/test/`) → `GATE_TEST_PATHS=true`. Full diff.
 - **comment-analyzer** — comment-line changes (`//`, `#`, `/*`, `"""`, `'''`) → `GATE_COMMENT_CHANGES=true`. Full diff.
-- **type-design-analyzer** — type definitions (`type ... struct`, `interface `, `class `, `enum `) → `GATE_TYPE_DEFINITIONS=true`. Full diff.
+- **type-design-analyzer** — type definitions (`type ... struct`, `type X =` aliases, `struct `, `interface `, `class `, `enum `) → `GATE_TYPE_DEFINITIONS=true`. Full diff.
 
 pr-test-analyzer, type-design-analyzer, and comment-analyzer: also pass the path of `$SKILL_ROOT/SEVERITY.md` and add to the task: "End your reply with a fenced json-findings block: a JSON array of {severity, confidence, category, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name)."
 
