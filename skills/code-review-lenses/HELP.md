@@ -41,7 +41,7 @@ Agents — full / deep
   Always:            pr-summarizer, code-reviewer
   Specialists:       architecture-reviewer, security-reviewer, blind-hunter,
                      edge-case-hunter, adversarial-general,
-                     issue-linker (GitHub only)
+                     issue-linker (GitHub only, never on a PR/MR URL)
   Conditional:       silent-failure-hunter, pr-test-analyzer,
                      comment-analyzer, type-design-analyzer
 

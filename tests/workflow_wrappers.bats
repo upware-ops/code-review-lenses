@@ -649,15 +649,16 @@ JS
   fi
 }
 
-@test "Grok wrapper skips issue-linker in PR/MR-URL reviews and reports why" {
-  grep -q -F 'let url_review = pre.output != () && pre.output.worktree_path != () && pre.output.worktree_path != "";' "$GROK_WF"
-  grep -B1 -F 'linker_skip = " issue-linker (PR/MR-URL review: the Grok wrapper does not give a shell-capable agent the PR author' "$GROK_WF" | grep -q -F 'if url_review && cand == "issue-linker" {'
-  grep -A1 -F 'assemble_prompt += skip_reasons;' "$GROK_WF" | grep -q -F 'assemble_prompt += linker_skip;'
-  names_line=$(grep -n -F 'if url_review && cand == "issue-linker" {' "$GROK_WF" | cut -d: -f1)
-  empty_line=$(grep -n -F 'if names.len() == 0 {' "$GROK_WF" | cut -d: -f1)
-  [ "$names_line" -lt "$empty_line" ]
+@test "wrappers pass PR_NUMBER to the overlay and the Grok wrapper takes its roster unchanged" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q -E 'PROVIDER PR_NUMBER bash \\?"\$SCRIPTS_DIR/apply-roster-overlays.sh\\?" --from-file' "$f"
+  done
+  if grep -n -E 'url_review|linker_skip|cand == "issue-linker"' "$GROK_WF"; then
+    echo "REGRESSION: the Grok wrapper forks the roster for issue-linker instead of taking the overlay's" >&2
+    return 1
+  fi
   [ "$(grep -c -F 'names.push(' "$GROK_WF")" -eq 1 ]
-  [ "$(grep -A3 -F 'if url_review && cand == "issue-linker" {' "$GROK_WF" | sed -n '3,4p' | tr -d ' ')" = $'}else{\nnames.push(cand);' ]
+  grep -B1 -F 'names.push(cand);' "$GROK_WF" | grep -q -F 'if cand == a {'
 }
 
 @test "Grok review jobs run read-only and only issue-linker keeps execute" {
@@ -891,17 +892,15 @@ JS
   [ "$(grep -c 'return s;' <<<"$fn")" -eq 1 ]
 }
 
-@test "Claude wrapper run: issue-linker gets PR_NUMBER only when the prelude returns a plain number" {
+@test "Claude wrapper run: the issue-linker prompt names the provider, host and repository and never a PR number" {
   if ! command -v node >/dev/null 2>&1; then
     skip "node not installed"
   fi
   prelude='{ "agents": ["issue-linker"], "skill_root": "/opt/crl/skills/code-review-lenses", "diff_file": "/tmp/code-review-lenses.d1", "provider": "github", "host": "github.com", "repo_slug": "acme/app", "pr_number": "42" }'
   out=$(run_claude_wf "$prelude" '""')
-  jq -e '.prompts[1].prompt | contains("REPO_SLUG: acme/app. PR_NUMBER: 42.")' <<<"$out"
-  for bad in '"42; rm -rf ~"' '"0"' '""'; do
-    out=$(run_claude_wf "$(jq -c --argjson n "$bad" '.pr_number = $n' <<<"$prelude")" '""')
-    jq -e '.prompts[1].prompt | contains("PR_NUMBER") | not' <<<"$out"
-  done
+  jq -e '.prompts[1].prompt | contains("PROVIDER: github. HOST: github.com. REPO_SLUG: acme/app.")' <<<"$out"
+  jq -e '.prompts[1].prompt | contains("PR_NUMBER") | not' <<<"$out"
+  [ "$(grep -c -F 'pr_number' "$CLAUDE_WF")" -eq 0 ]
 }
 
 @test "Grok assembler gets the validated DIFF_FILE so Block A has a source without pr-summarizer" {
@@ -941,7 +940,7 @@ JS
 @test "wrappers take conditional agents from the overlay's resolved RUN_* values" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     grep -q -F 'The overlay has already resolved every conditional agent to true or false from GATE_*; do not evaluate a trigger yourself.' "$f"
-    grep -q -F 'plus GATE_ERROR_PATTERNS GATE_CONTROL_FLOW GATE_TEST_PATHS GATE_COMMENT_CHANGES GATE_TYPE_DEFINITIONS PROVIDER bash' "$f"
+    grep -q -F 'plus GATE_ERROR_PATTERNS GATE_CONTROL_FLOW GATE_TEST_PATHS GATE_COMMENT_CHANGES GATE_TYPE_DEFINITIONS PROVIDER PR_NUMBER bash' "$f"
     if grep -q -F 'conditional+triggered' "$f"; then
       echo "REGRESSION: $f lets the prelude judge conditional triggers" >&2
       return 1

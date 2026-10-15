@@ -9,7 +9,7 @@ setup() {
   OVERLAY_SCRIPT="${SCRIPTS_DIR}/apply-roster-overlays.sh"
   GATES_SCRIPT="${SCRIPTS_DIR}/evaluate-gates.sh"
   WORK=$(mktemp -d)
-  unset TIER DOCS_ONLY LOW_RISK_CONFIG ARCH_PROMOTED SECURITY_PROMOTED PROVIDER \
+  unset TIER DOCS_ONLY LOW_RISK_CONFIG ARCH_PROMOTED SECURITY_PROMOTED PROVIDER PR_NUMBER \
     GATE_CONTROL_FLOW GATE_ERROR_PATTERNS GATE_TEST_PATHS GATE_COMMENT_CHANGES GATE_TYPE_DEFINITIONS
 }
 
@@ -287,6 +287,42 @@ EOF
   [[ "$RUN_ISSUE_LINKER" == "false" ]]
   eval "$(PROVIDER=github bash "$OVERLAY_SCRIPT" --profile full)"
   [[ "$RUN_ISSUE_LINKER" == "true" ]]
+}
+
+@test "overlay: a PR/MR-URL review skips issue-linker and says why" {
+  for profile in full deep; do
+    eval "$(PR_NUMBER=42 PROVIDER=github bash "$OVERLAY_SCRIPT" --profile "$profile")"
+    [ "$RUN_ISSUE_LINKER" = "false" ]
+    [ "$SKIP_REASONS" = "issue-linker (PR/MR-URL review: it would run gh while reading the PR author's commit messages)" ]
+  done
+  eval "$(PR_NUMBER=42 PROVIDER=github bash "$OVERLAY_SCRIPT" --profile quick)"
+  [ "$RUN_ISSUE_LINKER" = "false" ]
+  [ -z "$SKIP_REASONS" ]
+}
+
+@test "overlay: a local review keeps issue-linker whether PR_NUMBER is empty or unset" {
+  eval "$(PROVIDER=github bash "$OVERLAY_SCRIPT" --profile full)"
+  [ "$RUN_ISSUE_LINKER" = "true" ]
+  [ -z "$SKIP_REASONS" ]
+  eval "$(PR_NUMBER= PROVIDER=github bash "$OVERLAY_SCRIPT" --profile full)"
+  [ "$RUN_ISSUE_LINKER" = "true" ]
+  [ -z "$SKIP_REASONS" ]
+}
+
+@test "overlay: a non-GitHub provider skips issue-linker once, with or without a PR/MR URL" {
+  eval "$(PROVIDER=gitlab bash "$OVERLAY_SCRIPT" --profile full)"
+  [ "$RUN_ISSUE_LINKER" = "false" ]
+  [ "$SKIP_REASONS" = "issue-linker (PROVIDER=gitlab, GitHub only)" ]
+  eval "$(PR_NUMBER=7 PROVIDER=gitlab bash "$OVERLAY_SCRIPT" --profile full)"
+  [ "$RUN_ISSUE_LINKER" = "false" ]
+  [ "$SKIP_REASONS" = "issue-linker (PROVIDER=gitlab, GitHub only)" ]
+}
+
+@test "overlay: a PR/MR URL adds no second issue-linker reason after an earlier overlay skipped it" {
+  eval "$(PR_NUMBER=7 PROVIDER=github DOCS_ONLY=true bash "$OVERLAY_SCRIPT" --profile full)"
+  [ "$RUN_ISSUE_LINKER" = "false" ]
+  [ "$(tr '|' '\n' <<<"$SKIP_REASONS" | grep -c 'issue-linker')" -eq 1 ]
+  [ "$(tr '|' '\n' <<<"$SKIP_REASONS" | grep -c 'issue-linker (DOCS_ONLY)')" -eq 1 ]
 }
 
 @test "overlay: GATE_CONTROL_FLOW=false skips edge-case-hunter" {

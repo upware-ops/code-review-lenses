@@ -21,7 +21,7 @@ All 12 agents ship in `agents/`. Five were adapted from pr-review-toolkit
 | **blind-hunter** | Zero-context orthogonal review | full, deep |
 | **edge-case-hunter** | Whether a handling path exists | full, deep (control-flow gate) |
 | **adversarial-general** | Completeness, ops, docs debt | full, deep |
-| **issue-linker** | Related GitHub issues/PRs | full, deep (GitHub only) |
+| **issue-linker** | Related GitHub issues/PRs | full, deep (GitHub, local review only) |
 | **silent-failure-hunter** | Error-handling adequacy | quick, full, deep (error-pattern gate) |
 | **pr-test-analyzer** | Test coverage gaps | quick, full, deep (test-file gate) |
 | **comment-analyzer** | Comment accuracy / rot | full, deep (comment-change gate) |
@@ -29,6 +29,10 @@ All 12 agents ship in `agents/`. Five were adapted from pr-review-toolkit
 
 `deep` adds `EXTENDED_THINKING` for architecture-reviewer and security-reviewer,
 plus CVE reachability. TIER=tiny still skips hunters and comment/type agents.
+
+issue-linker never runs in a PR/MR-URL review, on any host: it runs `gh` while
+reading commit messages the PR author wrote, so `apply-roster-overlays.sh`
+skips it and lists the reason with the other skipped agents.
 
 ## Scope boundaries
 

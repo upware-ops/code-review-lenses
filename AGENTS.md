@@ -31,6 +31,10 @@ tests/*.bats                             bats + jq; run: bats tests/*.bats
   in `scripts/resolve-profile.sh` and `scripts/apply-roster-overlays.sh` —
   do not re-implement them in prose only. Host wrappers under `.claude/workflows/`
   and `.grok/workflows/` invoke those parsers; they must not fork the roster.
+- `issue-linker` runs authenticated `gh` and reads commit messages, so
+  `apply-roster-overlays.sh` skips it whenever `PR_NUMBER` is set (a PR/MR-URL
+  review, where the PR author wrote them). Wrappers pass `PR_NUMBER` to the
+  overlay; they do not filter the roster themselves.
 - Provider detection (including GitLab via `glab` on any authenticated host)
   lives in `scripts/detect-provider.sh`. External review host+number comes
   from `scripts/parse-pr-url.sh` (a PR/MR URL, never `--pr` / `--provider`).

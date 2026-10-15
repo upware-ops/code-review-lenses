@@ -359,7 +359,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
       GATE_CONTROL_FLOW="$GATE_CONTROL_FLOW" GATE_ERROR_PATTERNS="$GATE_ERROR_PATTERNS" \
       GATE_TEST_PATHS="$GATE_TEST_PATHS" GATE_COMMENT_CHANGES="$GATE_COMMENT_CHANGES" \
       GATE_TYPE_DEFINITIONS="$GATE_TYPE_DEFINITIONS" \
-      PROVIDER="$PROVIDER" \
+      PROVIDER="$PROVIDER" PR_NUMBER="${PR_NUMBER:-}" \
       bash "$SCRIPTS_DIR/apply-roster-overlays.sh" "${OVERLAY_ARGS[@]}") || exit $?
     eval "$_overlay_out"
     unset _overlay_out
@@ -449,7 +449,7 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 
 pr-test-analyzer, type-design-analyzer, and comment-analyzer: also pass the path of `$SKILL_ROOT/SEVERITY.md` and add to the task: "End your reply with a fenced json-findings block: a JSON array of {severity, confidence, category, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name)."
 
-**issue-linker** when `RUN_ISSUE_LINKER=true` (GitHub only after overlay). Pass commit log, branch, manifest, and labelled `REPO_SLUG`, `HOST`, `PROVIDER`; for a PR/MR-URL review pass `PR_NUMBER` instead of a branch, since the detached worktree has none. It pins every `gh` call to `$HOST/$REPO_SLUG`.
+**issue-linker** when `RUN_ISSUE_LINKER=true` (GitHub only after overlay, and never in a PR/MR-URL review: the overlay skips it there because it runs `gh` and the PR author writes the commit messages it reads). Pass commit log, branch, manifest, and labelled `REPO_SLUG`, `HOST`, `PROVIDER`. It pins every `gh` call to `$HOST/$REPO_SLUG`.
 
 Launch scheduled agents in parallel within the host's concurrency limit, collecting completed results before launching the remaining agents. Track skips for Phase 5.
 

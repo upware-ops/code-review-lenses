@@ -20,6 +20,7 @@
 #   GATE_COMMENT_CHANGES=true
 #   GATE_TYPE_DEFINITIONS=true
 #   PROVIDER=          (empty keeps issue-linker; any non-github value skips it)
+#   PR_NUMBER=         (empty is a local review; non-empty is a PR/MR-URL review and skips issue-linker)
 #
 # Output: the same KEY=value roster, after overlays. Safe to eval. The conditional
 # agents (silent-failure-hunter, pr-test-analyzer, comment-analyzer,
@@ -70,6 +71,7 @@ GATE_TEST_PATHS="${GATE_TEST_PATHS:-true}"
 GATE_COMMENT_CHANGES="${GATE_COMMENT_CHANGES:-true}"
 GATE_TYPE_DEFINITIONS="${GATE_TYPE_DEFINITIONS:-true}"
 PROVIDER="${PROVIDER:-}"
+PR_NUMBER="${PR_NUMBER:-}"
 
 SKIP_REASONS=()
 
@@ -152,6 +154,10 @@ resolve_conditional RUN_TYPE_DESIGN_ANALYZER GATE_TYPE_DEFINITIONS type-design-a
 # issue-linker is GitHub-only.
 if [[ "$RUN_ISSUE_LINKER" == "true" && -n "$PROVIDER" && "$PROVIDER" != "github" ]]; then
   skip RUN_ISSUE_LINKER "issue-linker (PROVIDER=$PROVIDER, GitHub only)"
+fi
+
+if [[ "$RUN_ISSUE_LINKER" == "true" && -n "$PR_NUMBER" ]]; then
+  skip RUN_ISSUE_LINKER "issue-linker (PR/MR-URL review: it would run gh while reading the PR author's commit messages)"
 fi
 
 # Tiny / summary / security / quick already disable enrichment; keep that.

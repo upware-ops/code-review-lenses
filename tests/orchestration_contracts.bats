@@ -571,6 +571,24 @@ JSON
   has "$(skill_line '**issue-linker** when')" '`HOST`'
 }
 
+@test "SKILL.md: a PR/MR-URL review never schedules issue-linker; the overlay block passes it PR_NUMBER" {
+  entry=$(skill_line '**issue-linker** when')
+  has "$entry" 'never in a PR/MR-URL review'
+  lacks "$entry" 'PR_NUMBER'
+  lacks "$(<"$REPO_ROOT/agents/issue-linker.md")" 'PR_NUMBER'
+
+  block=$(skill_block 'apply-roster-overlays.sh')
+  [ -n "$block" ]
+  printf '%s\n' "$block" 'printf "%s|%s" "$RUN_ISSUE_LINKER" "$SKIP_REASONS"' > "$WORK/overlay.sh"
+
+  SCRIPTS_DIR="$SCRIPTS_DIR" PROVIDER=github PR_NUMBER=42 run bash "$WORK/overlay.sh"
+  [ "$status" -eq 0 ]
+  has "$output" 'false|issue-linker (PR/MR-URL review: '
+  SCRIPTS_DIR="$SCRIPTS_DIR" PROVIDER=github PR_NUMBER= run bash "$WORK/overlay.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = 'true|' ]
+}
+
 @test "SKILL.md: project context walks ancestor AGENTS.md files independently of a root one" {
   ctx=$(skill_line '**Project context.**')
   [ -n "$ctx" ]
@@ -746,7 +764,7 @@ JSON
   [ ! -e "$WORK/body" ] && [ ! -e "$WORK/head" ]
 }
 
-@test "SKILL.md: worktree symlinks, suppression predicates, specialist prose and issue-linker's PR_NUMBER" {
+@test "SKILL.md: worktree symlinks, suppression predicates and specialist prose" {
   grep -qF 'then delete the symlinks: agents read files there and a PR symlink can point outside it' "$SKILL_MD"
   grep -qF 'whenever a block exits non-zero, run the Phase 5 cleanup (`git worktree remove --force "$WORKTREE_PATH"` from the reviewer checkout' "$SKILL_MD"
   grep -qF 'A rule matches only when every predicate it sets matches: `file` and `pattern` together when it sets both' "$SKILL_MD"
@@ -755,8 +773,6 @@ JSON
     return 1
   fi
   grep -qF 'These three sections never restate findings: findings appear only in the severity sections above, after Phase 2 filtering' "$SKILL_MD"
-  grep -qF 'for a PR/MR-URL review pass `PR_NUMBER` instead of a branch, since the detached worktree has none' "$SKILL_MD"
-  grep -qF 'gh pr view <PR_NUMBER> -R "$HOST/$REPO_SLUG" --json headRefName --jq .headRefName' "$REPO_ROOT/agents/issue-linker.md"
   for f in "$REPO_ROOT/.claude/workflows/code-review-lenses-workflow.js" "$REPO_ROOT/.grok/workflows/code-review-lenses-workflow.rhai"; do
     grep -qF 'Removed %s symlink(s) from the PR/MR worktree' "$f"
     grep -qF -- '-type l -print0 -delete | LC_ALL=C tr -dc ' "$f"

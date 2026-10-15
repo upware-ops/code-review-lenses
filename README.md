@@ -141,8 +141,7 @@ runs in.
 The Grok wrapper assembles the report with a read-only agent: the workflow
 saves the report as a run artifact (it refuses `--output-file`, which it cannot write), and a
 separate cleanup step that sees only validated temp paths removes the worktree
-and temp files. In a PR/MR-URL review it skips issue-linker, which would need
-shell access while reading the PR author's commit messages.
+and temp files.
 
 | Host | File | Invoke |
 |------|------|--------|
@@ -165,7 +164,7 @@ JSON `{ "arguments": "--profile deep https://github.com/acme/app/pull/42" }` is 
 |---------|:---:|:---:|:---:|
 | Auto-detection | Yes | Yes (any `glab` host) | Yes |
 | PR/MR URL checkout | Yes (`gh`) | Yes (`glab` + `git`) | Yes (`curl` + `git`) |
-| Issue cross-reference | Yes | No | No |
+| Issue cross-reference | Yes (local review only) | No | No |
 | Post / create PR | No | No | No |
 
 ## Agent roster
@@ -184,7 +183,7 @@ All 12 agents ship in `agents/`. Five were adapted from `pr-review-toolkit`
 | **blind-hunter** | Zero-context orthogonal review | full, deep |
 | **edge-case-hunter** | Whether a handling path exists | full, deep (if control-flow in the diff) |
 | **adversarial-general** | Completeness, ops readiness, docs debt | full, deep |
-| **issue-linker** | Related GitHub issues/PRs | full, deep (GitHub only) |
+| **issue-linker** | Related GitHub issues/PRs | full, deep (GitHub, local review only) |
 | **silent-failure-hunter** | Error-handling adequacy | quick, full, deep (if error patterns) |
 | **pr-test-analyzer** | Test coverage gaps | quick, full, deep (if test files) |
 | **comment-analyzer** | Comment accuracy / rot | full, deep (if comment changes) |
@@ -194,6 +193,10 @@ Plus non-agent **dependency-check** (`scripts/run-cve-check.sh` → OSV.dev) and
 opportunistic static analyzers (shellcheck, semgrep, trufflehog, ruff,
 golangci-lint, checkov, eslint, hadolint, kube-linter, phpcs, phpstan, tflint).
 A missing binary is a silent skip.
+
+issue-linker never runs in a PR/MR-URL review, on any host: it runs `gh` while
+reading commit messages the PR author wrote, so `apply-roster-overlays.sh`
+skips it and lists the reason with the other skipped agents.
 
 ## Models
 
