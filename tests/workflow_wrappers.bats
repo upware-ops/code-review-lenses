@@ -1007,3 +1007,25 @@ JS
   out=$(node "$BATS_TEST_TMPDIR/wf-fail.js")
   jq -e '[.prompts[] | select(.label == "assemble")][0].prompt | contains("[{\"agent\":\"code-reviewer\",\"result\":null},{\"agent\":\"pr-test-analyzer\",\"result\":\"RESULT\"}]")' <<<"$out"
 }
+
+@test "Claude wrapper run: issue-linker in a PR/MR-URL review's roster stops the run before any reviewer" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  prelude='{ "agents": ["code-reviewer", "issue-linker"], "skill_root": "/opt/crl/skills/code-review-lenses", "worktree_path": "/tmp/code-review-lenses.wt1",
+             "diff_file": "/tmp/code-review-lenses.d1", "cve_check_failed": false, "analyzer_failed": false }'
+  out=$(run_claude_wf "$prelude" '""')
+  [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,cleanup" ]
+  jq -e '.result.summary | startswith("Prelude scheduled issue-linker in a PR/MR-URL review")' <<<"$out"
+  out=$(run_claude_wf "$(jq -c 'del(.worktree_path)' <<<"$prelude")" '""')
+  [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,code-reviewer,issue-linker,assemble,cleanup" ]
+}
+
+@test "Grok wrapper stops a PR/MR-URL review whose roster still holds issue-linker" {
+  guard=$(grep -n -F 'if pre.output.worktree_path != () && pre.output.worktree_path != "" {' "$GROK_WF" | cut -d: -f1)
+  review=$(grep -n -F 'for name in names {' "$GROK_WF" | head -1 | cut -d: -f1)
+  [ -n "$guard" ]
+  [ -n "$review" ]
+  [ "$guard" -lt "$review" ]
+  grep -A3 -F 'if pre.output.worktree_path != () && pre.output.worktree_path != "" {' "$GROK_WF" | grep -q -F 'complete(#{ summary: "Prelude scheduled issue-linker in a PR/MR-URL review'
+}

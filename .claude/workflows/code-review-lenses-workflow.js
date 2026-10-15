@@ -211,6 +211,12 @@ if (names.length === 0) {
     profile: prelude.profile || 'full',
   }
 }
+if (prelude.worktree_path && names.indexOf('issue-linker') !== -1) {
+  return {
+    summary: 'Prelude scheduled issue-linker in a PR/MR-URL review, where apply-roster-overlays.sh skips it (was PR_NUMBER passed to the overlay?).' + (await cleanupNote(prelude)),
+    profile: prelude.profile || 'full',
+  }
+}
 const skillRoot = skillRootPath(prelude.skill_root)
 if (!skillRoot) {
   return {

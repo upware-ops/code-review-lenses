@@ -286,6 +286,13 @@ if pre.output != () && pre.output.agents != () {
 if names.len() == 0 {
     complete(#{ summary: "No agents scheduled (empty roster or canned validate_only output)." + cleanup_note(pre), profile: "full" });
 }
+if pre.output.worktree_path != () && pre.output.worktree_path != "" {
+    for n in names {
+        if n == "issue-linker" {
+            complete(#{ summary: "Prelude scheduled issue-linker in a PR/MR-URL review, where apply-roster-overlays.sh skips it (was PR_NUMBER passed to the overlay?)." + cleanup_note(pre), profile: "full" });
+        }
+    }
+}
 let skill_root = "";
 if pre.output != () && pre.output.skill_root != () {
     skill_root = skill_root_path(pre.output.skill_root);
