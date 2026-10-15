@@ -161,13 +161,13 @@ setup() {
   fi
 }
 
-@test "Grok assemble interpolates prelude worktree_path output_file min_confidence" {
+@test "Grok assemble interpolates prelude min_confidence and names an OUTPUT_FILE it cannot write" {
   grep -q 'pre.output.worktree_path' "$GROK_WF"
   grep -q 'pre.output.output_file' "$GROK_WF"
   grep -q 'pre.output.min_confidence' "$GROK_WF"
   grep -q 'WORKTREE_PATH: ' "$GROK_WF"
-  grep -q 'OUTPUT_FILE: ' "$GROK_WF"
   grep -q 'MIN_CONFIDENCE: ' "$GROK_WF"
+  grep -q -F 'out_note = " OUTPUT_FILE " + json_encode(out_file) + " was not written: the read-only assembler cannot write files, so the report is in " + report_path + ".";' "$GROK_WF"
 }
 
 @test "wrappers do not inject WORKTREE_PATH into blind-hunter" {
@@ -277,17 +277,17 @@ setup() {
 @test "wrappers print Block A only for --summary-only" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     grep -q -E 'profile ===? .summary.' "$f"
-    grep -q 'Print Block A only (--summary-only): no Block B' "$f"
+    grep -q -E '(Print|Return) Block A only \(--summary-only\): no Block B' "$f"
   done
 }
 
 @test "wrappers remove temp files and run cleanup when assemble fails" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     grep -q 'rm -f every temp file you created except diff_file' "$f"
-    grep -q 'Then Phase 5: rm -f DIFF_FILE if set' "$f"
     grep -q 'Phase 5 cleanup only: rm -f DIFF_FILE if set' "$f"
     grep -q -E 'label: .cleanup.' "$f"
   done
+  grep -q 'Then Phase 5: rm -f DIFF_FILE if set' "$CLAUDE_WF"
 }
 
 @test "Grok wrapper has no backslash-dollar escape, which Rhai rejects in double-quoted strings" {
@@ -392,14 +392,26 @@ setup() {
 }
 
 @test "wrappers write only Block A to --output-file for --summary-only" {
+  grep -q -F 'If OUTPUT_FILE is set, write the same Block A only (no ---, no Block B) to it.' "$CLAUDE_WF"
+  grep -q -F 'If OUTPUT_FILE is set, write Block A, ---, Block B to it.' "$CLAUDE_WF"
+  grep -q -F 'Return Block A only (--summary-only): no Block B, no findings verdict.' "$GROK_WF"
   for f in "$CLAUDE_WF" "$GROK_WF"; do
-    grep -q -F 'If OUTPUT_FILE is set, write the same Block A only (no ---, no Block B) to it.' "$f"
-    grep -q -F 'If OUTPUT_FILE is set, write Block A, ---, Block B to it.' "$f"
     if grep -q 'Honor --output-file if set' "$f"; then
       echo "REGRESSION: $f lets the assembler write Block B to --output-file for --summary-only" >&2
       return 1
     fi
   done
+}
+
+@test "Grok assembler is read-only; the script saves the report and a path-only cleanup agent runs Phase 5" {
+  grep -A2 -F 'let assembled = agent(assemble_prompt, #{' "$GROK_WF" | grep -q -F 'capability_mode: "read-only",'
+  grep -q -F 'assemble_prompt += "You are read-only: do not run commands, write files, or clean up. Run " + skill_root + "/SKILL.md Phase 2' "$GROK_WF"
+  grep -q -F 'let report_path = write_scratch_file("code-review-lenses-report.md", report);' "$GROK_WF"
+  grep -q -F 'complete(#{ summary: "Review complete." + cleanup_note(pre) + out_note, profile: profile, path: report_path, report: report });' "$GROK_WF"
+  if grep -q -e 'Then Phase 5' -e 'If OUTPUT_FILE is set' -e 'assemble_prompt += safe_temp_path(wt)' -e 'assemble_prompt += out_file' "$GROK_WF"; then
+    echo "REGRESSION: the Grok assembler cleans up, writes files, or receives cleanup paths" >&2
+    return 1
+  fi
 }
 
 @test "Claude wrapper: safeTempPath keeps only clean code-review-lenses.* paths under the system temp roots" {
@@ -523,11 +535,8 @@ JS
   grep -q -F 'wt = safe_temp_path(wt);' "$GROK_WF"
   grep -q -F 'df = safe_temp_path(df);' "$GROK_WF"
   grep -q -F 'ad = safe_temp_path(ad);' "$GROK_WF"
-  grep -q -F 'assemble_prompt += safe_temp_path(wt);' "$GROK_WF"
-  grep -q -F 'assemble_prompt += safe_temp_path(df_a);' "$GROK_WF"
   grep -q -F 'assemble_prompt += safe_temp_path(ad_a);' "$GROK_WF"
   grep -q -F 'not_cleaned([wt, df, ad])' "$GROK_WF"
-  grep -q -F 'not_cleaned([wt, df_a, ad_a])' "$GROK_WF"
   validated=$(grep -n -F 'df = safe_temp_path(df);' "$GROK_WF" | head -1 | cut -d: -f1)
   used=$(grep -n -F 'cleanup_prompt += df;' "$GROK_WF" | head -1 | cut -d: -f1)
   [ -n "$validated" ]
@@ -591,7 +600,7 @@ JS
   grep -q -F 'let capability = "read-only";' "$GROK_WF"
   grep -B1 -F 'capability = "execute";' "$GROK_WF" | grep -q -F 'if name == "issue-linker" {'
   grep -q -F 'capability_mode: capability,' "$GROK_WF"
-  [ "$(grep -c -F 'capability_mode: "execute"' "$GROK_WF")" -eq 3 ]
+  [ "$(grep -c -F 'capability_mode: "execute"' "$GROK_WF")" -eq 2 ]
   grep -q -F 'Read files under that path.' "$GROK_WF"
   [ "$(grep -c -F 'All git commands: git -C that path.' "$GROK_WF")" -eq 1 ]
   grep -B1 -F 'All git commands: git -C that path.' "$GROK_WF" | grep -q -F 'if name == "issue-linker" {'
@@ -699,7 +708,7 @@ Not cleaned (not a code-review-lenses temp path): "/home/u/analyzer"' ]
   grep -q -F 'p += ". Read " + agents_dir + "/" + name + ".md and follow it exactly. ";' "$GROK_WF"
   grep -q -F 'p += "Follow " + skill_root + "/SKILL.md context-passing rules for this agent. ";' "$GROK_WF"
   grep -q -F 'p += " SEVERITY.md: " + skill_root + "/SEVERITY.md.";' "$GROK_WF"
-  grep -q -F 'assemble_prompt += "Run " + skill_root + "/SKILL.md Phase 2' "$GROK_WF"
+  grep -q -F 'or clean up. Run " + skill_root + "/SKILL.md Phase 2' "$GROK_WF"
   grep -A1 -F 'if skill_root == "" {' "$GROK_WF" | grep -q -F 'complete(#{ summary: "Prelude did not resolve the skill root." + cleanup_note(pre)'
   fn=$(sed -n '/^fn skill_root_path(p) {/,/^}/p' "$GROK_WF")
   [[ "$fn" == *'p.ends_with("/skills/code-review-lenses") == false'* ]]

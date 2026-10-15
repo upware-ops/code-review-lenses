@@ -138,6 +138,11 @@ there first. Agents get absolute paths, so a wrapper copied to another
 repository or to your personal workflow directory reviews the repository it
 runs in.
 
+The Grok wrapper assembles the report with a read-only agent: the workflow
+saves the report as a run artifact (it does not write `--output-file`), and a
+separate cleanup step that sees only validated temp paths removes the worktree
+and temp files.
+
 | Host | File | Invoke |
 |------|------|--------|
 | Claude | `.claude/workflows/code-review-lenses-workflow.js` | `/code-review-lenses-workflow` |
