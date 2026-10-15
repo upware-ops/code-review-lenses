@@ -1,0 +1,25 @@
+docs/providers.md
+  s_22d2264024e6d9::t_28fea90d1bf0cb 50
+skills/code-review-lenses/PROVIDERS.md
+  s_22d2264024e6d9::t_28fea90d1bf0cb 30,41
+tests/orchestration_contracts.bats
+  s_22d2264024e6d9::t_28fea90d1bf0cb 280-284
+CHANGELOG.md
+  s_22d2264024e6d9::t_7375e9b22944ab 47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "5329ad8f486a03f0191ab573cb18d712d76d65a1",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
