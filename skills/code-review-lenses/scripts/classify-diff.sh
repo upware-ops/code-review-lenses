@@ -41,7 +41,7 @@ ARCH_PROMOTED=false
 SECURITY_PROMOTED=false
 if [[ "$TIER" == "tiny" ]]; then
   TINY_DIFF_NAMES="${DIFF_PATHS-}"
-  if echo "$TINY_DIFF_NAMES" | grep -qE '(auth|passwords?|routes?/|(^|/)api/|credentials?|token|secret)' \
+  if echo "$TINY_DIFF_NAMES" | grep -qiE '(auth|passwords?|routes?/|(^|/)api/|credentials?|token|secret)' \
     || echo "$TINY_DIFF_NAMES" | grep -qE '(^|/)(package(-lock)?\.json|go\.(mod|sum)|composer\.(json|lock)|requirements.*\.txt|pyproject\.toml|Gemfile(\.lock)?|Pipfile(\.lock)?|[Cc]argo\.(toml|lock)|yarn\.lock|pnpm-lock\.yaml)$' \
     || echo "$TINY_DIFF_NAMES" | grep -qE '(^|/)\.env' \
     || echo "$TINY_DIFF_NAMES" | grep -qE 'settings\.(py|ya?ml|json|toml)$'; then

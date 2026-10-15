@@ -509,7 +509,12 @@ const note = (s) => ' Not cleaned (not a code-review-lenses temp path): ' + JSON
   reply = null
   assert.strictEqual(
     await cleanupNote({ worktree_path: wt, diff_file: '' }),
-    ' Clean up leftover worktree: git worktree remove --force ' + wt,
+    ' Clean up leftover worktree and temp files: git worktree remove --force ' + wt,
+  )
+  reply = { success: false }
+  assert.strictEqual(
+    await cleanupNote({ worktree_path: wt, diff_file: df, analyzer_dir: ad }),
+    ' Clean up leftover worktree and temp files: git worktree remove --force ' + wt + '; rm -f ' + df + '; rm -rf ' + ad,
   )
   assert.strictEqual(await cleanupNote({ worktree_path: '/home/u/wt' }), note('/home/u/wt'))
 
@@ -850,5 +855,31 @@ JS
       echo "REGRESSION: $f lets the prelude judge conditional triggers" >&2
       return 1
     fi
+  done
+}
+
+@test "wrappers treat a missing CVE or analyzer status as a failed check" {
+  grep -q -F "'CVE_CHECK_FAILED=' + String(prelude.cve_check_failed !== false) + '. ANALYZER_FAILED=' + String(prelude.analyzer_failed !== false) + '." "$CLAUDE_WF"
+  grep -A1 -F 'if pre.output != () && pre.output.cve_check_failed == false {' "$GROK_WF" | grep -q -F 'assemble_prompt += "false";'
+  grep -A1 -F 'if pre.output != () && pre.output.analyzer_failed == false {' "$GROK_WF" | grep -q -F 'assemble_prompt += "false";'
+  if grep -q -E 'cve_check_failed === true|analyzer_failed === true|cve_check_failed == true|analyzer_failed == true' "$CLAUDE_WF" "$GROK_WF"; then
+    echo "REGRESSION: a missing status field reads as a clean check" >&2
+    return 1
+  fi
+}
+
+@test "Claude wrapper run: a prelude without status fields tells the assembler both checks failed" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  out=$(run_claude_wf '{ "agents": ["code-reviewer"], "skill_root": "/opt/crl/skills/code-review-lenses", "diff_file": "/tmp/code-review-lenses.d1" }' '""')
+  jq -e '[.prompts[] | select(.label == "assemble")][0].prompt | contains("CVE_CHECK_FAILED=true. ANALYZER_FAILED=true.")' <<<"$out"
+  out=$(run_claude_wf '{ "agents": ["code-reviewer"], "skill_root": "/opt/crl/skills/code-review-lenses", "diff_file": "/tmp/code-review-lenses.d1", "cve_check_failed": false, "analyzer_failed": false }' '""')
+  jq -e '[.prompts[] | select(.label == "assemble")][0].prompt | contains("CVE_CHECK_FAILED=false. ANALYZER_FAILED=false.")' <<<"$out"
+}
+
+@test "Grok cleanup_note lists every validated temp path in its manual fallback" {
+  for line in 'note = " Clean up leftover worktree and temp files:";' 'note += sep + "git worktree remove --force " + wt;' 'note += sep + "rm -f " + df;' 'note += sep + "rm -rf " + ad;'; do
+    grep -q -F "$line" "$GROK_WF"
   done
 }

@@ -43,6 +43,17 @@ STUB
   [ "$output" = "[]" ]
 }
 
+@test "kube-linter: a JSON manifest with spaced keys is linted, other JSON is skipped" {
+  printf '%s\n' '{' '  "apiVersion" : "v1",' '  "kind"	: "Pod"' '}' > "$WORK/pod.json"
+  printf '%s\n' '{ "name": "app", "version": "1.0.0" }' > "$WORK/package.json"
+  KUBELINTER_MOCK_FILE="$KL_FIX/kubelinter-violations.json" run --separate-stderr "$SCRIPT" "$WORK/pod.json"
+  [ "$status" -eq 0 ]
+  [ "$output" != "[]" ]
+  KUBELINTER_MOCK_FILE="$KL_FIX/kubelinter-violations.json" run --separate-stderr "$SCRIPT" "$WORK/package.json"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+}
+
 @test "kube-linter: plain YAML without apiVersion is skipped" {
   # Use the non-k8s YAML fixture which lacks apiVersion/kind
   KUBELINTER_MOCK_FILE="$KL_FIX/kubelinter-violations.json" run --separate-stderr "$SCRIPT" "$KL_FIX/not-k8s.yaml"

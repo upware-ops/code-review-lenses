@@ -95,8 +95,9 @@ async function cleanupNote(p) {
           { label: 'cleanup' },
         )
       : null
-  if (cleanup) return ' ' + cleanup + notCleaned(p)
-  return (wt ? ' Clean up leftover worktree: git worktree remove --force ' + wt : '') + notCleaned(p)
+  if (typeof cleanup === 'string') return ' ' + cleanup + notCleaned(p)
+  const manual = [wt && 'git worktree remove --force ' + wt, df && 'rm -f ' + df, ad && 'rm -rf ' + ad].filter(Boolean)
+  return (manual.length ? ' Clean up leftover worktree and temp files: ' + manual.join('; ') : '') + notCleaned(p)
 }
 
 function untrustedAndOutputSafety(governance) {
@@ -308,7 +309,7 @@ const assembled = await agent(
     'BASE: ' + (prelude.base || '') + '. REVIEW_MODE: ' + (prelude.review_mode || '') + '.',
     'WORKTREE_PATH: ' + safeTempPath(prelude.worktree_path) + '. DIFF_FILE: ' + safeTempPath(prelude.diff_file) + '. ANALYZER_DIR: ' + safeTempPath(prelude.analyzer_dir) + '.',
     'OUTPUT_FILE: ' + (prelude.output_file || '') + '. MIN_CONFIDENCE: ' + (prelude.min_confidence || '75') + '. NO_SUPPRESS: ' + (prelude.no_suppress || 'false') + '.',
-    'CVE_CHECK_FAILED=' + String(prelude.cve_check_failed === true) + '. ANALYZER_FAILED=' + String(prelude.analyzer_failed === true) + '. Honor SKILL.md Phase 5 item 9. Do not say "No significant issues found" if either is true.',
+    'CVE_CHECK_FAILED=' + String(prelude.cve_check_failed !== false) + '. ANALYZER_FAILED=' + String(prelude.analyzer_failed !== false) + '. Honor SKILL.md Phase 5 item 9. Do not say "No significant issues found" if either is true.',
     'GOVERNANCE_DEGRADED=' + String(!prelude.governance) + '.',
     'Skip reasons: ' + (prelude.skip_reasons || '') + '.',
     'Guidance: ' + (prelude.guidance || '') + '.',

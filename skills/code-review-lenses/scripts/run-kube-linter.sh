@@ -69,7 +69,7 @@ while IFS= read -r file; do
       ;;
     *.json)
       # JSON K8s heuristic: "apiVersion": and "kind": as object keys
-      if grep -qE '"apiVersion"\s*:' "$file" 2>/dev/null && grep -qE '"kind"\s*:' "$file" 2>/dev/null; then
+      if grep -qE '"apiVersion"[[:space:]]*:' "$file" 2>/dev/null && grep -qE '"kind"[[:space:]]*:' "$file" 2>/dev/null; then
         add_manifest "$file"
       fi
       ;;

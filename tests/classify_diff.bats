@@ -102,6 +102,16 @@ teardown() {
   [[ "$SECURITY_PROMOTED" == "true" ]]
 }
 
+@test "classify-diff: tiny CamelCase security-sensitive paths promote security" {
+  printf '%s\n' '+++ b/x' '+x' > "$WORK/diff"
+  for p in src/AuthService.java web/OAuthHandler.ts app/PasswordResetController.php lib/TokenStore.go; do
+    _cls=$(DIFF_FILE="$WORK/diff" DIFF_PATHS="$p" bash "$CLS")
+    eval "$_cls"
+    [ "$TIER" = "tiny" ]
+    [[ "$SECURITY_PROMOTED" == "true" ]] || { echo "not promoted: $p" >&2; return 1; }
+  done
+}
+
 @test "classify-diff: tiny lockfile-only diff promotes security" {
   printf '%s\n' '+++ b/x.lock' '+x' > "$WORK/diff"
   for lock in package-lock.json go.sum composer.lock Pipfile.lock Gemfile.lock Cargo.lock yarn.lock pnpm-lock.yaml; do

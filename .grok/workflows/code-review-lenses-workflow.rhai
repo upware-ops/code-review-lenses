@@ -140,8 +140,20 @@ fn cleanup_note(pre) {
         }
         if cleaned != "" {
             note = " " + cleaned;
-        } else if wt != "" {
-            note = " Clean up leftover worktree: git worktree remove --force " + wt;
+        } else {
+            note = " Clean up leftover worktree and temp files:";
+            let sep = " ";
+            if wt != "" {
+                note += sep + "git worktree remove --force " + wt;
+                sep = "; ";
+            }
+            if df != "" {
+                note += sep + "rm -f " + df;
+                sep = "; ";
+            }
+            if ad != "" {
+                note += sep + "rm -rf " + ad;
+            }
         }
     }
     return note + skipped;
@@ -506,16 +518,16 @@ assemble_prompt += min_conf;
 assemble_prompt += ". NO_SUPPRESS: ";
 assemble_prompt += no_sup;
 assemble_prompt += ". CVE_CHECK_FAILED=";
-if pre.output != () && pre.output.cve_check_failed == true {
-    assemble_prompt += "true";
-} else {
+if pre.output != () && pre.output.cve_check_failed == false {
     assemble_prompt += "false";
+} else {
+    assemble_prompt += "true";
 }
 assemble_prompt += ". ANALYZER_FAILED=";
-if pre.output != () && pre.output.analyzer_failed == true {
-    assemble_prompt += "true";
-} else {
+if pre.output != () && pre.output.analyzer_failed == false {
     assemble_prompt += "false";
+} else {
+    assemble_prompt += "true";
 }
 assemble_prompt += ". Honor SKILL.md Phase 5 item 9. Do not say No significant issues found if either is true.";
 assemble_prompt += ". GOVERNANCE_DEGRADED=";
