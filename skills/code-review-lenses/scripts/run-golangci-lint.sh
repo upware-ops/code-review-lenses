@@ -50,6 +50,8 @@ if [[ ${#GO_FILES[@]} -eq 0 ]]; then
   exit 0
 fi
 
+GL_FAILED=false
+
 # Run golangci-lint (or read mock).
 # golangci-lint v2 also prints stats and config-defined formats on stdout, and reports paths relative to its config file.
 if [[ -n "${GOLANGCI_MOCK_FILE:-}" ]]; then
@@ -119,16 +121,19 @@ else
     MODULE_OUTPUT=$(cat "$GOLANGCI_JSON")
     if [[ "$GL_EC" -ne 0 || -z "$MODULE_OUTPUT" ]]; then
       echo "WARNING: golangci-lint failed in '${MODULE_ROOT}' (exit ${GL_EC}). stderr: $(cat "$GOLANGCI_STDERR")" >&2
-      echo "[]"
-      exit 1
+      GL_FAILED=true
+      continue
     fi
     GL_OUTPUT+="$MODULE_OUTPUT"$'\n'
   done
 fi
 
+EXIT_CODE=0
+[[ "$GL_FAILED" == true ]] && EXIT_CODE=1
+
 if [[ -z "$GL_OUTPUT" ]]; then
   echo "[]"
-  exit 0
+  exit "$EXIT_CODE"
 fi
 
 # Convert golangci-lint JSON to the findings schema.
@@ -160,3 +165,4 @@ FINDINGS=$(echo "$GL_OUTPUT" | jq -rs --arg cwd "$PWD/" '
 }
 
 echo "${FINDINGS:-[]}"
+exit "$EXIT_CODE"

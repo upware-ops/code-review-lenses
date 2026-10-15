@@ -110,17 +110,22 @@ EOF
   echo "$output" | jq -e 'map(.file) == ["modA/a/x.go", "modB/c/w.go"] and map(.line) == [3, 7]' >/dev/null
 }
 
-@test "golangci-lint: a failing module run is exit 1 with empty array" {
+@test "golangci-lint: a failing module run is exit 1 and still emits the other modules' findings" {
   unset GOLANGCI_MOCK_FILE
   make_golangci_stub
-  mkdir -p "$WORK/modA/a" "$WORK/modB/c"
-  touch "$WORK/modA/go.mod" "$WORK/modA/a/x.go" "$WORK/modB/go.mod" "$WORK/modB/c/w.go" "$WORK/modB/fail"
+  mkdir -p "$WORK/modA/a" "$WORK/modB/c" "$WORK/modC/d"
+  touch "$WORK/modA/go.mod" "$WORK/modA/a/x.go" "$WORK/modB/go.mod" "$WORK/modB/c/w.go" "$WORK/modB/fail" "$WORK/modC/go.mod" "$WORK/modC/d/v.go"
   printf '{"Issues":[{"FromLinter":"errcheck","Text":"a","Pos":{"Filename":"%s/modA/a/x.go","Line":3}}]}\n' "$WORK" > "$WORK/modA/out.json"
+  printf '{"Issues":[{"FromLinter":"govet","Text":"c","Pos":{"Filename":"%s/modC/d/v.go","Line":5}}]}\n' "$WORK" > "$WORK/modC/out.json"
   cd "$WORK"
-  GITHUB_WORKSPACE="$WORK" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' modA/a/x.go modB/c/w.go)"
+  GITHUB_WORKSPACE="$WORK" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' modA/a/x.go modB/c/w.go modC/d/v.go)"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e 'map(.file) == ["modA/a/x.go", "modC/d/v.go"]' >/dev/null
+  [[ "$stderr" == *"modB"*"exit 3"*"boom"* ]]
+  touch "$WORK/modA/fail" "$WORK/modC/fail"
+  GITHUB_WORKSPACE="$WORK" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$(printf '%s\n' modA/a/x.go modB/c/w.go modC/d/v.go)"
   [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
-  [[ "$stderr" == *"modB"*"exit 3"*"boom"* ]]
 }
 
 @test "golangci-lint: pins the reviewer's config, or --no-config, never the reviewed module's" {
