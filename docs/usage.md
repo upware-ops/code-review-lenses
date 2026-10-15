@@ -59,7 +59,7 @@ Same `$ARGUMENTS` as the skill. Files:
 ## Auto-cheap (full profile only)
 
 - **DOCS_ONLY** — no code/infra in the diff
-- **LOW_RISK_CONFIG** — config-only, no security patterns
+- **LOW_RISK_CONFIG** — config-only, no security patterns; deployment/CI paths never count as low-risk
 
 `--profile deep` does not auto-cheap.
 

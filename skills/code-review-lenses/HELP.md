@@ -64,7 +64,8 @@ Auto-cheap (PROFILE=full only)
                       silent-failure-hunter / pr-test-analyzer (if triggered)
                       + CVE/static. comment-analyzer, type-design-analyzer,
                       and issue-linker are skipped.
-  LOW_RISK_CONFIG     config-only, no security patterns → same specialists off;
+  LOW_RISK_CONFIG     config-only, no security patterns, no deployment/CI
+                      paths → same specialists off;
                       issue-linker stays on. architecture/security only if
                       promoted.
   --profile deep does not auto-cheap.

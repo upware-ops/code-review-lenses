@@ -50,6 +50,24 @@ teardown() {
   [[ "$LOW_RISK_CONFIG" == "false" ]]
 }
 
+@test "classify-diff: small-tier deployment and CI yaml is not LOW_RISK_CONFIG" {
+  seq 1 60 | sed 's/^/+x: /' > "$WORK/diff"
+  for path in docker-compose.yml compose.yaml .github/workflows/ci.yml helm/values.yaml; do
+    _cls=$(DIFF_FILE="$WORK/diff" DIFF_PATHS="$path" GATE_SECURITY_PATTERNS=false bash "$CLS")
+    eval "$_cls"
+    [[ "$TIER" == "small" ]] || { echo "not small: $path" >&2; return 1; }
+    [[ "$LOW_RISK_CONFIG" == "false" ]] || { echo "low-risk: $path" >&2; return 1; }
+  done
+}
+
+@test "classify-diff: small-tier plain config yaml is LOW_RISK_CONFIG" {
+  seq 1 60 | sed 's/^/+x: /' > "$WORK/diff"
+  _cls=$(DIFF_FILE="$WORK/diff" DIFF_PATHS='config/app.yml' GATE_SECURITY_PATTERNS=false bash "$CLS")
+  eval "$_cls"
+  [[ "$TIER" == "small" ]]
+  [[ "$LOW_RISK_CONFIG" == "true" ]]
+}
+
 @test "classify-diff: GATE_CODE_OR_INFRA=false sets DOCS_ONLY" {
   printf '%s\n' 'README.md' > "$WORK/paths"
   printf '%s\n' '+++ a/README.md' '+x' > "$WORK/diff"

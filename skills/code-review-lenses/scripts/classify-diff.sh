@@ -35,6 +35,8 @@ elif [[ "$LINES_CHANGED" -lt 300 ]]; then
   TIER=small
 fi
 
+INFRA_PATH_PATTERN='(^|/)(Dockerfile|\.nvmrc|\.node-version|\.ddev/|\.github/workflows/|\.claude/workflows/|\.grok/workflows/|\.gitlab-ci\.yml|bitbucket-pipelines\.yml|lagoon/|helm/|k8s/|kubernetes/|terraform/|docker-compose|compose\.ya?ml)'
+
 ARCH_PROMOTED=false
 SECURITY_PROMOTED=false
 if [[ "$TIER" == "tiny" ]]; then
@@ -45,7 +47,7 @@ if [[ "$TIER" == "tiny" ]]; then
     || echo "$TINY_DIFF_NAMES" | grep -qE 'settings\.(py|ya?ml|json|toml)$'; then
     SECURITY_PROMOTED=true
   fi
-  if echo "$TINY_DIFF_NAMES" | grep -qE '(^|/)(Dockerfile|\.nvmrc|\.node-version|\.ddev/|\.github/workflows/|\.claude/workflows/|\.grok/workflows/|\.gitlab-ci\.yml|bitbucket-pipelines\.yml|lagoon/|helm/|k8s/|kubernetes/|terraform/|docker-compose)'; then
+  if echo "$TINY_DIFF_NAMES" | grep -qE "$INFRA_PATH_PATTERN"; then
     ARCH_PROMOTED=true
   elif [[ $(echo "$TINY_DIFF_NAMES" | sed '/^$/d' | awk -F/ '{print $1}' | sort -u | wc -l | tr -d ' ') -ge 2 ]]; then
     ARCH_PROMOTED=true
@@ -60,7 +62,8 @@ DOCS_ONLY=false
 LOW_RISK_CONFIG=false
 if [[ "$DOCS_ONLY" == "false" && "$GATE_SECURITY_PATTERNS" == "false" ]]; then
   _nonempty=$(printf '%s\n' "${DIFF_PATHS-}" | sed '/^$/d')
-  if [[ -n "$_nonempty" ]] && ! grep -qiEv '\.(ya?ml|toml|ini|conf|cfg|env\.example)$' <<< "$_nonempty"; then
+  if [[ -n "$_nonempty" ]] && ! grep -qiEv '\.(ya?ml|toml|ini|conf|cfg|env\.example)$' <<< "$_nonempty" \
+    && ! grep -qE "$INFRA_PATH_PATTERN" <<< "$_nonempty"; then
     LOW_RISK_CONFIG=true
   fi
 fi
