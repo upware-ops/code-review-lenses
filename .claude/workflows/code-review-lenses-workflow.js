@@ -89,7 +89,7 @@ async function cleanupNote(p) {
     wt || df || ad
       ? await agent(
           [
-            'Phase 5 cleanup only: rm -f DIFF_FILE if set; rm -rf ANALYZER_DIR if set; if WORKTREE_PATH is set, git worktree remove --force and verify it is gone. Reply WORKTREE_REMOVED or the error.',
+            'Phase 5 cleanup only: rm -f DIFF_FILE if set; rm -rf ANALYZER_DIR if set; if WORKTREE_PATH is set, git worktree remove --force and verify it is gone (a path that is already gone counts as removed). Reply WORKTREE_REMOVED or the error.',
             'DIFF_FILE: ' + df + '. ANALYZER_DIR: ' + ad + '. WORKTREE_PATH: ' + wt + '.',
           ].join('\n'),
           { label: 'cleanup' },
@@ -336,5 +336,5 @@ if (!assembled || assembled.success === false) {
   }
 }
 
-const left = notCleaned(prelude)
+const left = await cleanupNote(prelude)
 return left && typeof assembled === 'string' ? assembled + '\n' + left.trim() : assembled

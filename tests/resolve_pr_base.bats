@@ -171,6 +171,17 @@ teardown() {
   [[ "$output" == *"BASE=$D"* ]]
 }
 
+@test "resolve-pr-base: a www.github.com remote matches the github.com repository of a PR URL" {
+  hosted_remotes
+
+  mkdir -p "$WORK/ssh/git@www.github.com/acme"
+  git clone -q --bare "$WORK/origin.git" "$WORK/ssh/git@www.github.com/acme/web.git"
+  git -C "$WORK/parent" remote add www git@www.github.com:acme/web.git
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host github.com --repo acme/web"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BASE=$D"* ]]
+}
+
 @test "resolve-pr-base: a GitLab nested-group project matches on a self-hosted host" {
   hosted_remotes
 

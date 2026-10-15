@@ -163,13 +163,24 @@ setup() {
   fi
 }
 
-@test "Grok assemble interpolates prelude min_confidence and names an OUTPUT_FILE it cannot write" {
+@test "Grok assemble interpolates prelude min_confidence" {
   grep -q 'pre.output.worktree_path' "$GROK_WF"
-  grep -q 'pre.output.output_file' "$GROK_WF"
   grep -q 'pre.output.min_confidence' "$GROK_WF"
   grep -q 'WORKTREE_PATH: ' "$GROK_WF"
   grep -q 'MIN_CONFIDENCE: ' "$GROK_WF"
-  grep -q -F 'out_note = " OUTPUT_FILE " + json_encode(out_file) + " was not written: the read-only assembler cannot write files, so the report is in " + report_path + ".";' "$GROK_WF"
+}
+
+@test "Grok wrapper refuses --output-file before any reviewer runs and does not advertise it" {
+  refuse=$(grep -n -F 'if pre.output != () && pre.output.output_file != () && pre.output.output_file != "" {' "$GROK_WF" | cut -d: -f1)
+  review=$(grep -n -F 'for name in names {' "$GROK_WF" | head -1 | cut -d: -f1)
+  [ -n "$refuse" ]
+  [ -n "$review" ]
+  [ "$refuse" -lt "$review" ]
+  grep -A1 -F 'if pre.output != () && pre.output.output_file != () && pre.output.output_file != "" {' "$GROK_WF" | grep -q -F 'complete(#{ summary: "Refused --output-file: '
+  if sed -n '1,8p' "$GROK_WF" | grep -q -F -- '--output-file'; then
+    echo "REGRESSION: the Grok wrapper advertises --output-file" >&2
+    return 1
+  fi
 }
 
 @test "wrappers do not inject WORKTREE_PATH into blind-hunter" {
@@ -409,7 +420,7 @@ setup() {
   grep -A2 -F 'let assembled = agent(assemble_prompt, #{' "$GROK_WF" | grep -q -F 'capability_mode: "read-only",'
   grep -q -F 'assemble_prompt += "You are read-only: do not run commands, write files, or clean up. Run " + skill_root + "/SKILL.md Phase 2' "$GROK_WF"
   grep -q -F 'let report_path = write_scratch_file("code-review-lenses-report.md", report);' "$GROK_WF"
-  grep -q -F 'complete(#{ summary: "Review complete." + cleanup_note(pre) + out_note, profile: profile, path: report_path, report: report });' "$GROK_WF"
+  grep -q -F 'complete(#{ summary: "Review complete." + cleanup_note(pre), profile: profile, path: report_path, report: report });' "$GROK_WF"
   if grep -q -e 'Then Phase 5' -e 'If OUTPUT_FILE is set' -e 'assemble_prompt += safe_temp_path(wt)' -e 'assemble_prompt += out_file' "$GROK_WF"; then
     echo "REGRESSION: the Grok assembler cleans up, writes files, or receives cleanup paths" >&2
     return 1
@@ -532,7 +543,7 @@ JS
   grep -q -F "'DIFF_FILE: ' + df + '. ANALYZER_DIR: ' + ad + '. WORKTREE_PATH: ' + wt + '.'" "$CLAUDE_WF"
   grep -q -F "'WORKTREE_PATH: ' + safeTempPath(prelude.worktree_path) + '. DIFF_FILE: ' + safeTempPath(prelude.diff_file) + '. ANALYZER_DIR: ' + safeTempPath(prelude.analyzer_dir) + '.'" "$CLAUDE_WF"
   grep -q -F 'const paths = p ? [p.worktree_path, p.diff_file, p.analyzer_dir] : []' "$CLAUDE_WF"
-  grep -q -F 'notCleaned(prelude)' "$CLAUDE_WF"
+  grep -q -F 'const left = await cleanupNote(prelude)' "$CLAUDE_WF"
   grep -q -F 'fn safe_temp_path(p) {' "$GROK_WF"
   grep -q -F 'wt = safe_temp_path(wt);' "$GROK_WF"
   grep -q -F 'df = safe_temp_path(df);' "$GROK_WF"
@@ -669,11 +680,11 @@ JS
   prelude='{ "agents": ["code-reviewer", "pr-test-analyzer"], "skill_root": "/opt/crl/skills/code-review-lenses",
              "analyzer_dir": "/tmp/code-review-lenses.an1", "diff_file": "/tmp/code-review-lenses.d1", "profile": "full" }'
   out=$(run_claude_wf "$prelude" '"--profile full"')
-  [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,code-reviewer,pr-test-analyzer,assemble" ]
+  [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,code-reviewer,pr-test-analyzer,assemble,cleanup" ]
   jq -e '.prompts[1].prompt | contains("Read /opt/crl/agents/code-reviewer.md and follow it exactly.") and contains("Follow /opt/crl/skills/code-review-lenses/SKILL.md for context-passing rules")' <<<"$out"
   jq -e '.prompts[2].prompt | contains("SEVERITY.md: /opt/crl/skills/code-review-lenses/SEVERITY.md.")' <<<"$out"
   jq -e '.prompts[3].prompt | contains("Run /opt/crl/skills/code-review-lenses/SKILL.md Phase 2") and contains("ANALYZER_DIR: /tmp/code-review-lenses.an1.") and (contains("<analyzer-json>") | not)' <<<"$out"
-  [ "$(jq -r '.result' <<<"$out")" = "RESULT" ]
+  [ "$(jq -r '.result' <<<"$out")" = $'RESULT\nRESULT' ]
 
   out=$(run_claude_wf "$(jq -c '.diff_file = "/tmp/code-review-lenses.d2"' <<<"$prelude")" '""')
   jq -e '.prompts[1].prompt | contains("DIFF_FILE: /tmp/code-review-lenses.d2. Read the diff under review from that file.")' <<<"$out"
@@ -683,7 +694,19 @@ JS
   out=$(run_claude_wf "$(jq -c '.analyzer_dir = "/home/u/analyzer"' <<<"$prelude")" '""')
   jq -e '.prompts[3].prompt | contains("DIFF_FILE: /tmp/code-review-lenses.d1. ANALYZER_DIR: .")' <<<"$out"
   [ "$(jq -r '.result' <<<"$out")" = 'RESULT
-Not cleaned (not a code-review-lenses temp path): "/home/u/analyzer"' ]
+RESULT Not cleaned (not a code-review-lenses temp path): "/home/u/analyzer"' ]
+}
+
+@test "Claude wrapper run: a successful assembly is followed by the path-only cleanup agent" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  prelude='{ "agents": ["code-reviewer"], "skill_root": "/opt/crl/skills/code-review-lenses", "worktree_path": "/tmp/code-review-lenses.wt1",
+             "diff_file": "/tmp/code-review-lenses.d1", "analyzer_dir": "/tmp/code-review-lenses.an1" }'
+  out=$(run_claude_wf "$prelude" '""')
+  [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,code-reviewer,assemble,cleanup" ]
+  jq -e '.prompts[3].prompt | contains("DIFF_FILE: /tmp/code-review-lenses.d1. ANALYZER_DIR: /tmp/code-review-lenses.an1. WORKTREE_PATH: /tmp/code-review-lenses.wt1.") and contains("already gone counts as removed")' <<<"$out"
+  [ "$(jq -r '.result' <<<"$out")" = $'RESULT\nRESULT' ]
 }
 
 @test "Claude wrapper run: a prelude without a valid skill_root stops before any reviewer and cleans up" {

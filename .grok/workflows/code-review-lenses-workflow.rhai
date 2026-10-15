@@ -1,7 +1,7 @@
 let meta = #{
     name: "code-review-lenses-workflow",
-    description: "Local review via shipped parsers (Phase 0-1b, 2, 3, 5). Skill-only: Phase 0c symbol context and Phase 1c CVE reachability. Pass skill flags and optional PR/MR URL or focus through to resolve-profile.sh. [--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--output-file <path>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]",
-    when_to_use: "[--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--output-file <path>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]",
+    description: "Local review via shipped parsers (Phase 0-1b, 2, 3, 5). Skill-only: Phase 0c symbol context and Phase 1c CVE reachability. Pass skill flags and optional PR/MR URL or focus through to resolve-profile.sh. [--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]",
+    when_to_use: "[--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]",
     phases: [
         #{ title: "Prelude", detail: "shipped parsers emit roster" },
         #{ title: "Review", detail: "existing agents in parallel" },
@@ -250,6 +250,9 @@ let pre = agent(prelude_prompt, #{
 if pre == () || pre.success == false {
     complete(#{ summary: "Prelude failed." + cleanup_note(pre), profile: "full" });
 }
+if pre.output != () && pre.output.output_file != () && pre.output.output_file != "" {
+    complete(#{ summary: "Refused --output-file: the Grok wrapper's read-only assembler cannot write files, so it saves the report as the run artifact instead. Rerun without --output-file." + cleanup_note(pre), profile: "full" });
+}
 
 let allowed = ["pr-summarizer", "code-reviewer", "architecture-reviewer", "security-reviewer", "blind-hunter", "edge-case-hunter", "adversarial-general", "issue-linker", "silent-failure-hunter", "pr-test-analyzer", "comment-analyzer", "type-design-analyzer"];
 let url_review = pre.output != () && pre.output.worktree_path != () && pre.output.worktree_path != "";
@@ -468,10 +471,6 @@ let cls = ();
 if pre.output != () && pre.output.classification != () {
     cls = pre.output.classification;
 }
-let out_file = "";
-if pre.output != () && pre.output.output_file != () {
-    out_file = pre.output.output_file;
-}
 let min_conf = "75";
 if pre.output != () && pre.output.min_confidence != () {
     min_conf = pre.output.min_confidence;
@@ -557,8 +556,4 @@ if type_of(report) != "string" {
     report = json_encode(report);
 }
 let report_path = write_scratch_file("code-review-lenses-report.md", report);
-let out_note = "";
-if out_file != "" {
-    out_note = " OUTPUT_FILE " + json_encode(out_file) + " was not written: the read-only assembler cannot write files, so the report is in " + report_path + ".";
-}
-complete(#{ summary: "Review complete." + cleanup_note(pre) + out_note, profile: profile, path: report_path, report: report });
+complete(#{ summary: "Review complete." + cleanup_note(pre), profile: profile, path: report_path, report: report });

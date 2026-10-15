@@ -624,6 +624,13 @@ EOF
   [[ "$output" == *"Bitbucket Cloud only"* ]]
 }
 
+@test "detect-provider: a www.github.com remote is reported as github.com, as parse-pr-url.sh normalizes it" {
+  run bash "$DETECT" --provider github --remote-url https://www.github.com/acme/app.git
+  [ "$status" -eq 0 ]
+  grep -qx 'HOST=github.com' <<<"$output"
+  grep -qx 'REPO_SLUG=acme/app' <<<"$output"
+}
+
 @test "detect-provider: a filesystem origin is PROVIDER=unknown with --fallback unknown, an error without it" {
   for url in /tmp/repo.git ./repo ../repo file:///tmp/repo.git repo.git sub/repo.git sub/dir:repo.git; do
     run bash "$DETECT" --remote-url "$url" --fallback unknown

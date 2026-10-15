@@ -139,7 +139,7 @@ repository or to your personal workflow directory reviews the repository it
 runs in.
 
 The Grok wrapper assembles the report with a read-only agent: the workflow
-saves the report as a run artifact (it does not write `--output-file`), and a
+saves the report as a run artifact (it refuses `--output-file`, which it cannot write), and a
 separate cleanup step that sees only validated temp paths removes the worktree
 and temp files. In a PR/MR-URL review it skips issue-linker, which would need
 shell access while reading the PR author's commit messages.

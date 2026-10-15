@@ -288,6 +288,10 @@ HOST_PATH=$(extract_host_path "$REMOTE_URL")
 HOST="${HOST_PATH%%$'\t'*}"
 REPO_PATH="${HOST_PATH#*$'\t'}"
 HOST_LC=$(printf '%s' "$HOST" | tr '[:upper:]' '[:lower:]')
+if [[ "$HOST_LC" == www.github.com ]]; then
+  HOST=github.com
+  HOST_LC=github.com
+fi
 
 if [[ -z "$HOST" || -z "$REPO_PATH" ]]; then
   die "Could not extract host/path from remote URL '$(sanitize_url "$REMOTE_URL")'."
