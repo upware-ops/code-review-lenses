@@ -1,0 +1,25 @@
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_ab7014778d6cc9 130
+  s_22d2264024e6d9::t_07a86db9e867f7 479-480
+tests/orchestration_contracts.bats
+  s_22d2264024e6d9::t_07a86db9e867f7 703-711
+  s_22d2264024e6d9::t_ab7014778d6cc9 689
+CHANGELOG.md
+  s_22d2264024e6d9::t_58e5802ccb8abb 57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "5a1bc713821d14bd8364f78f75a08131799e1046",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
