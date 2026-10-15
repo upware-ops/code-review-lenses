@@ -1,0 +1,19 @@
+skills/code-review-lenses/SEVERITY.md
+  s_22d2264024e6d9::t_15f61208fadfb5 17-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "c9724d49670a79fcd262f39765f965f4623a1956",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
