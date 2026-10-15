@@ -583,9 +583,9 @@ JS
 
 @test "wrappers have the prelude create the URL worktree and every diff file as code-review-lenses.* temp paths" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
-    [ "$(grep -c -F 'git worktree add' "$f")" -eq 1 ]
-    line=$(grep -F 'git worktree add' "$f" | sed 's/\\"/"/g')
-    [[ "$line" == *'WORKTREE_PATH=$(mktemp -d /tmp/code-review-lenses.XXXXXX)'*'git worktree add'* ]]
+    [ "$(grep -c -F 'worktree add' "$f")" -eq 1 ]
+    line=$(grep -F 'worktree add' "$f" | sed 's/\\"/"/g')
+    [[ "$line" == *'WORKTREE_PATH=$(mktemp -d /tmp/code-review-lenses.XXXXXX)'*'worktree add'* ]] || return 1
     [[ "$line" == *'DIFF_FILE=$(mktemp /tmp/code-review-lenses.XXXXXX)'* ]]
     sed 's/\\"/"/g' "$f" | grep -q -F -- '--diff-file "$DIFF_FILE" with DIFF_FILE=$(mktemp /tmp/code-review-lenses.XXXXXX)'
     sed 's/\\"/"/g' "$f" | grep -q -F 'ANALYZER_DIR=$(mktemp -d /tmp/code-review-lenses.XXXXXX)'
@@ -594,12 +594,32 @@ JS
       echo "REGRESSION: $f creates temp paths under TMPDIR, which the cleanup check rejects outside /tmp" >&2
       return 1
     fi
-    [[ "$line" == *'git worktree add --detach "$WORKTREE_PATH" and checkout inside it'* ]]
+    [[ "$line" == *'git -c core.hooksPath=/dev/null worktree add --detach "$WORKTREE_PATH" and checkout inside it'* ]] || return 1
     if grep -q -F -e '$(mktemp)' -e '$(mktemp -d)' -e 'temp file from mktemp' "$f"; then
       echo "REGRESSION: $f has the prelude create a temp path the cleanup check rejects" >&2
       return 1
     fi
   done
+}
+
+@test "wrappers: the PR worktree is created, checked out and read by reviewers with git hooks off, and symlink names print encoded" {
+  command -v node >/dev/null 2>&1 || skip "node not installed"
+  skill_cmd=$(grep -F -- '-type l -print0' "${SCRIPTS_DIR}/../SKILL.md" | sed 's/^ *//')
+  [ -n "$skill_cmd" ]
+  claude=$(run_claude_wf '{ "agents": [] }' '""' | jq -r '.prompts[0].prompt')
+  grok=$(sed -e 's/\\"/"/g' -e 's/\\\\/\\/g' "$GROK_WF")
+  for text in "$claude" "$grok"; do
+    grep -qF -- 'git -c core.hooksPath=/dev/null worktree add --detach "$WORKTREE_PATH" and checkout inside it' <<<"$text"
+    grep -qF -- 'for gh, GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null in its environment' <<<"$text"
+    grep -qF -- "$skill_cmd" <<<"$text"
+    if grep -qF -- '-type l -print -delete' <<<"$text"; then
+      echo "REGRESSION: a wrapper prints raw symlink names again" >&2
+      return 1
+    fi
+  done
+
+  out=$(run_claude_wf '{ "agents": ["code-reviewer"], "skill_root": "/opt/crl/skills/code-review-lenses", "worktree_path": "/tmp/code-review-lenses.wt1", "diff_file": "/tmp/code-review-lenses.d1" }' '""')
+  jq -e '.prompts[1].prompt | contains("WORKTREE_PATH: /tmp/code-review-lenses.wt1. All git commands: git -c core.hooksPath=/dev/null -C that path.")' <<<"$out"
 }
 
 @test "wrappers take the issue-linker host from detect-provider.sh on local reviews" {
@@ -640,8 +660,8 @@ JS
   grep -q -F 'capability_mode: capability,' "$GROK_WF"
   [ "$(grep -c -F 'capability_mode: "execute"' "$GROK_WF")" -eq 2 ]
   grep -q -F 'Read files under that path.' "$GROK_WF"
-  [ "$(grep -c -F 'All git commands: git -C that path.' "$GROK_WF")" -eq 1 ]
-  grep -B1 -F 'All git commands: git -C that path.' "$GROK_WF" | grep -q -F 'if name == "issue-linker" {'
+  [ "$(grep -c -F 'All git commands: git -c core.hooksPath=/dev/null -C that path.' "$GROK_WF")" -eq 1 ]
+  grep -B1 -F 'All git commands: git -c core.hooksPath=/dev/null -C that path.' "$GROK_WF" | grep -q -F 'if name == "issue-linker" {'
   grep -q -F 'Return that file as diff_file in every mode' "$GROK_WF"
   grep -A3 -F 'if name != "blind-hunter" && name != "issue-linker" {' "$GROK_WF" | grep -q -F 'Read the diff under review from that file'
 }

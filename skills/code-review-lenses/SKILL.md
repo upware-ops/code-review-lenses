@@ -127,7 +127,22 @@ Run a full local review of all changes on the current branch (or a specified PR/
    unset _meta_out
    ```
 
-   Emits `baseRefName`, `baseRefOid`, `HEAD_REF_FILE`, `PR_BODY_FILE`. Exit 2 (fetch failed, CLOSED/MERGED, Bitbucket fork PR, empty or invalid branch name) is a hard stop — never invent `main`, `master`, or `dev` for a missing base. `HEAD_REF_FILE` (the source branch name) and `PR_BODY_FILE` are author-written: never cat or print them; step 7 hands `PR_BODY_FILE` to agents and Phase 5 removes both. Create a temporary worktree with `git worktree add --detach "$WORKTREE_PATH"` (without `--detach` git creates a branch named after the directory, which worktree removal leaves behind) and **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree — never in the parent clone), then `find "$WORKTREE_PATH" -type l -print -delete`: agents read files there and a PR symlink can point outside it; keep the printed paths as Phase 5 notes. All later git commands use `git -C "$WORKTREE_PATH"`. Track `WORKTREE_PATH` for Phase 5 cleanup. From here on, whenever a block exits non-zero, run the Phase 5 cleanup (`git worktree remove --force "$WORKTREE_PATH"` from the reviewer checkout, then `rm -f` on `PR_BODY_FILE`, `HEAD_REF_FILE` and any `DIFF_FILE`) before stopping: each block runs in its own shell, so no trap can do it. If `BASE` is empty, pin it to the target branch fetched from the git remote that owns the PR/MR repository — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
+   Emits `baseRefName`, `baseRefOid`, `HEAD_REF_FILE`, `PR_BODY_FILE`. Exit 2 (fetch failed, CLOSED/MERGED, Bitbucket fork PR, empty or invalid branch name) is a hard stop — never invent `main`, `master`, or `dev` for a missing base. `HEAD_REF_FILE` (the source branch name) and `PR_BODY_FILE` are author-written: never cat or print them; step 7 hands `PR_BODY_FILE` to agents and Phase 5 removes both.
+
+   Create a temporary worktree in an empty `mktemp -d` directory, with hooks off: a relative `core.hooksPath` such as `.githooks` resolves inside the worktree, so the PR author's own `post-checkout` or `reference-transaction` hook would run as the reviewer. `--detach` stops git creating a branch named after the directory, which worktree removal leaves behind:
+
+   ```bash
+   WORKTREE_PATH=$(mktemp -d /tmp/code-review-lenses.XXXXXX)
+   git -c core.hooksPath=/dev/null worktree add --detach "$WORKTREE_PATH" || exit $?
+   ```
+
+   Run **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree, hooks off — never in the parent clone), then delete the symlinks: agents read files there and a PR symlink can point outside it. The names are author-chosen, so `tr` turns control bytes such as ESC and newline into `?`; keep the printed paths as Phase 5 notes:
+
+   ```bash
+   find "$WORKTREE_PATH" -type l -print0 -delete | LC_ALL=C tr -c '[:print:]\0' '?' | tr '\0' '\n'
+   ```
+
+   All later git commands use `git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH"` (`_git` in step 4). Track `WORKTREE_PATH` for Phase 5 cleanup. From here on, whenever a block exits non-zero, run the Phase 5 cleanup (`git worktree remove --force "$WORKTREE_PATH"` from the reviewer checkout, then `rm -f` on `PR_BODY_FILE`, `HEAD_REF_FILE` and any `DIFF_FILE`) before stopping: each block runs in its own shell, so no trap can do it. If `BASE` is empty, pin it to the target branch fetched from the git remote that owns the PR/MR repository — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:
 
    ```bash
    if [[ -z "$BASE" ]]; then
@@ -194,7 +209,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
 
    ```bash
    _git=(git)
-   [[ -n "${WORKTREE_PATH:-}" ]] && _git=(git -C "$WORKTREE_PATH")
+   [[ -n "${WORKTREE_PATH:-}" ]] && _git=(git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH")
    if [[ "${REVIEW_MODE:-committed}" == "dirty" ]]; then
      if ! DIFF_PATHS=$("${_git[@]}" diff --name-only "$BASE"); then
        echo "Error: git diff --name-only $BASE failed." >&2

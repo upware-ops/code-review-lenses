@@ -210,3 +210,20 @@ teardown() {
   run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider svn --host github.com --repo acme/app"
   [[ "$output" == *"--provider must be github, gitlab, or bitbucket"* ]]
 }
+
+@test "resolve-pr-base: its fetch runs no hook of the PR worktree's own relative core.hooksPath" {
+  git -C "$WORK/parent" config core.hooksPath .githooks
+  mkdir "$WT/.githooks"
+  printf '#!/bin/sh\ntouch "%s/ran"\n' "$WORK" > "$WT/.githooks/reference-transaction"
+  chmod +x "$WT/.githooks/reference-transaction"
+  git -C "$WORK/pusher" push -q origin release/x:refs/heads/probe
+
+  git -C "$WT" fetch -q --no-tags origin probe
+  [ -e "$WORK/ran" ]
+  rm "$WORK/ran"
+
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x"
+  [ "$status" -eq 0 ]
+  grep -qF "BASE=$D" <<<"$output"
+  [ ! -e "$WORK/ran" ]
+}

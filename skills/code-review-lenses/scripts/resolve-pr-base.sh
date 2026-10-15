@@ -112,7 +112,8 @@ fi
 
 [[ "$(git rev-parse --is-shallow-repository)" != true ]] || die "Shallow clone: the merge-base of $REMOTE/$REF and HEAD may be missing. Run: git fetch --unshallow $REMOTE"
 
-git fetch --no-tags "$REMOTE" "refs/heads/$REF" || die "git fetch $REMOTE $REF failed. Pass --base <ref> to choose the compare base."
+# A relative core.hooksPath resolves inside the PR worktree, so its reference-transaction hook would be the PR author's.
+git -c core.hooksPath=/dev/null fetch --no-tags "$REMOTE" "refs/heads/$REF" || die "git fetch $REMOTE $REF failed. Pass --base <ref> to choose the compare base."
 BASE=$(git rev-parse --verify 'FETCH_HEAD^{commit}') || die "Fetched $REMOTE/$REF is not a commit."
 
 if [[ -n "$PROVIDER_BASE" ]]; then
