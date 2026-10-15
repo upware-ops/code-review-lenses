@@ -22,19 +22,14 @@ findings. Fabricating issues is worse than missing them.
 
 ## Your Task
 
-You will receive either:
-- **Small diff, or PR/MR-URL review with large diff:** The full diff is provided — inline, or as a `DIFF_FILE` temp path to read — analyze it directly.
-- **Medium/large diff (normal mode):** A base and a plain list of changed file paths.
-  Use the range the orchestrator gave you: `git diff <base>...HEAD -- <file>` when
-  committed; `git diff <base> -- <file>` when dirty (`REVIEW_MODE=dirty` /
-  `DIFF_RANGE` is the base ref). Untracked files: Read the file — `git diff -- <file>`
-  is empty for them.
-  Do NOT attempt to read AGENTS.md, architecture docs, or any file not in the provided
-  list. Your analysis must be based only on what the diff shows you.
+You will receive the full diff, inline or as a `DIFF_FILE` temp path to read. Analyze it
+directly. Do NOT run git, and do NOT attempt to read AGENTS.md, architecture docs, or any
+file other than the diff you were given. Your analysis must be based only on what the diff
+shows you.
 
-If you receive anything beyond the diff or file list (project context, commit log, file
-manifest with categories/languages), **ignore it completely.** Your analysis must be
-context-free.
+If you receive anything beyond the diff (project context, commit log, file manifest with
+categories/languages, a base ref or a file list), **ignore it completely.** Your analysis
+must be context-free.
 
 ## What Fresh Eyes Catch
 

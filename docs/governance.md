@@ -26,7 +26,7 @@ Every custom agent receives a shared governance block (`skills/code-review-lense
 
 ## blind-hunter exception
 
-`blind-hunter` receives the GOVERNANCE block but with one override: "verify before naming" applies only within the diff or file list it was given — never the broader repo. This preserves blind-hunter's zero-context "fresh eyes" purpose while keeping every other directive in force.
+`blind-hunter` receives the GOVERNANCE block but with one override: "verify before naming" applies only within the diff it was given — never the broader repo. This preserves blind-hunter's zero-context "fresh eyes" purpose while keeping every other directive in force.
 
 ## Orchestrator governance
 

@@ -248,10 +248,14 @@ teardown() {
   fi
 }
 
-@test "agents: blind-hunter dirty range is two-dot plus Read untracked" {
-  grep -q 'REVIEW_MODE=dirty' "$REPO_ROOT/agents/blind-hunter.md"
-  grep -q 'git diff <base> -- <file>' "$REPO_ROOT/agents/blind-hunter.md"
-  grep -q 'Untracked files: Read the file' "$REPO_ROOT/agents/blind-hunter.md"
+@test "agents: blind-hunter reads only the diff it is given and never runs git" {
+  agent="$REPO_ROOT/agents/blind-hunter.md"
+  grep -q -F 'You will receive the full diff, inline or as a `DIFF_FILE` temp path to read.' "$agent"
+  grep -q -F 'Do NOT run git' "$agent"
+  if grep -q -e 'git diff' -e 'REVIEW_MODE' -e 'list of changed file paths' "$agent"; then
+    echo "REGRESSION: blind-hunter is told to run git or given a file list" >&2
+    return 1
+  fi
 }
 
 @test "agents: all twelve review agents are present" {
@@ -457,7 +461,7 @@ JSON
   [ "$status" -eq 2 ]
 }
 
-@test "SKILL.md: step 7 hands only the first 100 lines of PR_BODY_FILE to PR_NARRATIVE" {
+@test "SKILL.md: step 7 hands only the first 100 lines of PR_BODY_FILE to PR_NARRATIVE and caps its bytes" {
   block=$(skill_block 'PR/MR description:')
   [ -n "$block" ]
   git init -q "$WORK/repo"
@@ -482,6 +486,25 @@ JSON
   lacks "$output" 'PR/MR description:'
   PR_BODY_FILE= run bash "$WORK/step7.sh"
   lacks "$output" 'PR/MR description:'
+
+  { printf 'long\n\n'; head -c 100000 /dev/zero | tr '\0' y; } > "$WORK/msg"
+  git -C "$WORK/repo" commit -q --allow-empty -F "$WORK/msg"
+  head -c 100000 /dev/zero | tr '\0' x > "$WORK/body"
+  PR_BODY_FILE="$WORK/body" run bash "$WORK/step7.sh"
+  [ "$status" -eq 0 ]
+  has "$output" 'Commit messages:'
+  has "$output" 'PR/MR description:'
+  [ "${#output}" -le 8192 ]
+}
+
+@test "SKILL.md: blind-hunter gets only the diff file and GOVERNANCE, never the base or a file list" {
+  entry=$(skill_line '- **blind-hunter** —')
+  [ -n "$entry" ]
+  has "$entry" '**ONLY** the diff and GOVERNANCE, never the base, a file list, or `WORKTREE_PATH`'
+  has "$entry" 'Medium: the `$DIFF_FILE` path'
+  lacks "$entry" 'git diff'
+  lacks "$entry" 'name-only'
+  has "$(skill_line '**Do not display raw diffs.**')" 'custom agents other than blind-hunter get the manifest'
 }
 
 @test "SKILL.md: the CVE block keeps the findings a failing run-cve-check.sh printed" {

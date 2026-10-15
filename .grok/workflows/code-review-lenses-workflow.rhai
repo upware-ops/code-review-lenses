@@ -11,7 +11,7 @@ let meta = #{
 
 let roster_schema = #{
     "type": "object",
-    "required": ["agents", "skill_root", "cve_check_failed", "analyzer_failed"],
+    "required": ["agents", "skill_root", "diff_file", "cve_check_failed", "analyzer_failed"],
     "properties": #{
         "profile": #{ "type": "string" },
         "agents": #{ "type": "array", "items": #{ "type": "string" } },
@@ -294,6 +294,13 @@ if skill_root == "" {
     complete(#{ summary: "Prelude did not resolve the skill root." + cleanup_note(pre), profile: "full" });
 }
 let agents_dir = skill_root.sub_string(0, skill_root.len() - 26) + "/agents";
+let diff_file = "";
+if pre.output != () && pre.output.diff_file != () {
+    diff_file = safe_temp_path(pre.output.diff_file);
+}
+if diff_file == "" {
+    complete(#{ summary: "Prelude did not return a usable diff file." + cleanup_note(pre), profile: "full" });
+}
 
 let guidance = "";
 if pre.output != () && pre.output.guidance != () {
@@ -334,7 +341,7 @@ for name in names {
         p += governance;
         p += "\n";
         if name == "blind-hunter" {
-            p += "BLIND_HUNTER_NOTE: The \"Verification before naming\" directive means verify within the diff or file list you were given — do NOT Grep or Read outside it. The \"Refuse incoherent input\" directive applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.\n";
+            p += "BLIND_HUNTER_NOTE: The \"Verification before naming\" directive means verify within the diff you were given — do NOT Grep or Read outside it. The \"Refuse incoherent input\" directive applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.\n";
         }
         p += "\n";
     }
@@ -371,11 +378,7 @@ for name in names {
     if pre.output != () && pre.output.worktree_path != () {
         worktree_path = safe_temp_path(pre.output.worktree_path);
     }
-    let df = "";
-    if pre.output != () && pre.output.diff_file != () {
-        df = safe_temp_path(pre.output.diff_file);
-    }
-    if name != "blind-hunter" || df == "" {
+    if name != "blind-hunter" {
         p += "BASE: ";
         p += base;
         p += ". REVIEW_MODE: ";
@@ -383,13 +386,9 @@ for name in names {
         p += ". ";
     }
     if name == "blind-hunter" {
-        if df != "" {
-            p += "DIFF_FILE: ";
-            p += df;
-            p += ". Read only that temp diff. Do not use WORKTREE_PATH or git -C. Zero project context. ";
-        } else {
-            p += "No URL worktree (local review). File list + git diff BASE -- file. Zero project context. ";
-        }
+        p += "DIFF_FILE: ";
+        p += diff_file;
+        p += ". Read only that temp diff. Do not use WORKTREE_PATH or git -C. Zero project context. ";
     } else if worktree_path != "" {
         p += "WORKTREE_PATH: ";
         p += worktree_path;
@@ -399,9 +398,9 @@ for name in names {
             p += ". Read files under that path. Do not review the parent clone. ";
         }
     }
-    if name != "blind-hunter" && name != "issue-linker" && df != "" {
+    if name != "blind-hunter" && name != "issue-linker" {
         p += "DIFF_FILE: ";
-        p += df;
+        p += diff_file;
         p += ". Read the diff under review from that file (read-only: you cannot run git). ";
     }
     if name == "issue-linker" {

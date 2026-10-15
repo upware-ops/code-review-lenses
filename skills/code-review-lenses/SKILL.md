@@ -262,14 +262,14 @@ Run a full local review of all changes on the current branch (or a specified PR/
    ```bash
    COMMIT_LOG_SHORT=$("${_git[@]}" log --no-merges --oneline "${BASE}..HEAD")
    PR_NARRATIVE=""
-   COMMIT_BODIES=$("${_git[@]}" log --no-merges --format='--- Commit: %h%n%s%n%n%b%n' "${BASE}..HEAD" 2>/dev/null | head -200)
+   COMMIT_BODIES=$("${_git[@]}" log --no-merges --format='--- Commit: %h%n%s%n%n%b%n' "${BASE}..HEAD" 2>/dev/null | head -200 | head -c 4000)
    [[ -n "$COMMIT_BODIES" ]] && PR_NARRATIVE+=$'\nCommit messages:\n'"$COMMIT_BODIES"
    if [[ -n "${PR_NUMBER:-}" && -s "${PR_BODY_FILE:-}" ]]; then
-     PR_NARRATIVE+=$'\nPR/MR description:\n'"$(head -100 "$PR_BODY_FILE")"
+     PR_NARRATIVE+=$'\nPR/MR description:\n'"$(head -100 "$PR_BODY_FILE" | head -c 4000)"
    fi
    ```
 
-   Pass `PR_NARRATIVE` to pr-summarizer, code-reviewer, architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter. Never to blind-hunter.
+   Pass `PR_NARRATIVE` to pr-summarizer, code-reviewer, architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter. Never to blind-hunter. Each part is capped at 4,000 bytes on top of its line cap (8 KB, about 2,000 tokens, combined): a few long author-written lines would otherwise pass the line caps unbounded.
 
 8. **Diff file:**
 
@@ -384,7 +384,7 @@ Eligible: architecture-reviewer, security-reviewer, adversarial-general, edge-ca
 
 ### Phase 1: Launch agents
 
-**Do not display raw diffs.** Use `$DIFF_FILE`. For `TIER=small`/`tiny`, pass the full diff inline. For `TIER=medium`, custom agents get the manifest and read `git diff` over the same range as Phase 0b (`${BASE}...HEAD` when committed, `"$BASE"` when dirty) `-- <file>`; **untracked files: Read the file — `git diff -- <file>` is empty for them**.
+**Do not display raw diffs.** Use `$DIFF_FILE`. For `TIER=small`/`tiny`, pass the full diff inline. For `TIER=medium`, custom agents other than blind-hunter get the manifest and read `git diff` over the same range as Phase 0b (`${BASE}...HEAD` when committed, `"$BASE"` when dirty) `-- <file>`; **untracked files: Read the file — `git diff -- <file>` is empty for them**.
 
 **Spawn protocol:**
 
@@ -406,7 +406,7 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 | `SYMBOL_CONTEXT` | architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter, code-reviewer |
 | `SECURITY_POLICY` | security-reviewer |
 
-**GOVERNANCE injection:** when `GOVERNANCE_BLOCK` is non-empty, prepend it under `GOVERNANCE:` to every custom agent. **blind-hunter:** after that block append: `BLIND_HUNTER_NOTE: The "Verification before naming" directive means verify within the diff or file list you were given — do NOT Grep or Read outside it. The "Refuse incoherent input" directive applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.` If `GOVERNANCE_DEGRADED=true`, omit both. **Vendored toolkit agents** (code-reviewer, silent-failure-hunter, pr-test-analyzer, comment-analyzer, type-design-analyzer): prepend only the `## Untrusted input` and `## Output safety` sections of `GOVERNANCE_BLOCK`, verbatim, under `GOVERNANCE:` (omitted when degraded).
+**GOVERNANCE injection:** when `GOVERNANCE_BLOCK` is non-empty, prepend it under `GOVERNANCE:` to every custom agent. **blind-hunter:** after that block append: `BLIND_HUNTER_NOTE: The "Verification before naming" directive means verify within the diff you were given — do NOT Grep or Read outside it. The "Refuse incoherent input" directive applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.` If `GOVERNANCE_DEGRADED=true`, omit both. **Vendored toolkit agents** (code-reviewer, silent-failure-hunter, pr-test-analyzer, comment-analyzer, type-design-analyzer): prepend only the `## Untrusted input` and `## Output safety` sections of `GOVERNANCE_BLOCK`, verbatim, under `GOVERNANCE:` (omitted when degraded).
 
 **Always-run when `RUN_*=true`:**
 
@@ -418,7 +418,7 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 - **architecture-reviewer** — manifest, FILE_DIGEST, commit log, project context; small diffs: full diff. Tool budget 25. `TIER=tiny` + promoted: diff + RELATED_FILES + GOVERNANCE only.
 - **security-reviewer** — same as architecture, plus `SECURITY_POLICY` when set. Tool budget 25.
 - **adversarial-general** — manifest, commit log, project context.
-- **blind-hunter** — **ONLY** the diff and GOVERNANCE. Medium/local: base + `git diff --name-only` file list. Medium/PR-URL: write a copy of the worktree diff to a temp file and pass that path (agent has no worktree knowledge).
+- **blind-hunter** — **ONLY** the diff and GOVERNANCE, never the base, a file list, or `WORKTREE_PATH`: it has no repository or worktree knowledge and does not run git. Small: the full diff inline. Medium: the `$DIFF_FILE` path (Phase 0b step 8 writes the complete diff there in every review mode, untracked files of a dirty review included).
 - **edge-case-hunter** — manifest, commit log, project context.
 
 **Conditional agents.** `apply-roster-overlays.sh` resolves each trigger below from its `evaluate-gates.sh` gate: `RUN_*` becomes `true` when the gate is `true` and `false` (listed in `SKIP_REASONS`) when it is `false`. Launch the agent only when `RUN_*=true`. The comment and type gates read added or removed lines only.

@@ -252,13 +252,22 @@ setup() {
   done
 }
 
-@test "wrappers keep blind-hunter off SKILL.md and off BASE/REVIEW_MODE when it has DIFF_FILE" {
+@test "wrappers keep blind-hunter off SKILL.md and off BASE/REVIEW_MODE" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     grep -B2 'context-passing rules' "$f" | grep -q 'blind-hunter'
     grep -B2 'Review the range from review-diff.sh' "$f" | grep -q 'blind-hunter'
   done
-  grep -A1 "name === 'blind-hunter' && diffFile" "$CLAUDE_WF" | grep -q "? ''"
-  grep -q 'if name != "blind-hunter" || df == "" {' "$GROK_WF"
+  grep -B2 -F "'BASE: ' + (prelude.base" "$CLAUDE_WF" | grep -q -F "name === 'blind-hunter'"
+  grep -B1 -F 'p += "BASE: ";' "$GROK_WF" | grep -q -F 'if name != "blind-hunter" {'
+}
+
+@test "wrappers never hand blind-hunter a git instruction against BASE" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    if grep -q -F 'git diff BASE' "$f"; then
+      echo "REGRESSION: $f tells blind-hunter to run git against BASE" >&2
+      return 1
+    fi
+  done
 }
 
 @test "wrappers load SECURITY_POLICY and inject it into security-reviewer only" {
@@ -634,7 +643,7 @@ JS
   [ "$(grep -c -F 'All git commands: git -C that path.' "$GROK_WF")" -eq 1 ]
   grep -B1 -F 'All git commands: git -C that path.' "$GROK_WF" | grep -q -F 'if name == "issue-linker" {'
   grep -q -F 'Return that file as diff_file in every mode' "$GROK_WF"
-  grep -A3 -F 'if name != "blind-hunter" && name != "issue-linker" && df != "" {' "$GROK_WF" | grep -q -F 'Read the diff under review from that file'
+  grep -A3 -F 'if name != "blind-hunter" && name != "issue-linker" {' "$GROK_WF" | grep -q -F 'Read the diff under review from that file'
 }
 
 run_claude_wf() {
@@ -693,7 +702,7 @@ JS
 
   out=$(run_claude_wf "$(jq -c '.diff_file = "/tmp/code-review-lenses.d2"' <<<"$prelude")" '""')
   jq -e '.prompts[1].prompt | contains("DIFF_FILE: /tmp/code-review-lenses.d2. Read the diff under review from that file.")' <<<"$out"
-  out=$(run_claude_wf "$(jq -c '.diff_file = "/home/u/x.diff" | .worktree_path = "/home/u/wt"' <<<"$prelude")" '""')
+  out=$(run_claude_wf "$(jq -c '.worktree_path = "/home/u/wt"' <<<"$prelude")" '""')
   jq -e '.prompts[1].prompt | (contains("/home/u/") | not) and contains("No URL worktree (local review).")' <<<"$out"
 
   out=$(run_claude_wf "$(jq -c '.analyzer_dir = "/home/u/analyzer"' <<<"$prelude")" '""')
@@ -726,6 +735,62 @@ RESULT Not cleaned (not a code-review-lenses temp path): "/home/u/analyzer"' ]
   done
 }
 
+@test "Claude wrapper run: a prelude without a usable diff_file stops before any reviewer and cleans up" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  prelude='{ "agents": ["blind-hunter", "code-reviewer"], "skill_root": "/opt/crl/skills/code-review-lenses", "base": "origin/main", "review_mode": "committed",
+             "worktree_path": "/tmp/code-review-lenses.wt1", "analyzer_dir": "/tmp/code-review-lenses.an1" }'
+  for variant in missing 'null' '""' '"/home/u/x.diff"' '"/tmp/other.diff"' '"/tmp/code-review-lenses.d1/../../etc/passwd"' '5'; do
+    if [ "$variant" = missing ]; then
+      p="$prelude"
+    else
+      p=$(jq -c --argjson d "$variant" '.diff_file = $d' <<<"$prelude")
+    fi
+    out=$(run_claude_wf "$p" '""')
+    [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,cleanup" ]
+    jq -e '.prompts[1].prompt | contains("DIFF_FILE: . ANALYZER_DIR: /tmp/code-review-lenses.an1. WORKTREE_PATH: /tmp/code-review-lenses.wt1.")' <<<"$out"
+    jq -e '.result.summary | startswith("Prelude did not return a usable diff file. RESULT")' <<<"$out"
+  done
+
+  out=$(run_claude_wf "$(jq -c '.diff_file = "/home/u/x.diff"' <<<"$prelude")" '""')
+  [ "$(jq -r '.result.summary' <<<"$out")" = 'Prelude did not return a usable diff file. RESULT Not cleaned (not a code-review-lenses temp path): "/home/u/x.diff"' ]
+  jq -e '.prompts[1].prompt | contains("/home/u/") | not' <<<"$out"
+}
+
+@test "Claude wrapper run: blind-hunter gets the validated diff file and no BASE, REVIEW_MODE, worktree or git instruction" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  prelude='{ "agents": ["blind-hunter", "code-reviewer"], "skill_root": "/opt/crl/skills/code-review-lenses", "base": "origin/main", "review_mode": "dirty",
+             "worktree_path": "/tmp/code-review-lenses.wt1", "diff_file": "/tmp/code-review-lenses.d1" }'
+  out=$(run_claude_wf "$prelude" '""')
+  [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,blind-hunter,code-reviewer,assemble,cleanup" ]
+  jq -e '.prompts[1].prompt | contains("DIFF_FILE: /tmp/code-review-lenses.d1. Read only that temp diff.") and (test("BASE|REVIEW_MODE|git diff|wt1") | not)' <<<"$out"
+  jq -e '.prompts[2].prompt | contains("BASE: origin/main. REVIEW_MODE: dirty.") and contains("DIFF_FILE: /tmp/code-review-lenses.d1. Read the diff under review from that file.")' <<<"$out"
+
+  out=$(run_claude_wf "$(jq -c 'del(.diff_file)' <<<"$prelude")" '""')
+  jq -e '[.prompts[].prompt | contains("git diff BASE")] | any | not' <<<"$out"
+}
+
+@test "wrappers require diff_file in the prelude schema" {
+  grep -q -F "required: ['agents', 'skill_root', 'diff_file', 'cve_check_failed', 'analyzer_failed']," "$CLAUDE_WF"
+  grep -q -F '"required": ["agents", "skill_root", "diff_file", "cve_check_failed", "analyzer_failed"],' "$GROK_WF"
+}
+
+@test "Grok wrapper stops before any reviewer unless the prelude returns a validated diff file" {
+  [ "$(grep -c -F 'safe_temp_path(pre.output.diff_file)' "$GROK_WF")" -eq 1 ]
+  validated=$(grep -n -F 'diff_file = safe_temp_path(pre.output.diff_file);' "$GROK_WF" | head -1 | cut -d: -f1)
+  guard=$(grep -n -F 'if diff_file == "" {' "$GROK_WF" | head -1 | cut -d: -f1)
+  review=$(grep -n -F 'for name in names {' "$GROK_WF" | head -1 | cut -d: -f1)
+  [ -n "$validated" ]
+  [ -n "$guard" ]
+  [ -n "$review" ]
+  [ "$validated" -lt "$guard" ]
+  [ "$guard" -lt "$review" ]
+  grep -A1 -F 'if diff_file == "" {' "$GROK_WF" | grep -q -F 'complete(#{ summary: "Prelude did not return a usable diff file." + cleanup_note(pre), profile: "full" });'
+}
+
 @test "wrappers run only the skill installed in a user skill directory and never package files from the working tree" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     line=$(grep -F 'SKILL_ROOT=$(bash' "$f" | sed 's/\\"/"/g')
@@ -742,7 +807,7 @@ RESULT Not cleaned (not a code-review-lenses temp path): "/home/u/analyzer"' ]
   done
   grep -F 'SKILL_ROOT=$(bash' "$CLAUDE_WF" | grep -q -F 'SKILL_ROOT=$(bash "$HOME/.claude/skills/code-review-lenses/scripts/resolve-skill-root.sh")'
   sed 's/\\"/"/g' "$GROK_WF" | grep -q -F 'for the first d of "$HOME/.grok/skills/code-review-lenses", "$HOME/.agents/skills/code-review-lenses", "$HOME/.claude/skills/code-review-lenses"'
-  grep -q -F '"required": ["agents", "skill_root", "cve_check_failed", "analyzer_failed"],' "$GROK_WF"
+  grep -q -F '"required": ["agents", "skill_root", "diff_file", "cve_check_failed", "analyzer_failed"],' "$GROK_WF"
   grep -q -F 'skill_root = skill_root_path(pre.output.skill_root);' "$GROK_WF"
   grep -q -F 'let agents_dir = skill_root.sub_string(0, skill_root.len() - 26) + "/agents";' "$GROK_WF"
   [ "$(printf '%s' '/skills/code-review-lenses' | wc -c | tr -d ' ')" -eq 26 ]
@@ -804,7 +869,7 @@ JS
   if ! command -v node >/dev/null 2>&1; then
     skip "node not installed"
   fi
-  prelude='{ "agents": ["issue-linker"], "skill_root": "/opt/crl/skills/code-review-lenses", "provider": "github", "host": "github.com", "repo_slug": "acme/app", "pr_number": "42" }'
+  prelude='{ "agents": ["issue-linker"], "skill_root": "/opt/crl/skills/code-review-lenses", "diff_file": "/tmp/code-review-lenses.d1", "provider": "github", "host": "github.com", "repo_slug": "acme/app", "pr_number": "42" }'
   out=$(run_claude_wf "$prelude" '""')
   jq -e '.prompts[1].prompt | contains("REPO_SLUG: acme/app. PR_NUMBER: 42.")' <<<"$out"
   for bad in '"42; rm -rf ~"' '"0"' '""'; do
@@ -842,7 +907,7 @@ JS
   if ! command -v node >/dev/null 2>&1; then
     skip "node not installed"
   fi
-  prelude='{ "agents": ["code-reviewer"], "skill_root": "/opt/crl/skills/code-review-lenses", "classification": { "TIER": "tiny", "ARCH_PROMOTED": "true" } }'
+  prelude='{ "agents": ["code-reviewer"], "skill_root": "/opt/crl/skills/code-review-lenses", "diff_file": "/tmp/code-review-lenses.d1", "classification": { "TIER": "tiny", "ARCH_PROMOTED": "true" } }'
   out=$(run_claude_wf "$prelude" '""')
   jq -e '.prompts[2].prompt | split("Everything after this line")[1] | contains("<classification>\n{\"TIER\":\"tiny\",\"ARCH_PROMOTED\":\"true\"}\n</classification>")' <<<"$out"
 }
@@ -862,8 +927,8 @@ JS
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     grep -q -F 'Whether or not step 7 runs, return cve_check_failed and analyzer_failed booleans (false for a check that was not scheduled or had nothing to scan).' "$f"
   done
-  grep -q -F "required: ['agents', 'skill_root', 'cve_check_failed', 'analyzer_failed']," "$CLAUDE_WF"
-  grep -q -F '"required": ["agents", "skill_root", "cve_check_failed", "analyzer_failed"],' "$GROK_WF"
+  grep -q -F "required: ['agents', 'skill_root', 'diff_file', 'cve_check_failed', 'analyzer_failed']," "$CLAUDE_WF"
+  grep -q -F '"required": ["agents", "skill_root", "diff_file", "cve_check_failed", "analyzer_failed"],' "$GROK_WF"
   grep -q -F "'CVE_CHECK_FAILED=' + String(prelude.cve_check_failed !== false) + '. ANALYZER_FAILED=' + String(prelude.analyzer_failed !== false) + '." "$CLAUDE_WF"
   grep -A1 -F 'if pre.output != () && pre.output.cve_check_failed == false {' "$GROK_WF" | grep -q -F 'assemble_prompt += "false";'
   grep -A1 -F 'if pre.output != () && pre.output.analyzer_failed == false {' "$GROK_WF" | grep -q -F 'assemble_prompt += "false";'

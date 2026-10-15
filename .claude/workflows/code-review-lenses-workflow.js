@@ -155,7 +155,7 @@ const prelude = await agent(
     label: 'prelude',
     schema: {
       type: 'object',
-      required: ['agents', 'skill_root', 'cve_check_failed', 'analyzer_failed'],
+      required: ['agents', 'skill_root', 'diff_file', 'cve_check_failed', 'analyzer_failed'],
       properties: {
         profile: { type: 'string' },
         agents: { type: 'array', items: { type: 'string' } },
@@ -222,6 +222,12 @@ if (!skillRoot) {
 const agentsDir = skillRoot.slice(0, -'/skills/code-review-lenses'.length) + '/agents'
 const worktreePath = safeTempPath(prelude.worktree_path)
 const diffFile = safeTempPath(prelude.diff_file)
+if (!diffFile) {
+  return {
+    summary: 'Prelude did not return a usable diff file.' + (await cleanupNote(prelude)),
+    profile: prelude.profile || 'full',
+  }
+}
 
 const vendoredStems = [
   'code-reviewer',
@@ -231,7 +237,7 @@ const vendoredStems = [
   'type-design-analyzer',
 ]
 const blindHunterNote =
-  'BLIND_HUNTER_NOTE: The "Verification before naming" directive means verify within the diff or file list you were given — do NOT Grep or Read outside it. The "Refuse incoherent input" directive applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.'
+  'BLIND_HUNTER_NOTE: The "Verification before naming" directive means verify within the diff you were given — do NOT Grep or Read outside it. The "Refuse incoherent input" directive applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.'
 const vendoredGovernance = untrustedAndOutputSafety(prelude.governance || '')
 const jsonFindingsStems = ['pr-test-analyzer', 'type-design-analyzer', 'comment-analyzer']
 const jsonFindingsNote =
@@ -264,17 +270,15 @@ const reviews = await pipeline(names, function (name) {
       !prelude.guidance
         ? 'No extra GUIDANCE.'
         : 'GUIDANCE: ' + prelude.guidance,
-      name === 'blind-hunter' && diffFile
+      name === 'blind-hunter'
         ? ''
         : 'BASE: ' + (prelude.base || '') + '. REVIEW_MODE: ' + (prelude.review_mode || '') + '.',
       name === 'blind-hunter'
-        ? diffFile
-          ? 'DIFF_FILE: ' + diffFile + '. Read only that temp diff. Do not use WORKTREE_PATH or git -C. Zero project context.'
-          : 'No URL worktree (local review). File list + git diff BASE -- file. Zero project context.'
+        ? 'DIFF_FILE: ' + diffFile + '. Read only that temp diff. Do not use WORKTREE_PATH or git -C. Zero project context.'
         : worktreePath
           ? 'WORKTREE_PATH: ' + worktreePath + '. All git commands: git -C that path. Do not review the parent clone.'
           : 'No URL worktree (local review).',
-      name !== 'blind-hunter' && diffFile ? 'DIFF_FILE: ' + diffFile + '. Read the diff under review from that file.' : '',
+      name !== 'blind-hunter' ? 'DIFF_FILE: ' + diffFile + '. Read the diff under review from that file.' : '',
       name === 'issue-linker'
         ? 'PROVIDER: ' +
           (prelude.provider || '') +
