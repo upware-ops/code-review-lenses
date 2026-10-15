@@ -1,0 +1,27 @@
+tests/resolve_profile.bats
+  s_22d2264024e6d9::t_c6d1ba9d2c570a 12-13
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_c6d1ba9d2c570a 429
+skills/code-review-lenses/scripts/evaluate-gates.sh
+  s_22d2264024e6d9::t_c6d1ba9d2c570a 116
+docs/architecture.md
+  s_22d2264024e6d9::t_c6d1ba9d2c570a 103
+tests/evaluate_gates.bats
+  s_22d2264024e6d9::t_c6d1ba9d2c570a 238-239,247-248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "5f2a7b5021067f91e71397eab7b1711a9e9bb2ef",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
