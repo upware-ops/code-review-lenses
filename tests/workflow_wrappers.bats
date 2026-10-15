@@ -241,7 +241,7 @@ setup() {
     grep -B2 'context-passing rules' "$f" | grep -q 'blind-hunter'
     grep -B2 'Review the range from review-diff.sh' "$f" | grep -q 'blind-hunter'
   done
-  grep -A1 "name === 'blind-hunter' && prelude.diff_file" "$CLAUDE_WF" | grep -q "? ''"
+  grep -A1 "name === 'blind-hunter' && diffFile" "$CLAUDE_WF" | grep -q "? ''"
   grep -q 'if name != "blind-hunter" || df == "" {' "$GROK_WF"
 }
 
@@ -405,12 +405,10 @@ setup() {
 const keep = [
   '/tmp/code-review-lenses.AbC123',
   '/private/tmp/code-review-lenses.x1',
-  '/var/folders/d4/r7jlsr2s3_gbckcs5fdrkkgr0000gn/T/code-review-lenses.JBI28RKCyr',
-  '/var/folders/d4/r7jlsr2s3_gbckcs5fdrkkgr0000gn/T//code-review-lenses.JBI28RKCyr',
-  '/private/var/folders/ab/T/code-review-lenses.1',
 ]
 const drop = [
   '/tmp/x', '/tmp/tmp.AbC123', '/private/tmp/review/diff.patch', '/var/folders/ab/T/tmp.JBI28RKCyr',
+  '/var/folders/d4/T/code-review-lenses.JBI28RKCyr', '/private/var/folders/ab/T/code-review-lenses.1', '/var/tmp/code-review-lenses.x',
   '/tmp/code-review-lenses.x/inner', '/tmp/code-review-lensesX', '/tmp/other.code-review-lenses.x', '/tmp/code-review-lenses.x/',
   '', '/', '/tmp', '/var/folders', 'tmp/x', './tmp/x', 'x/tmp/y', '/Users/x/file', '/etc/passwd', '/tmpx/y', '/private/tmpx/y',
   '/tmp/../etc/passwd', '/tmp/a/../../b', '/tmp/..', '/var/folders/../../etc',
@@ -445,7 +443,7 @@ globalThis.agent = async (prompt) => {
 const note = (s) => ' Not cleaned (not a code-review-lenses temp path): ' + JSON.stringify(s)
 
 ;(async () => {
-  const wt = '/private/var/folders/ab/T/code-review-lenses.wt1'
+  const wt = '/private/tmp/code-review-lenses.wt1'
   const df = '/tmp/code-review-lenses.diff1'
   const ad = '/tmp/code-review-lenses.an1'
 
@@ -501,7 +499,7 @@ JS
 
 @test "wrappers pass only their own temp-dir paths to destructive cleanup and name the rest in a manual note" {
   for f in "$CLAUDE_WF" "$GROK_WF"; do
-    grep -q -F '/private/var/folders/' "$f"
+    grep -q -F '/private/tmp/' "$f"
     grep -q -F ' Not cleaned (not a code-review-lenses temp path): ' "$f"
   done
   grep -q -F "if (p.split('/').pop().indexOf('code-review-lenses.') !== 0) return ''" "$CLAUDE_WF"
@@ -544,10 +542,15 @@ JS
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     [ "$(grep -c -F 'git worktree add' "$f")" -eq 1 ]
     line=$(grep -F 'git worktree add' "$f" | sed 's/\\"/"/g')
-    [[ "$line" == *'WORKTREE_PATH=$(mktemp -d "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'*'git worktree add'* ]]
-    [[ "$line" == *'DIFF_FILE=$(mktemp "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'* ]]
-    sed 's/\\"/"/g' "$f" | grep -q -F -- '--diff-file "$DIFF_FILE" with DIFF_FILE=$(mktemp "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'
-    sed 's/\\"/"/g' "$f" | grep -q -F 'ANALYZER_DIR=$(mktemp -d "${TMPDIR:-/tmp}/code-review-lenses.XXXXXX")'
+    [[ "$line" == *'WORKTREE_PATH=$(mktemp -d /tmp/code-review-lenses.XXXXXX)'*'git worktree add'* ]]
+    [[ "$line" == *'DIFF_FILE=$(mktemp /tmp/code-review-lenses.XXXXXX)'* ]]
+    sed 's/\\"/"/g' "$f" | grep -q -F -- '--diff-file "$DIFF_FILE" with DIFF_FILE=$(mktemp /tmp/code-review-lenses.XXXXXX)'
+    sed 's/\\"/"/g' "$f" | grep -q -F 'ANALYZER_DIR=$(mktemp -d /tmp/code-review-lenses.XXXXXX)'
+    grep -q -F 'Return that file as diff_file in every mode' "$f"
+    if grep -q -F 'TMPDIR' "$f"; then
+      echo "REGRESSION: $f creates temp paths under TMPDIR, which the cleanup check rejects outside /tmp" >&2
+      return 1
+    fi
     [[ "$line" == *'git worktree add --detach "$WORKTREE_PATH" and checkout inside it'* ]]
     if grep -q -F -e '$(mktemp)' -e '$(mktemp -d)' -e 'temp file from mktemp' "$f"; then
       echo "REGRESSION: $f has the prelude create a temp path the cleanup check rejects" >&2
@@ -635,6 +638,11 @@ JS
   jq -e '.prompts[2].prompt | contains("SEVERITY.md: /opt/crl/skills/code-review-lenses/SEVERITY.md.")' <<<"$out"
   jq -e '.prompts[3].prompt | contains("Run /opt/crl/skills/code-review-lenses/SKILL.md Phase 2") and contains("ANALYZER_DIR: /tmp/code-review-lenses.an1.") and (contains("<analyzer-json>") | not)' <<<"$out"
   [ "$(jq -r '.result' <<<"$out")" = "RESULT" ]
+
+  out=$(run_claude_wf "$(jq -c '.diff_file = "/tmp/code-review-lenses.d2"' <<<"$prelude")" '""')
+  jq -e '.prompts[1].prompt | contains("DIFF_FILE: /tmp/code-review-lenses.d2. Read the diff under review from that file.")' <<<"$out"
+  out=$(run_claude_wf "$(jq -c '.diff_file = "/home/u/x.diff" | .worktree_path = "/home/u/wt"' <<<"$prelude")" '""')
+  jq -e '.prompts[1].prompt | (contains("/home/u/") | not) and contains("No URL worktree (local review).")' <<<"$out"
 
   out=$(run_claude_wf "$(jq -c '.analyzer_dir = "/home/u/analyzer"' <<<"$prelude")" '""')
   jq -e '.prompts[3].prompt | contains("DIFF_FILE: /tmp/code-review-lenses.d1. ANALYZER_DIR: .")' <<<"$out"
