@@ -12,8 +12,9 @@
 #
 # --provider/--host/--repo (all three or none): the PR/MR URL's repository. The
 # target branch is fetched from the first git remote (origin first) whose URL
-# points at HOST/REPO_SLUG, compared case-insensitively. Without them it is
-# fetched from origin.
+# points at HOST/REPO_SLUG, compared case-insensitively; an http:// or git://
+# remote never matches (nothing authenticates the server, so anyone on the path
+# could answer the fetch). Without them it is fetched from origin.
 #
 # Output (exit 0): BASE=<sha>
 # Exit 2: missing/invalid --ref, --provider-base, or --provider/--host/--repo,
@@ -100,7 +101,7 @@ if [[ -n "$PROVIDER$HOST$REPO" ]]; then
   REMOTE=""
   for name in origin $(git remote | grep -vx origin); do
     url=$(git remote get-url "$name" 2>/dev/null) || continue
-    out=$(bash "$SCRIPT_DIR/detect-provider.sh" --provider "$PROVIDER" --remote-url "$url" 2>/dev/null) || continue
+    out=$(bash "$SCRIPT_DIR/detect-provider.sh" --provider "$PROVIDER" --authenticated-transport --remote-url "$url" 2>/dev/null) || continue
     found=$(eval "$out"; printf '%s/%s' "$HOST" "$REPO_SLUG" | tr '[:upper:]' '[:lower:]')
     if [[ "$found" == "$target" ]]; then
       REMOTE="$name"

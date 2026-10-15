@@ -643,6 +643,23 @@ EOF
   [[ "$output" == *"Unrecognized remote URL"* ]]
 }
 
+@test "detect-provider: --authenticated-transport refuses http:// and git:// remotes, which local detection still reads" {
+  for url in http://github.com/acme/app.git git://github.com/acme/app.git http://oauth2:REDACT@github.com/acme/app.git; do
+    run -2 bash "$DETECT" --provider github --authenticated-transport --remote-url "$url"
+    [[ "$output" == *"Refusing remote"* ]] || return 1
+    [[ "$output" != *REDACT* ]] || return 1
+    run bash "$DETECT" --provider github --remote-url "$url"
+    [ "$status" -eq 0 ]
+    grep -qx 'REPO_SLUG=acme/app' <<<"$output"
+  done
+  for url in https://github.com/acme/app.git ssh://git@github.com/acme/app.git git@github.com:acme/app.git; do
+    run bash "$DETECT" --provider github --authenticated-transport --remote-url "$url"
+    [ "$status" -eq 0 ]
+    grep -qx 'HOST=github.com' <<<"$output"
+    grep -qx 'REPO_SLUG=acme/app' <<<"$output"
+  done
+}
+
 @test "detect-provider: local detection matches GH_HOST directly and probes only with CLI env tokens unset" {
   mkdir -p "$WORK/bin"
   cat > "$WORK/bin/gh" << 'EOF'

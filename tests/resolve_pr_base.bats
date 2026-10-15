@@ -239,6 +239,34 @@ EOF
   [[ "$output" == *"--provider must be github, gitlab, or bitbucket"* ]]
 }
 
+@test "resolve-pr-base: an http:// or git:// remote never matches the PR/MR repository, an https:// or ssh:// one does" {
+  # git refuses a transport outside this list before any network access, so a regression fails here instead of fetching
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_ALLOW_PROTOCOL=file
+
+  for url in http://git.example.test/acme/app.git git://git.example.test/acme/app.git; do
+    git -C "$WORK/parent" remote set-url origin "$url"
+    run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host git.example.test --repo acme/app"
+    [[ "$output" == *"No git remote points at https://git.example.test/acme/app"* ]] || return 1
+  done
+
+  for url in https://git.example.test/acme/app.git ssh://git@git.example.test/acme/app.git; do
+    git -C "$WORK/parent" remote set-url origin "$url"
+    run -2 bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host git.example.test --repo acme/app"
+    [[ "$output" == *"git fetch origin release/x failed"* ]] || return 1
+  done
+}
+
+@test "resolve-pr-base: plaintext remotes of the PR/MR repository are skipped for an authenticated one" {
+  hosted_remotes
+  export GIT_ALLOW_PROTOCOL=ssh:file
+  git -C "$WORK/parent" remote set-url origin http://github.com/acme/app.git
+  git -C "$WORK/parent" remote add aaa git://github.com/acme/app.git
+
+  run bash -c "cd '$WT' && bash '$RESOLVE' --ref release/x --provider github --host github.com --repo acme/app"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"BASE=$D"* ]]
+}
+
 @test "resolve-pr-base: its fetch runs no hook of the PR worktree's own relative core.hooksPath" {
   git -C "$WORK/parent" config core.hooksPath .githooks
   mkdir "$WT/.githooks"

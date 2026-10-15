@@ -4,6 +4,7 @@
 #
 # Usage:
 #   bash detect-provider.sh [--provider NAME] [--remote-url URL] [--fallback unknown]
+#                           [--authenticated-transport]
 #   bash detect-provider.sh --check-url-host --provider NAME --host HOST
 #
 # If --remote-url is omitted, uses `git remote get-url origin`.
@@ -13,6 +14,10 @@
 # includes a host known only by a stored gh login while GH_ENTERPRISE_TOKEN /
 # GITHUB_ENTERPRISE_TOKEN is set and GH_HOST is not that host (gh would send
 # the token to it).
+# --authenticated-transport: exit 2 for a remote that is not https://, ssh:// or
+# scp-like (host:path). http:// and git:// authenticate no server, so whoever is
+# on the path can answer a fetch. resolve-pr-base.sh passes it for the remote a
+# PR/MR review fetches from; local detection fetches nothing and still reads them.
 # --check-url-host: after parse-pr-url only. GitHub: github.com /
 # *.ghe.com, GH_HOST equal to HOST, or `gh auth status --hostname HOST --active`
 # succeeds (origin match is not enough). GitLab: glab's host (first set of
@@ -42,6 +47,7 @@ set -euo pipefail
 PROVIDER_OVERRIDE=""
 REMOTE_URL=""
 FALLBACK=""
+AUTHENTICATED_TRANSPORT=false
 CHECK_URL_HOST=false
 CHECK_HOST=""
 
@@ -110,6 +116,10 @@ while [[ $# -gt 0 ]]; do
       FALLBACK="${1#--fallback=}"
       shift
       ;;
+    --authenticated-transport)
+      AUTHENTICATED_TRANSPORT=true
+      shift
+      ;;
     --check-url-host)
       CHECK_URL_HOST=true
       shift
@@ -169,6 +179,13 @@ extract_host_path() {
   url="${url%/}"
   url="${url%.git}"
   url="${url%/}"
+
+  if [[ "$AUTHENTICATED_TRANSPORT" == true ]]; then
+    case "$url" in
+      ssh://*|https://* ) ;;
+      *://* ) die "Refusing remote '$(sanitize_url "$url")': only https://, ssh:// and scp-like remotes authenticate the server." ;;
+    esac
+  fi
 
   case "$url" in
     ssh://*|http://*|https://*|git://* )
