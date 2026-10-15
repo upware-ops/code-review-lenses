@@ -476,7 +476,7 @@ Wait for agents.
 
 **2a — extract json-findings** from architecture-reviewer, security-reviewer, blind-hunter, edge-case-hunter, adversarial-general, and pr-test-analyzer, type-design-analyzer, comment-analyzer (prefer their block when present). Salvage truncated arrays. Validate `severity` ∈ Critical|High|Medium|Low. Normalize `category` to `authz|injection|dependency-cve|secret|architecture-coupling|test-gap|edge-case|observability|docs|lint|other`. Merge with `CVE_JSON` and analyzer JSON; in PR/MR-URL mode first make their `file` repo-relative with `jq --arg p "$WORKTREE_PATH/" '(.[].file | strings) |= ltrimstr($p)'`. Toolkit agents without a usable json-findings block: map via [SEVERITY.md](SEVERITY.md).
 
-**2b — severity** per SEVERITY.md. Unparseable CVSS → High.
+**2b — severity** per SEVERITY.md. Analyzer findings keep their emitted severity. Unparseable CVSS → High.
 
 **2c — confidence.** Drop findings with `confidence < MIN_CONFIDENCE` (default 75; 0 disables). Before suppressions.
 

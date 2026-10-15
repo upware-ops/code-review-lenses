@@ -14,12 +14,20 @@ unified Critical/High/Medium/Low scale.
 | blind-hunter, edge-case-hunter | Critical/High/Medium/Low via json-findings | pass through |
 | dependency-check (parsed CVSS) | Critical/High/Medium/Low | pass through (identity mapping) |
 | dependency-check (CVSS unparsed / v4 / v2) | High | maps to High (conservative) |
-| shellcheck | error/warning/info | High / Medium / Low |
-| semgrep | ERROR/WARNING/INFO (or rule confidence) | Critical / High / Medium |
-| trufflehog | verified/unverified/unverified-test | Critical / High / Low |
-| ruff | all findings | Medium |
-| golangci-lint | all findings | Medium |
-| checkov | CKV2_*/CKV_SECRET_* vs others | High / Medium |
+| shellcheck | error/warning (info and style are not emitted) | High / Medium (emitted; pass through) |
+| semgrep | ERROR/WARNING/other (INFO) | High / Medium / Low (emitted; pass through) |
+| trufflehog | verified/unverified/unverified-test | Critical / High / Low (emitted; pass through) |
+| ruff | rule code starting with F or E / W or C / other | High / Medium / Low (emitted; pass through) |
+| golangci-lint | errcheck, govet, staticcheck / other linters | High / Medium (emitted; pass through) |
+| checkov | CKV2_*/CKV_SECRET_* vs others | High / Medium (emitted; pass through) |
+| eslint | error (2)/warning (1) | High / Medium (emitted; pass through) |
+| hadolint | error/warning/other (info, style) | High / Medium / Low (emitted; pass through) |
+| kube-linter | no severity field | Medium (emitted; pass through) |
+| phpcs | ERROR/WARNING | High / Medium (emitted; pass through) |
+| phpstan | no severity field | High (emitted; pass through) |
+| tflint | error/warning/other (notice) | High / Medium / Low (emitted; pass through) |
+
+Phase 2 keeps an analyzer finding's emitted severity, and the scripts are the only place that mapping is applied.
 
 pr-test-analyzer, type-design-analyzer, and comment-analyzer end their reply with a json-findings block whose `severity` and `confidence` follow the rows above and the confidence mapping below; `category` is one of the values listed below. Phase 2a uses that block when present and falls back to these rows otherwise.
 
