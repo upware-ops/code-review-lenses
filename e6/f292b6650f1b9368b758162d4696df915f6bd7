@@ -2,8 +2,16 @@ CHANGELOG.md
   s_22d2264024e6d9::t_4917a051e85085 54
 skills/code-review-lenses/scripts/run-cve-check.sh
   s_22d2264024e6d9::t_5d21ba4bffc422 409-410,413,415,440-442,449-451,473-474
+  s_22d2264024e6d9::t_77cc6b1de51ed2 409-410,415
+  s_22d2264024e6d9::t_2e2d886bddbfdf 474
+  s_22d2264024e6d9::t_a49ef5bc0a3407 449-451
+  s_22d2264024e6d9::t_3bda72a7417074 413
+  s_22d2264024e6d9::t_cc8b62e7193ae3 440-442
+  s_22d2264024e6d9::t_b9275b27062527 473
 tests/run_cve_check.bats
   s_22d2264024e6d9::t_ec463ca0dda3bd 131-208,542-568
+  s_22d2264024e6d9::t_844f1a92e48650 131-208
+  s_22d2264024e6d9::t_942154af31a4a8 542-568
 ---
 {
   "schema_version": "authorship/3.0.0",
