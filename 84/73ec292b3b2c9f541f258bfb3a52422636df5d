@@ -1,0 +1,29 @@
+skills/code-review-lenses/SKILL.md
+  s_22d2264024e6d9::t_a177288f3cec5e 463
+tests/evaluate_gates.bats
+  s_22d2264024e6d9::t_a177288f3cec5e 152-164
+tests/run_trufflehog.bats
+  s_22d2264024e6d9::t_a177288f3cec5e 113-125
+skills/code-review-lenses/scripts/run-trufflehog.sh
+  s_22d2264024e6d9::t_a177288f3cec5e 22-24,86,94
+skills/code-review-lenses/scripts/evaluate-gates.sh
+  s_22d2264024e6d9::t_09db895d555ead 82-83
+CHANGELOG.md
+  s_22d2264024e6d9::t_e1f625adc63988 49,53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "8473ec292b3b2c9f541f258bfb3a52422636df5d",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
