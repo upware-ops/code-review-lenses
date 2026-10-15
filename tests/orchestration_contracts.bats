@@ -281,7 +281,7 @@ teardown() {
 
 @test "PROVIDERS.md: GitHub OPs pin GH_HOST and --repo" {
   grep -q 'GH_HOST="$HOST" gh pr view' "$PROVIDERS_MD"
-  grep -qF -- '- **github:** `git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" fetch -q <remote> "refs/pull/$PR_NUMBER/head" && git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" checkout -q FETCH_HEAD`' "$PROVIDERS_MD"
+  grep -qF -- '- **github:** `git -c core.hooksPath=/dev/null -c "credential.https://$HOST.helper=!gh auth git-credential" -C "$WORKTREE_PATH" fetch -q <remote> "refs/pull/$PR_NUMBER/head" && git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" checkout -q FETCH_HEAD`' "$PROVIDERS_MD"
   if grep -q -E 'gh pr checkout|GIT_CONFIG_COUNT' "$PROVIDERS_MD"; then
     echo "REGRESSION: a checkout OP runs gh, whose git children do not get the hooks flag" >&2
     return 1

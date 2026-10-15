@@ -182,6 +182,34 @@ teardown() {
   [[ "$output" == *"BASE=$D"* ]]
 }
 
+@test "resolve-pr-base: a GitHub base fetch can use the gh login through gh's git credential helper, other providers' cannot" {
+  hosted_remotes
+  real_git=$(command -v git)
+  mkdir -p "$WORK/gitlog-bin"
+  cat > "$WORK/gitlog-bin/git" <<EOF
+#!/bin/sh
+printf '%s\n' "\$*" >> "$WORK/git.log"
+exec "$real_git" "\$@"
+EOF
+  chmod +x "$WORK/gitlog-bin/git"
+
+  run bash -c "cd '$WT' && PATH='$WORK/gitlog-bin':\"\$PATH\" bash '$RESOLVE' --ref release/x --provider github --host github.com --repo acme/app"
+  [ "$status" -eq 0 ]
+  grep -qF -- '-c core.hooksPath=/dev/null -c credential.https://github.com.helper=!gh auth git-credential fetch --no-tags upstream refs/heads/release/x' "$WORK/git.log"
+
+  mkdir -p "$WORK/ssh/git@git.example.test/group"
+  git clone -q --bare "$WORK/origin.git" "$WORK/ssh/git@git.example.test/group/proj.git"
+  git -C "$WORK/parent" remote add gl git@git.example.test:group/proj.git
+  : > "$WORK/git.log"
+  run bash -c "cd '$WT' && PATH='$WORK/gitlog-bin':\"\$PATH\" bash '$RESOLVE' --ref release/x --provider gitlab --host git.example.test --repo group/proj"
+  [ "$status" -eq 0 ]
+  grep -qF -- '-c core.hooksPath=/dev/null fetch --no-tags gl refs/heads/release/x' "$WORK/git.log"
+  if grep -qF 'credential.' "$WORK/git.log"; then
+    echo "REGRESSION: a non-GitHub fetch got gh's credential helper" >&2
+    return 1
+  fi
+}
+
 @test "resolve-pr-base: a GitLab nested-group project matches on a self-hosted host" {
   hosted_remotes
 
