@@ -122,10 +122,10 @@ fi
 #   },
 #   "errors": []
 # }
+EXIT_CODE=0
 if echo "$PHPSTAN_OUTPUT" | jq -e '((.errors // []) | length) > 0' >/dev/null 2>&1; then
   echo "WARNING: phpstan reported non-file errors; not treating as zero findings." >&2
-  echo "[]"
-  exit 1
+  EXIT_CODE=1
 fi
 
 # PHPStan has no severity field — all findings are errors; map to High.
@@ -153,3 +153,4 @@ FINDINGS=$(echo "$PHPSTAN_OUTPUT" | jq -r --arg root "$PWD" '
 }
 
 echo "${FINDINGS:-[]}"
+exit "$EXIT_CODE"
