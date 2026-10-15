@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # parse-pr-url.sh — extract host, provider, repo slug, and PR/MR number from
-# invoke text. The first http(s) (or scheme-less) PR/MR URL wins.
+# invoke text. The first https (or scheme-less) PR/MR URL wins.
 #
 # Usage:
 #   bash parse-pr-url.sh [text...]
@@ -10,10 +10,10 @@
 #   PR_URL PROVIDER HOST REPO_SLUG PR_NUMBER PR_TERM PR_TERM_LONG CLI_TOOL
 #   GUIDANCE_REST (invoke text with the matched URL removed; userinfo stripped)
 # Exit 1: no PR/MR URL in the text (local branch review).
-# Exit 2: invalid / refused URL (scheme, non-default port, api.github.com,
-#         non-owner/repo path, text glued to the number, non-Cloud Bitbucket,
-#         or grep failure). A bare number is never a complete identity.
-#         A default port (:443 for https, :80 for http) is accepted and dropped.
+# Exit 2: invalid / refused URL (scheme, http://, non-default port,
+#         api.github.com, non-owner/repo path, text glued to the number,
+#         non-Cloud Bitbucket, or grep failure). A bare number is never a
+#         complete identity. The default :443 is accepted and dropped.
 #
 # This is the shipped URL parser. Orchestrator SKILL.md must invoke it
 # rather than re-implement host/number extraction.
@@ -69,7 +69,7 @@ while IFS= read -r raw; do
   clean="${url%%#*}"
   clean="${clean%%\?*}"
   clean="${clean%/}"
-  if [[ "$clean" =~ ^(https://[^/]*):443(/.*)$ || "$clean" =~ ^(http://[^/]*):80(/.*)$ ]]; then
+  if [[ "$clean" =~ ^(https://[^/]*):443(/.*)$ ]]; then
     clean="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
   fi
 
@@ -128,8 +128,12 @@ while IFS= read -r raw; do
   if [[ -z "$host" || -z "$slug" || -z "$number" ]]; then
     continue
   fi
+  if [[ "$clean" == http://* ]]; then
+    echo "Error: parse-pr-url.sh: refused http:// PR/MR URL; use https (provider calls would send credentials unencrypted)." >&2
+    exit 2
+  fi
   if [[ "$host" == *:* ]]; then
-    echo "Error: parse-pr-url.sh: refused non-default port (only :443 for https and :80 for http are supported)." >&2
+    echo "Error: parse-pr-url.sh: refused non-default port (only :443 is supported)." >&2
     exit 2
   fi
   if [[ "$host" == "api.github.com" ]]; then

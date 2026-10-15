@@ -201,16 +201,28 @@ source_url() {
   [[ "$output" != *s3cret* ]]
 }
 
-@test "parse-pr-url: the default port (:443 for https, :80 for http) is accepted and dropped" {
+@test "parse-pr-url: the default port :443 is accepted and dropped" {
   source_url "https://oauth2:s3cret@git.example.test:443/group/sub/proj/-/merge_requests/7"
   [[ "$HOST" == "git.example.test" ]]
   [[ "$REPO_SLUG" == "group/sub/proj" ]]
   [[ "$PR_URL" == "https://git.example.test/group/sub/proj/-/merge_requests/7" ]]
-  source_url "http://github.com:80/acme/app/pull/42.diff"
-  [[ "$HOST" == "github.com" ]]
-  [[ "$PR_URL" == "http://github.com/acme/app/pull/42.diff" ]]
   source_url "git.example.test:443/group/proj/-/merge_requests/7"
   [[ "$HOST" == "git.example.test" ]]
+}
+
+@test "parse-pr-url: an http:// PR/MR URL is exit 2 (provider calls would send credentials unencrypted)" {
+  run -2 bash "$PARSE" "http://git.example.test/group/project/-/merge_requests/7"
+  [[ "$output" == *"refused http:// PR/MR URL"* ]]
+  run -2 bash "$PARSE" "http://github.com:80/acme/app/pull/42.diff"
+  [[ "$output" == *"refused http:// PR/MR URL"* ]]
+  run -2 bash "$PARSE" "http://oauth2:s3cret@github.com/acme/app/pull/42"
+  [[ "$output" != *s3cret* ]]
+}
+
+@test "parse-pr-url: an http:// non-PR link does not block the first PR/MR URL" {
+  source_url "see http://example.com/docs and https://github.com/acme/app/pull/42"
+  [[ "$HOST" == "github.com" ]]
+  [[ "$PR_URL" == "https://github.com/acme/app/pull/42" ]]
 }
 
 @test "parse-pr-url: a port on a non-PR link does not block the first PR/MR URL" {
