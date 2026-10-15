@@ -38,6 +38,14 @@ A remote is treated as GitLab when:
 3. `glab config get host` equals the hostname
 4. `glab auth status --hostname <hostname>` succeeds (other hosts' auth state is ignored)
 
+An MR URL host is checked by `detect-provider.sh --check-url-host` before any
+`glab` call. It accepts glab's host (`GITLAB_HOST`, `GITLAB_URI` or `GL_HOST`,
+else `gitlab.com`) or a host where `glab auth status --hostname <hostname>`
+succeeds with the env tokens unset. glab sends `GITLAB_TOKEN`,
+`GITLAB_ACCESS_TOKEN` and `OAUTH_TOKEN` to any host, so while one is set, any
+other host is refused: set `GITLAB_HOST` to the MR's host or unset the token.
+A matching `origin` or `glab config get host` is not enough.
+
 Nested groups stay in the project slug (`group/sub/project`).
 `glab mr view` / `glab mr checkout` are used for an MR URL.
 
@@ -45,6 +53,13 @@ Nested groups stay in the project slug (`group/sub/project`).
 
 Requires [gh](https://cli.github.com/). A `…/pull/<N>` URL on any host is
 GitHub (including Enterprise).
+
+`detect-provider.sh --check-url-host` accepts github.com / `*.github.com` /
+`*.ghe.com`, `GH_HOST` equal to the URL host, or a host where
+`gh auth status --hostname <host> --active` succeeds with the env tokens unset.
+gh sends `GH_ENTERPRISE_TOKEN` / `GITHUB_ENTERPRISE_TOKEN` to every GitHub
+Enterprise Server host, so while one is set, a host other than `GH_HOST` is
+refused. A matching `origin` is not enough.
 
 ## Bitbucket
 

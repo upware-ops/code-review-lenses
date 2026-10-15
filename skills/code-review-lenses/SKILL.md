@@ -108,7 +108,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
      bash "$SCRIPTS_DIR/detect-provider.sh" --check-url-host --provider "$PROVIDER" --host "$HOST" || exit $?
      ```
 
-     GitHub: allow `github.com` / `*.github.com` / `*.ghe.com`, or `gh auth status` (origin match is not enough). GitLab: glab's env host (first set of `GITLAB_HOST`, `GITLAB_URI`, `GL_HOST`) or `glab auth status --hostname "$HOST"` (origin match is not enough, nor is `glab config get host`). Bitbucket: Cloud hosts only. Stop rather than send env tokens to an unknown host.
+     GitHub: allow `github.com` / `*.github.com` / `*.ghe.com`, `GH_HOST` equal to the host, or `gh auth status` (origin match is not enough). GitLab: allow glab's host (first set of `GITLAB_HOST`, `GITLAB_URI`, `GL_HOST`, else `gitlab.com`) or `glab auth status --hostname "$HOST"` (origin match is not enough, nor is `glab config get host`). An env token that would reach `HOST` but belongs to another host is a refusal, and both `auth status` probes run with the env tokens unset. Bitbucket: Cloud hosts only. Stop rather than send env tokens to an unknown host.
    - URL review + `PROVIDER=github`: `gh --version` must succeed.
    - URL review + `PROVIDER=gitlab`: `glab --version` must succeed. `glab` must already be authenticated to `HOST` (`glab auth login --hostname <HOST>` for self-hosted / dedicated).
    - URL review + `PROVIDER=bitbucket`: `curl` plus `BITBUCKET_EMAIL` and `BITBUCKET_TOKEN` (map `BITBUCKET_APP_PASSWORD` → `BITBUCKET_TOKEN` if only the former is set).

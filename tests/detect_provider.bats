@@ -359,8 +359,8 @@ EOF
     --check-url-host --provider gitlab --host git.internal.corp
   [ "$status" -eq 0 ]
   run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GL_HOST= bash "$DETECT" \
-    --check-url-host --provider gitlab --host gitlab.com
-  [[ "$output" == *"Refusing glab for host 'gitlab.com'"* ]]
+    --check-url-host --provider gitlab --host git.broken.example
+  [[ "$output" == *"Refusing glab for host 'git.broken.example'"* ]]
   eval "$(PATH="$WORK/bin:$PATH" GITLAB_HOST= GL_HOST= bash "$DETECT" \
     --remote-url git@git.internal.corp:group/app.git)"
   [[ "$PROVIDER" == "gitlab" ]]
@@ -441,6 +441,138 @@ EOF
   run env PATH="$WORK/bin:$PATH" GITLAB_HOST=git.corp.example bash "$DETECT" \
     --check-url-host --provider gitlab --host git.corp.example
   [ "$status" -eq 0 ]
+}
+
+@test "detect-provider: gitlab --check-url-host allows gitlab.com without probing glab" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/glab" << 'EOF'
+#!/usr/bin/env bash
+touch "$PROBED_FILE"
+exit 1
+EOF
+  chmod +x "$WORK/bin/glab"
+  run env PATH="$WORK/bin:$PATH" PROBED_FILE="$WORK/probed" GITLAB_HOST= GITLAB_URI= GL_HOST= \
+    bash "$DETECT" --check-url-host --provider gitlab --host gitlab.com
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/probed" ]
+}
+
+@test "detect-provider: gitlab --check-url-host probes glab with every glab env token unset" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/glab" << 'EOF'
+#!/usr/bin/env bash
+printf '%s=%s\n' \
+  GITLAB_TOKEN "${GITLAB_TOKEN-unset}" \
+  GITLAB_ACCESS_TOKEN "${GITLAB_ACCESS_TOKEN-unset}" \
+  OAUTH_TOKEN "${OAUTH_TOKEN-unset}" \
+  CI_JOB_TOKEN "${CI_JOB_TOKEN-unset}" > "$SEEN_FILE"
+exit 0
+EOF
+  chmod +x "$WORK/bin/glab"
+  run env PATH="$WORK/bin:$PATH" SEEN_FILE="$WORK/seen" GITLAB_HOST= GITLAB_URI= GL_HOST= CI_JOB_TOKEN=t4 \
+    bash "$DETECT" --check-url-host --provider gitlab --host git.internal.corp
+  [ "$status" -eq 0 ]
+  [ "$(cat "$WORK/seen")" = $'GITLAB_TOKEN=unset\nGITLAB_ACCESS_TOKEN=unset\nOAUTH_TOKEN=unset\nCI_JOB_TOKEN=unset' ]
+}
+
+@test "detect-provider: gitlab --check-url-host refuses a host with stored credentials while an env token for glab's host is set" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/glab" << 'EOF'
+#!/usr/bin/env bash
+touch "$PROBED_FILE"
+exit 0
+EOF
+  chmod +x "$WORK/bin/glab"
+  for tok in GITLAB_TOKEN GITLAB_ACCESS_TOKEN OAUTH_TOKEN; do
+    run -2 env PATH="$WORK/bin:$PATH" PROBED_FILE="$WORK/probed" GITLAB_HOST=gitlab.corp.example GITLAB_URI= GL_HOST= "$tok=t1" \
+      bash "$DETECT" --check-url-host --provider gitlab --host gitlab.com
+    [[ "$output" == *"would be sent to it, and they belong to gitlab.corp.example"* ]]
+    run -2 env PATH="$WORK/bin:$PATH" PROBED_FILE="$WORK/probed" GITLAB_HOST= GITLAB_URI= GL_HOST= "$tok=t1" \
+      bash "$DETECT" --check-url-host --provider gitlab --host git.other.example
+    [[ "$output" == *"they belong to gitlab.com"* ]]
+  done
+  [ ! -e "$WORK/probed" ]
+  run env PATH="$WORK/bin:$PATH" PROBED_FILE="$WORK/probed" GITLAB_HOST=gitlab.corp.example GITLAB_URI= GL_HOST= GITLAB_TOKEN=t1 \
+    bash "$DETECT" --check-url-host --provider gitlab --host GitLab.Corp.Example
+  [ "$status" -eq 0 ]
+}
+
+@test "detect-provider: gitlab --check-url-host refuses an unknown host that only an env token authenticates" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/glab" << 'EOF'
+#!/usr/bin/env bash
+[[ -n "${GITLAB_TOKEN-}" ]]
+EOF
+  chmod +x "$WORK/bin/glab"
+  run -2 env PATH="$WORK/bin:$PATH" GITLAB_HOST= GITLAB_URI= GL_HOST= GITLAB_TOKEN=t1 \
+    bash "$DETECT" --check-url-host --provider gitlab --host evil.example
+  [[ "$output" == *"Refusing glab for host 'evil.example'"* ]]
+}
+
+@test "detect-provider: github --check-url-host allows GH_HOST without probing gh" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/gh" << 'EOF'
+#!/usr/bin/env bash
+touch "$PROBED_FILE"
+exit 1
+EOF
+  chmod +x "$WORK/bin/gh"
+  run env PATH="$WORK/bin:$PATH" PROBED_FILE="$WORK/probed" GH_HOST=GHE.Corp.Example \
+    bash "$DETECT" --check-url-host --provider github --host ghe.corp.example
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/probed" ]
+  run -2 env PATH="$WORK/bin:$PATH" PROBED_FILE="$WORK/probed" GH_HOST=ghe.other.example \
+    bash "$DETECT" --check-url-host --provider github --host ghe.corp.example
+  [[ "$output" == *"Refusing gh for host 'ghe.corp.example'"* ]]
+}
+
+@test "detect-provider: github --check-url-host probes gh with every gh env token unset" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/gh" << 'EOF'
+#!/usr/bin/env bash
+printf '%s=%s\n' \
+  GH_TOKEN "${GH_TOKEN-unset}" \
+  GITHUB_TOKEN "${GITHUB_TOKEN-unset}" \
+  GH_ENTERPRISE_TOKEN "${GH_ENTERPRISE_TOKEN-unset}" \
+  GITHUB_ENTERPRISE_TOKEN "${GITHUB_ENTERPRISE_TOKEN-unset}" > "$SEEN_FILE"
+exit 0
+EOF
+  chmod +x "$WORK/bin/gh"
+  run env PATH="$WORK/bin:$PATH" SEEN_FILE="$WORK/seen" GH_HOST= GH_TOKEN=t1 GITHUB_TOKEN=t2 \
+    bash "$DETECT" --check-url-host --provider github --host ghe.corp.example
+  [ "$status" -eq 0 ]
+  [ "$(cat "$WORK/seen")" = $'GH_TOKEN=unset\nGITHUB_TOKEN=unset\nGH_ENTERPRISE_TOKEN=unset\nGITHUB_ENTERPRISE_TOKEN=unset' ]
+}
+
+@test "detect-provider: github --check-url-host refuses a GHES host with stored credentials while an enterprise token for GH_HOST is set" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/gh" << 'EOF'
+#!/usr/bin/env bash
+touch "$PROBED_FILE"
+exit 0
+EOF
+  chmod +x "$WORK/bin/gh"
+  for tok in GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN; do
+    run -2 env PATH="$WORK/bin:$PATH" PROBED_FILE="$WORK/probed" GH_HOST=ghe.corp.example "$tok=t3" \
+      bash "$DETECT" --check-url-host --provider github --host ghe.other.example
+    [[ "$output" == *"would be sent to it, and GH_HOST is not that host"* ]]
+  done
+  [ ! -e "$WORK/probed" ]
+  run env PATH="$WORK/bin:$PATH" PROBED_FILE="$WORK/probed" GH_HOST=ghe.corp.example GH_ENTERPRISE_TOKEN=t3 \
+    bash "$DETECT" --check-url-host --provider github --host ghe.corp.example
+  [ "$status" -eq 0 ]
+}
+
+@test "detect-provider: github --check-url-host refuses an unknown host that only an env token authenticates" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/gh" << 'EOF'
+#!/usr/bin/env bash
+[[ -n "${GH_ENTERPRISE_TOKEN-}" ]]
+EOF
+  chmod +x "$WORK/bin/gh"
+  run -2 env PATH="$WORK/bin:$PATH" GH_HOST= GH_ENTERPRISE_TOKEN=t3 \
+    bash "$DETECT" --check-url-host --provider github --host evil.example
+  [[ "$output" == *"Refusing gh for host 'evil.example'"* ]]
 }
 
 @test "detect-provider: bitbucket --check-url-host allows bitbucket.org" {

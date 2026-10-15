@@ -11,10 +11,14 @@
 # --fallback unknown: emit PROVIDER=unknown instead of dying when the remote
 # is missing or the host cannot be classified (local branch review).
 # --check-url-host: after parse-pr-url only. GitHub: github.com / *.github.com /
-# *.ghe.com, or `gh auth status --hostname HOST --active` succeeds (origin match
-# is not enough). GitLab: glab's env host (first set of GITLAB_HOST, GITLAB_URI,
-# GL_HOST) or `glab auth status --hostname HOST` succeeds (origin or
-# `glab config get host` match is not enough). Bitbucket: Cloud hosts only.
+# *.ghe.com, GH_HOST equal to HOST, or `gh auth status --hostname HOST --active`
+# succeeds (origin match is not enough). GitLab: glab's host (first set of
+# GITLAB_HOST, GITLAB_URI, GL_HOST, else gitlab.com) or `glab auth status
+# --hostname HOST` succeeds (origin or `glab config get host` match is not
+# enough). An env token the CLI would send to HOST but that belongs to another
+# host is a refusal (gh enterprise tokens belong to GH_HOST, GITLAB_TOKEN /
+# GITLAB_ACCESS_TOKEN / OAUTH_TOKEN to glab's host), so the later gh/glab calls
+# use the credential the check accepted. Bitbucket: Cloud hosts only.
 # Exit 0 if allowed, 2 if refused.
 # Does not emit a roster. Never run on local PROVIDER=unknown.
 #
@@ -212,6 +216,7 @@ if [[ "$CHECK_URL_HOST" == true ]]; then
   [[ -n "$PROVIDER_OVERRIDE" ]] || die "--check-url-host requires --provider."
   [[ -n "$CHECK_HOST" ]] || die "--check-url-host requires --host."
   HOST_LC=$(printf '%s' "$CHECK_HOST" | tr '[:upper:]' '[:lower:]')
+  # gh enterprise tokens and glab's env tokens are not host-scoped and override stored credentials.
   case "$PROVIDER_OVERRIDE" in
     github)
       case "$HOST_LC" in
@@ -219,20 +224,30 @@ if [[ "$CHECK_URL_HOST" == true ]]; then
           exit 0
           ;;
       esac
-      if gh_lists_host "$HOST_LC"; then
+      _gh_cfg=$(printf '%s' "${GH_HOST:-}" | tr '[:upper:]' '[:lower:]')
+      if [[ -n "$_gh_cfg" && "$_gh_cfg" == "$HOST_LC" ]]; then
         exit 0
       fi
-      die "Refusing gh for host '$CHECK_HOST' (not github.com / *.github.com / *.ghe.com and not on gh auth status). Run: gh auth login --hostname $CHECK_HOST"
+      if [[ -n "${GH_ENTERPRISE_TOKEN:-}${GITHUB_ENTERPRISE_TOKEN:-}" ]]; then
+        die "Refusing gh for host '$CHECK_HOST': GH_ENTERPRISE_TOKEN / GITHUB_ENTERPRISE_TOKEN would be sent to it, and GH_HOST is not that host. Unset the token or set GH_HOST=$CHECK_HOST."
+      fi
+      if (unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN; gh_lists_host "$HOST_LC"); then
+        exit 0
+      fi
+      die "Refusing gh for host '$CHECK_HOST' (not github.com / *.github.com / *.ghe.com, not GH_HOST and not on gh auth status). Run: gh auth login --hostname $CHECK_HOST"
       ;;
     gitlab)
       _gl_cfg=$(gitlab_host_name "${GITLAB_HOST:-${GITLAB_URI:-${GL_HOST:-}}}")
-      if [[ -n "$_gl_cfg" && "$_gl_cfg" == "$HOST_LC" ]]; then
+      if [[ "$HOST_LC" == "${_gl_cfg:-gitlab.com}" ]]; then
         exit 0
       fi
-      if glab auth status --hostname "$HOST_LC" >/dev/null 2>&1; then
+      if [[ -n "${GITLAB_TOKEN:-}${GITLAB_ACCESS_TOKEN:-}${OAUTH_TOKEN:-}" ]]; then
+        die "Refusing glab for host '$CHECK_HOST': GITLAB_TOKEN / GITLAB_ACCESS_TOKEN / OAUTH_TOKEN would be sent to it, and they belong to ${_gl_cfg:-gitlab.com}. Unset them or set GITLAB_HOST=$CHECK_HOST."
+      fi
+      if (unset GITLAB_TOKEN GITLAB_ACCESS_TOKEN OAUTH_TOKEN CI_JOB_TOKEN; glab auth status --hostname "$HOST_LC" >/dev/null 2>&1); then
         exit 0
       fi
-      die "Refusing glab for host '$CHECK_HOST' (not GITLAB_HOST/GL_HOST and not on glab auth status). Run: glab auth login --hostname $CHECK_HOST"
+      die "Refusing glab for host '$CHECK_HOST' (not glab's host from GITLAB_HOST/GITLAB_URI/GL_HOST or gitlab.com, and not on glab auth status). Run: glab auth login --hostname $CHECK_HOST"
       ;;
     bitbucket)
       case "$HOST_LC" in
