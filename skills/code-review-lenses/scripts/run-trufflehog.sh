@@ -19,6 +19,9 @@
 #   TRUFFLEHOG_MOCK_FILE  When set to a readable file path, read trufflehog
 #                         JSON output from that file instead of running the
 #                         binary. For offline testing only; unset in production.
+#   WORKTREE_PATH         PR/MR-URL review worktree. Reported paths are made
+#                         relative to it (else to the current directory) before
+#                         the .trufflehog.yml allowlist and test-path checks.
 
 set -euo pipefail
 
@@ -80,7 +83,7 @@ _th_transform() {
   local test_pattern="${_TEST_FILE_PATTERN}"
   local allowlist_json
   allowlist_json=$(_build_allowlist_json)
-  jq -Rs --arg test_pat "$test_pattern" --argjson allowlist "$allowlist_json" '
+  jq -Rs --arg test_pat "$test_pattern" --argjson allowlist "$allowlist_json" --arg root "${WORKTREE_PATH:-$PWD}" '
     split("\n") | map(select(length > 0)) as $lines |
     if ($lines | length) > 0 and any($lines[]; ((try fromjson catch null) == null)) then
       error("unparseable trufflehog JSON line")
@@ -88,7 +91,7 @@ _th_transform() {
     map(
       (. | fromjson? // null) |
       select(. != null) |
-      (.SourceMetadata.Data.Filesystem.file? // "unknown") as $file |
+      (.SourceMetadata.Data.Filesystem.file? // "unknown" | ltrimstr($root + "/")) as $file |
       select($allowlist | map(. == $file) | any | not) |
       (.Verified) as $verified |
       (if ($verified | not) and ($file | test($test_pat)) then true else false end) as $is_test_fp |

@@ -79,8 +79,8 @@ while IFS= read -r f; do
   fi
   # Pure doc extensions → skip
   echo "$f" | grep -qE '\.(md|markdown|txt|rst|adoc)$' && continue
-  # Meta directories → skip
-  echo "$f" | grep -qE '(^|/)(docs|memory-bank|\.github|\.claude)/' && continue
+  # Meta directories and GitHub's documentary files → skip (other .github files, such as actions/, are infra)
+  echo "$f" | grep -qE '(^|/)(docs|memory-bank|\.claude)/|(^|/)\.github/((ISSUE|DISCUSSION|PULL_REQUEST)_TEMPLATE/|FUNDING\.ya?ml$)' && continue
   # Meta filenames → skip
   echo "$f" | grep -qiE '(^|/)(CHANGELOG|README|LICENSE|NOTICE|AUTHORS|CONTRIBUTING|CODEOWNERS|CODE_OF_CONDUCT)(\..+)?$' && continue
   # Anything else is code or infra

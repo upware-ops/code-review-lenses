@@ -149,6 +149,19 @@ gate_value() {
   [ "$(gate_value GATE_CODE_OR_INFRA)" = "true" ]
 }
 
+@test "gates: executable and operational .github files are infra; GitHub's documentary files are not" {
+  for path in .github/actions/setup/action.yml .github/actions/setup/run.sh .github/dependabot.yml; do
+    run_gates "+x: y" "$path"
+    [ "$status" -eq 0 ]
+    [ "$(gate_value GATE_CODE_OR_INFRA)" = "true" ] || { echo "not infra: $path" >&2; return 1; }
+  done
+  for path in .github/ISSUE_TEMPLATE/bug.yml .github/PULL_REQUEST_TEMPLATE/default.md .github/FUNDING.yml .github/CODEOWNERS; do
+    run_gates "+x: y" "$path"
+    [ "$status" -eq 0 ]
+    [ "$(gate_value GATE_CODE_OR_INFRA)" = "false" ] || { echo "infra: $path" >&2; return 1; }
+  done
+}
+
 @test "gates: only .md files do not trigger GATE_CODE_OR_INFRA" {
   run_gates "+Updated documentation" "docs/guide.md"
   [ "$status" -eq 0 ]

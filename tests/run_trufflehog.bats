@@ -110,6 +110,19 @@ teardown() {
   echo "$output" | jq -e 'length == 0' >/dev/null
 }
 
+@test "trufflehog: an allowlisted path in a PR/MR worktree is suppressed, and findings are reported worktree-relative" {
+  cp "$TH_FIX/.trufflehog.yml" "$WORK/.trufflehog.yml"
+  cd "$WORK"
+  sed 's#"file":"vendor/autoload.php"#"file":"/tmp/code-review-lenses.wt/vendor/autoload.php"#' "$TH_FIX/allowlisted-path.ndjson" > "$WORK/abs.ndjson"
+  WORKTREE_PATH=/tmp/code-review-lenses.wt TRUFFLEHOG_MOCK_FILE="$WORK/abs.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length == 0' >/dev/null
+  rm "$WORK/.trufflehog.yml"
+  WORKTREE_PATH=/tmp/code-review-lenses.wt TRUFFLEHOG_MOCK_FILE="$WORK/abs.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length == 1 and .[0].file == "vendor/autoload.php"' >/dev/null
+}
+
 @test "trufflehog: finding at allowlisted path is NOT suppressed when .trufflehog.yml absent" {
   # Run from $WORK which has no .trufflehog.yml
   cd "$WORK"
