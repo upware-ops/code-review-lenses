@@ -1,0 +1,23 @@
+CHANGELOG.md
+  s_22d2264024e6d9::t_4917a051e85085 54
+skills/code-review-lenses/scripts/run-cve-check.sh
+  s_22d2264024e6d9::t_5d21ba4bffc422 409-410,413,415,440-442,449-451,473-474
+tests/run_cve_check.bats
+  s_22d2264024e6d9::t_ec463ca0dda3bd 131-208,542-568
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "e6f292b6650f1b9368b758162d4696df915f6bd7",
+  "prompts": {},
+  "sessions": {
+    "s_22d2264024e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e25fbda-b98e-40d4-869b-774997fd44ef",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Paul O'Reilly <paul@upware.dev>"
+    }
+  }
+}
