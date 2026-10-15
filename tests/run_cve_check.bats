@@ -427,6 +427,20 @@ two_batches_with_a_finding_in_the_first() {
   grep -qF 'WARNING: CVE check incomplete' <<<"$stderr"
 }
 
+@test "cve-check: an advisory record that cannot be fetched is skipped with a warning and every other finding is still reported" {
+  mock_advisory npm lib0 1.0.1
+  printf '%s\n' '{"dependencies":{"lib0":"1.0.0","lib1":"1.0.0","lib2":"1.0.0"}}' > "$WORK/package.json"
+  jq -n '{results: [
+      {vulns: [{id: "GHSA-aaaa-missing"}, {id: "GHSA-test-ver"}]},
+      {vulns: [{id: "GHSA-aaaa-missing"}]},
+      {vulns: [{id: "GHSA-test-ver"}]}]}' > "$WORK/batch.json"
+  run_mocked "$WORK/package.json"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e 'length == 2 and (.[0].finding | endswith("Affects lib0@1.0.0.")) and (.[1].finding | endswith("Affects lib2@1.0.0."))' >/dev/null
+  [ "$(grep -c 'GHSA-aaaa-missing' <<<"$stderr")" -eq 1 ]
+  grep -qF 'WARNING: CVE check incomplete' <<<"$stderr"
+}
+
 # ---------------------------------------------------------------------------
 # Advisory fields: CVE alias fallback and fixed-version selection
 # ---------------------------------------------------------------------------
