@@ -134,12 +134,16 @@ Run a full local review of all changes on the current branch (or a specified PR/
    ```bash
    WORKTREE_PATH=$(mktemp -d /tmp/code-review-lenses.XXXXXX)
    git -c core.hooksPath=/dev/null worktree add --detach "$WORKTREE_PATH" || exit $?
+   printf 'WORKTREE_PATH=%s\n' "$WORKTREE_PATH"
    ```
+
+   Each block runs in its own shell: set `WORKTREE_PATH` to the printed value at the top of every later block that uses it.
 
    Run **OP: Checkout PR/MR branch into `$WORKTREE_PATH`** (checkout runs inside that worktree, hooks off — never in the parent clone), then delete the symlinks: agents read files there and a PR symlink can point outside it. Their names are author-chosen text, so print only their count (the diff still lists them for the reviewers) and keep that line as a Phase 5 note:
 
    ```bash
-   printf 'Removed %s symlink(s) from the PR/MR worktree\n' "$(find "$WORKTREE_PATH" -type l -print0 -delete | LC_ALL=C tr -dc '\0' | wc -c | tr -d ' ')"
+   _links=$(set -o pipefail; find "$WORKTREE_PATH" -type l -print0 -delete | LC_ALL=C tr -dc '\0' | wc -c | tr -d ' ') || exit $?
+   printf 'Removed %s symlink(s) from the PR/MR worktree\n' "$_links"
    ```
 
    All later git commands use `git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH"` (`_git` in step 4). Track `WORKTREE_PATH` for Phase 5 cleanup. From here on, whenever a block exits non-zero, run the Phase 5 cleanup (`git worktree remove --force "$WORKTREE_PATH"` from the reviewer checkout, then `rm -f` on `PR_BODY_FILE`, `HEAD_REF_FILE` and any `DIFF_FILE`) before stopping: each block runs in its own shell, so no trap can do it. If `BASE` is empty, pin it to the target branch fetched from the git remote that owns the PR/MR repository — a bare `baseRefName` resolves to the parent clone's local branch, which can be stale:

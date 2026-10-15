@@ -281,8 +281,11 @@ teardown() {
 
 @test "PROVIDERS.md: GitHub OPs pin GH_HOST and --repo" {
   grep -q 'GH_HOST="$HOST" gh pr view' "$PROVIDERS_MD"
-  grep -q 'GH_HOST="$HOST" gh pr checkout' "$PROVIDERS_MD"
-  grep -q -- 'gh pr checkout "$PR_NUMBER" --repo "$REPO_SLUG" --detach' "$PROVIDERS_MD"
+  grep -qF -- '- **github:** `git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" fetch -q <remote> "refs/pull/$PR_NUMBER/head" && git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" checkout -q FETCH_HEAD`' "$PROVIDERS_MD"
+  if grep -q -E 'gh pr checkout|GIT_CONFIG_COUNT' "$PROVIDERS_MD"; then
+    echo "REGRESSION: a checkout OP runs gh, whose git children do not get the hooks flag" >&2
+    return 1
+  fi
   grep -q -- '--repo "$REPO_SLUG"' "$PROVIDERS_MD"
   grep -q 'baseRefName,baseRefOid' "$PROVIDERS_MD"
 }
@@ -757,7 +760,7 @@ JSON
   for f in "$REPO_ROOT/.claude/workflows/code-review-lenses-workflow.js" "$REPO_ROOT/.grok/workflows/code-review-lenses-workflow.rhai"; do
     grep -qF 'Removed %s symlink(s) from the PR/MR worktree' "$f"
     grep -qF -- '-type l -print0 -delete | LC_ALL=C tr -dc ' "$f"
-    grep -qF '(a PR symlink can point outside the worktree; its name is author-chosen text, so only the count is printed; keep that line for step 7)' "$f"
+    grep -qF '(a PR symlink can point outside the worktree; its name is author-chosen text, so only the count is printed, and a failed find is a hard stop; keep that line for step 7)' "$f"
     grep -qF 'and the removed-symlink count line from step 5, in' "$f"
   done
 }
@@ -877,6 +880,7 @@ assert_checkout_op_runs_no_hook() {
   [ "$(git -C "$wt" rev-parse --abbrev-ref HEAD)" = HEAD ]
   [ "$(git branch --format='%(refname:short)')" = main ]
   [ -z "$(ls "$MARKERS")" ]
+  grep -qx "WORKTREE_PATH=$wt" <<<"$output"
 
   git worktree add -q --detach "$WORK/control"
   [ -e "$MARKERS/reviewer-post-checkout" ]
@@ -896,6 +900,10 @@ assert_checkout_op_runs_no_hook() {
   WORKTREE_PATH="$WORK/wt" bash "$WORK/links.sh" > "$WORK/links.out"
   [ -z "$(find "$WORK/wt" -type l)" ]
   [ "$(cat "$WORK/links.out")" = "Removed 3 symlink(s) from the PR/MR worktree" ]
+
+  WORKTREE_PATH="$WORK/missing" run bash "$WORK/links.sh"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *Removed* ]] || return 1
 }
 
 @test "SKILL.md Phase 0b: _git runs the PR/MR worktree's git commands with hooks off, a local review's plain" {

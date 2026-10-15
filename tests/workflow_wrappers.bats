@@ -613,7 +613,10 @@ JS
   grok=$(sed -e 's/\\"/"/g' -e 's/\\\\/\\/g' "$GROK_WF")
   for text in "$claude" "$grok"; do
     grep -qF -- 'git -c core.hooksPath=/dev/null worktree add --detach "$WORKTREE_PATH" and checkout inside it' <<<"$text"
-    grep -qF -- 'for gh, GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null in its environment' <<<"$text"
+    if grep -qF -- 'GIT_CONFIG_COUNT' <<<"$text"; then
+      echo "REGRESSION: a wrapper checks out through gh again" >&2
+      return 1
+    fi
     grep -qF -- "$skill_cmd" <<<"$text"
     if grep -qF -- '-type l -print -delete' <<<"$text" || grep -qF -- "tr -c '[:print:]" <<<"$text"; then
       echo "REGRESSION: a wrapper prints symlink names again" >&2
