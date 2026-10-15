@@ -405,6 +405,8 @@ Eligible: architecture-reviewer, security-reviewer, adversarial-general, edge-ca
 
 **Do not display raw diffs.** Use `$DIFF_FILE`. For `TIER=small`/`tiny`, pass the full diff inline. For `TIER=medium`, custom agents other than blind-hunter get the manifest and read `git diff` over the same range as Phase 0b (`${BASE}...HEAD` when committed, `"$BASE"` when dirty) `-- <file>`; **untracked files: Read the file — `git diff -- <file>` is empty for them**.
 
+**PR/MR-URL review:** the change exists only in `$WORKTREE_PATH`; in the reviewer checkout, `git diff "${BASE}...HEAD"` compares the parent's own HEAD, an unrelated or empty range. At every tier, give every agent except blind-hunter `WORKTREE_PATH: <the path step 1 of Phase 0b printed>`, tell it to Read files under that path, and tell it to run every git command in this hooks-off form, with `$WORKTREE_PATH` and `$BASE` written out (as `_git` does: a relative `core.hooksPath` resolves inside the worktree and would run the PR author's hooks): `git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" diff "${BASE}...HEAD" -- <file>`.
+
 **Spawn protocol:**
 
 - **Codex:** Read `$AGENTS_DIR/<name>.md` and embed its body (without YAML frontmatter), the required directives below, and only the permitted review inputs in the native `spawn_agent` message. Use the name as a task label (`task_name` uses underscores), not as a registered agent type. Start with no inherited conversation history (`fork_turns="none"` when exposed by the tool), especially for blind-hunter. No custom-agent registration is required.

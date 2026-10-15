@@ -513,6 +513,39 @@ JSON
   has "$(skill_line '**Do not display raw diffs.**')" 'custom agents other than blind-hunter get the manifest'
 }
 
+@test "SKILL.md Phase 1: a PR/MR-URL review points every agent but blind-hunter at the worktree with the hooks-off git -C form" {
+  para=$(skill_line '**PR/MR-URL review:**')
+  [ -n "$para" ]
+  has "$para" 'give every agent except blind-hunter `WORKTREE_PATH: '
+  has "$para" 'tell it to Read files under that path'
+  cmd=$(grep -o 'git -c core.hooksPath=/dev/null -C "\$WORKTREE_PATH" diff [^<]*<file>' <<<"$para")
+  [ -n "$cmd" ]
+
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+  export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+  git init -q "$WORK/parent"
+  git -C "$WORK/parent" checkout -qb main
+  echo base > "$WORK/parent/f.txt"
+  git -C "$WORK/parent" add f.txt
+  git -C "$WORK/parent" commit -qm base
+  base=$(git -C "$WORK/parent" rev-parse HEAD)
+  git -C "$WORK/parent" checkout -qb pr
+  echo pr-change >> "$WORK/parent/f.txt"
+  git -C "$WORK/parent" commit -qam pr
+  git -C "$WORK/parent" checkout -q main
+  echo unrelated >> "$WORK/parent/f.txt"
+  git -C "$WORK/parent" commit -qam unrelated
+  git -C "$WORK/parent" worktree add -q --detach "$WORK/wt" pr
+  cd "$WORK/parent"
+
+  out=$(WORKTREE_PATH="$WORK/wt" BASE="$base" bash -c "${cmd//<file>/f.txt}")
+  has "$out" '+pr-change'
+  lacks "$out" '+unrelated'
+  plain=$(git diff "${base}...HEAD" -- f.txt)
+  has "$plain" '+unrelated'
+  lacks "$plain" '+pr-change'
+}
+
 @test "SKILL.md: the CVE block keeps the findings a failing run-cve-check.sh printed" {
   command -v jq >/dev/null 2>&1 || skip "jq not available"
   block=$(skill_block 'CVE_SCRIPT=')
