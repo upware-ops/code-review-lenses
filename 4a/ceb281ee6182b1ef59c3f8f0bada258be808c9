@@ -15,6 +15,7 @@ tests/workflow_wrappers.bats
   s_22d2264024e6d9::t_63464fa44474e3 588
   s_22d2264024e6d9::t_948fc465f537ec 617-619
   s_22d2264024e6d9::t_3b4f01aaff83fe 623-624
+  s_22d2264024e6d9::t_5412fc32ddde84 621
 .claude/workflows/code-review-lenses-workflow.js
   s_22d2264024e6d9::t_a9e4ac119a36ba 279
   s_22d2264024e6d9::t_cdf0726c955f4b 137
