@@ -120,6 +120,21 @@ teardown() {
   grep -qF '_detect_out=$(bash "$SCRIPTS_DIR/detect-provider.sh" --fallback unknown)' "$SKILL_MD"
 }
 
+@test "SKILL.md: sources every gate evaluate-gates.sh emits, passes the overlay its gates, and leaves no trigger to the model" {
+  _gates=$(bash "$GATE_SCRIPT")
+  for gate in $(cut -d= -f1 <<< "$_gates"); do
+    grep -qE "^ +$gate=true$" "$SKILL_MD" || { echo "SKILL.md has no default for $gate" >&2; return 1; }
+    grep -qF "'^$gate='" "$SKILL_MD" || { echo "SKILL.md does not require $gate in the gate output" >&2; return 1; }
+  done
+  for gate in GATE_CONTROL_FLOW GATE_ERROR_PATTERNS GATE_TEST_PATHS GATE_COMMENT_CHANGES GATE_TYPE_DEFINITIONS; do
+    grep -qF "$gate=\"\$$gate\"" "$SKILL_MD" || { echo "SKILL.md does not pass $gate to the overlay" >&2; return 1; }
+  done
+  if grep -q 'its trigger matches' "$SKILL_MD"; then
+    echo "REGRESSION: SKILL.md leaves conditional triggers to the model" >&2
+    return 1
+  fi
+}
+
 @test "classify-diff.sh: defines TIER=tiny with 50-line / 3-file threshold" {
   grep -q "TIER=tiny" "$SCRIPTS_DIR/classify-diff.sh"
   grep -q 'LINES_CHANGED" -lt 50' "$SCRIPTS_DIR/classify-diff.sh"

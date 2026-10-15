@@ -289,6 +289,9 @@ Run a full local review of all changes on the current branch (or a specified PR/
    GATE_CONTROL_FLOW=true
    GATE_SECURITY_PATTERNS=true
    GATE_CODE_OR_INFRA=true
+   GATE_TEST_PATHS=true
+   GATE_COMMENT_CHANGES=true
+   GATE_TYPE_DEFINITIONS=true
    if [[ -x "$SCRIPTS_DIR/evaluate-gates.sh" ]]; then
      _gates_tmp=$(mktemp)
      _gates_rc=0
@@ -301,7 +304,10 @@ Run a full local review of all changes on the current branch (or a specified PR/
      if grep -qE '^GATE_ERROR_PATTERNS=' "$_gates_tmp" && \
         grep -qE '^GATE_CONTROL_FLOW=' "$_gates_tmp" && \
         grep -qE '^GATE_SECURITY_PATTERNS=' "$_gates_tmp" && \
-        grep -qE '^GATE_CODE_OR_INFRA=' "$_gates_tmp"; then
+        grep -qE '^GATE_CODE_OR_INFRA=' "$_gates_tmp" && \
+        grep -qE '^GATE_TEST_PATHS=' "$_gates_tmp" && \
+        grep -qE '^GATE_COMMENT_CHANGES=' "$_gates_tmp" && \
+        grep -qE '^GATE_TYPE_DEFINITIONS=' "$_gates_tmp"; then
        source "$_gates_tmp"
      fi
      rm -f "$_gates_tmp"
@@ -332,13 +338,15 @@ Run a full local review of all changes on the current branch (or a specified PR/
     _overlay_out=$(TIER="$TIER" DOCS_ONLY="$DOCS_ONLY" LOW_RISK_CONFIG="$LOW_RISK_CONFIG" \
       ARCH_PROMOTED="$ARCH_PROMOTED" SECURITY_PROMOTED="$SECURITY_PROMOTED" \
       GATE_CONTROL_FLOW="$GATE_CONTROL_FLOW" GATE_ERROR_PATTERNS="$GATE_ERROR_PATTERNS" \
+      GATE_TEST_PATHS="$GATE_TEST_PATHS" GATE_COMMENT_CHANGES="$GATE_COMMENT_CHANGES" \
+      GATE_TYPE_DEFINITIONS="$GATE_TYPE_DEFINITIONS" \
       PROVIDER="$PROVIDER" \
       bash "$SCRIPTS_DIR/apply-roster-overlays.sh" "${OVERLAY_ARGS[@]}") || exit $?
     eval "$_overlay_out"
     unset _overlay_out
     ```
 
-    Launch an agent only when its `RUN_*` is `true`, or `conditional` and its trigger matches.
+    Launch an agent only when its `RUN_*` is `true`. The overlay has already resolved the conditional agents' triggers (Phase 1) to `true` or `false`; do not judge them again.
 
 12. **Governance block:**
 
@@ -413,12 +421,12 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 - **blind-hunter** — **ONLY** the diff and GOVERNANCE. Medium/local: base + `git diff --name-only` file list. Medium/PR-URL: write a copy of the worktree diff to a temp file and pass that path (agent has no worktree knowledge).
 - **edge-case-hunter** — manifest, commit log, project context.
 
-**Conditional when `RUN_*=conditional` and the trigger matches:**
+**Conditional agents.** `apply-roster-overlays.sh` resolves each trigger below from its `evaluate-gates.sh` gate: `RUN_*` becomes `true` when the gate is `true` and `false` (listed in `SKIP_REASONS`) when it is `false`. Launch the agent only when `RUN_*=true`. The comment and type gates read added or removed lines only.
 
 - **silent-failure-hunter** — `GATE_ERROR_PATTERNS=true`. Full diff.
-- **pr-test-analyzer** — test paths (`*_test.go`, `test_*.py`, `*.test.ts`, `*.spec.ts`, `spec/`, `__tests__/`, `test/`, `tests/`, `*_test.*`, `*.test.*`, `*.spec.*`, `*_spec.rb`, `*Test.java`, `*Tests.cs`, `src/test/`). Full diff.
-- **comment-analyzer** — comment-line changes (`//`, `#`, `/*`, `"""`, `'''`). Full diff.
-- **type-design-analyzer** — type definitions (`type ... struct`, `interface `, `class `, `enum `). Full diff.
+- **pr-test-analyzer** — test paths (`*_test.go`, `test_*.py`, `*.test.ts`, `*.spec.ts`, `spec/`, `__tests__/`, `test/`, `tests/`, `*_test.*`, `*.test.*`, `*.spec.*`, `*_spec.rb`, `*Test.java`, `*Tests.cs`, `src/test/`) → `GATE_TEST_PATHS=true`. Full diff.
+- **comment-analyzer** — comment-line changes (`//`, `#`, `/*`, `"""`, `'''`) → `GATE_COMMENT_CHANGES=true`. Full diff.
+- **type-design-analyzer** — type definitions (`type ... struct`, `interface `, `class `, `enum `) → `GATE_TYPE_DEFINITIONS=true`. Full diff.
 
 pr-test-analyzer, type-design-analyzer, and comment-analyzer: also pass the path of `$SKILL_ROOT/SEVERITY.md` and add to the task: "End your reply with a fenced json-findings block: a JSON array of {severity, confidence, category, file, line, finding, remediation, source} objects per SEVERITY.md, one per issue (repo-relative file; line 0 when unknown; source = your agent name)."
 
@@ -590,7 +598,7 @@ There is no Phase 4. Nothing is written to a hosting provider. Block A and Block
 
 1. Always print Block A then Block B (Block A only when `PROFILE=summary`).
 2. PR/MR-URL worktree: cite `WORKTREE_REMOVED` or the cleanup error.
-3. Skipped agents from `SKIP_REASONS` and from conditional triggers that did not fire. If `DOCS_ONLY=true` and `PROFILE=full`: `Auto-cheap: DOCS_ONLY`. If `LOW_RISK_CONFIG=true` and `PROFILE=full`: `Auto-cheap: LOW_RISK_CONFIG`.
+3. Skipped agents from `SKIP_REASONS`. If `DOCS_ONLY=true` and `PROFILE=full`: `Auto-cheap: DOCS_ONLY`. If `LOW_RISK_CONFIG=true` and `PROFILE=full`: `Auto-cheap: LOW_RISK_CONFIG`.
 4. `Diff tier: <tiny|small|medium>  (<N> lines, <M> files)` plus tiny-tier promotions. If `REVIEW_MODE=dirty`, say so (working tree vs `$BASE`, committed range was empty).
 5. Agent tool-call counts for architecture-reviewer and security-reviewer (budget 25).
 6. Token table: Agent, Model (or `inherit`), Tokens, Tools. Use `unavailable` for counts the host does not expose. No host-specific price column.

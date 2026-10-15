@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# evaluate-gates.sh — Evaluate the four agent-dispatch gates and emit
+# evaluate-gates.sh — Evaluate the agent-dispatch gates and emit
 # shell-sourceable key=value assignments to stdout.
 #
 # Usage (capture then eval — do not source <(…) or eval "$(…)"; that
@@ -18,6 +18,9 @@
 #   GATE_CONTROL_FLOW=true|false
 #   GATE_SECURITY_PATTERNS=true|false
 #   GATE_CODE_OR_INFRA=true|false
+#   GATE_TEST_PATHS=true|false
+#   GATE_COMMENT_CHANGES=true|false
+#   GATE_TYPE_DEFINITIONS=true|false
 #
 # When DIFF_FILE is absent or DIFF_PATHS is empty, all gates default to true
 # (conservative — avoids silently skipping agents due to missing data).
@@ -32,6 +35,9 @@ if [[ -z "$DIFF_FILE" || ! -f "$DIFF_FILE" || -z "$DIFF_PATHS" ]]; then
   echo "GATE_CONTROL_FLOW=true"
   echo "GATE_SECURITY_PATTERNS=true"
   echo "GATE_CODE_OR_INFRA=true"
+  echo "GATE_TEST_PATHS=true"
+  echo "GATE_COMMENT_CHANGES=true"
+  echo "GATE_TYPE_DEFINITIONS=true"
   exit 0
 fi
 
@@ -87,7 +93,35 @@ while IFS= read -r f; do
   GATE_CODE_OR_INFRA=true; break
 done <<< "$DIFF_PATHS"
 
+# Gate: has_test_paths — fires pr-test-analyzer
+GATE_TEST_PATHS=false
+_rc=0
+grep -qE '(^|/)([^/]*_test\.go|test_[^/]*\.py|[^/]*\.test\.ts|[^/]*\.spec\.ts|[^/]*_test\.[^/]*|[^/]*\.test\.[^/]*|[^/]*\.spec\.[^/]*|[^/]*_spec\.rb|[^/]*Test\.java|[^/]*Tests\.cs)$|(^|/)(spec|__tests__|test|tests|src/test)/' <<< "$DIFF_PATHS" || _rc=$?
+if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed reading DIFF_PATHS" >&2; exit 1; fi
+if [[ $_rc -eq 0 ]]; then GATE_TEST_PATHS=true; fi
+
+# Gates: has_comment_changes, has_type_definitions — fire comment-analyzer and type-design-analyzer
+# on added or removed lines; the +++ / --- file headers are excluded.
+GATE_COMMENT_CHANGES=false
+GATE_TYPE_DEFINITIONS=false
+_rc=0
+_changed_lines=$(grep -E '^([+][^+]|[-][^-])' "$DIFF_FILE") || _rc=$?
+if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed reading $DIFF_FILE" >&2; exit 1; fi
+if [[ -n "$_changed_lines" ]]; then
+  _rc=0
+  grep -qE "^[+-][[:space:]]*(//|#|/\\*|\"\"\"|''')" <<< "$_changed_lines" || _rc=$?
+  if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed on changed lines" >&2; exit 1; fi
+  if [[ $_rc -eq 0 ]]; then GATE_COMMENT_CHANGES=true; fi
+  _rc=0
+  grep -qE '\btype .* struct\b|\binterface |\bclass |\benum ' <<< "$_changed_lines" || _rc=$?
+  if [[ $_rc -eq 2 ]]; then echo "ERROR: grep failed on changed lines" >&2; exit 1; fi
+  if [[ $_rc -eq 0 ]]; then GATE_TYPE_DEFINITIONS=true; fi
+fi
+
 echo "GATE_ERROR_PATTERNS=${GATE_ERROR_PATTERNS}"
 echo "GATE_CONTROL_FLOW=${GATE_CONTROL_FLOW}"
 echo "GATE_SECURITY_PATTERNS=${GATE_SECURITY_PATTERNS}"
 echo "GATE_CODE_OR_INFRA=${GATE_CODE_OR_INFRA}"
+echo "GATE_TEST_PATHS=${GATE_TEST_PATHS}"
+echo "GATE_COMMENT_CHANGES=${GATE_COMMENT_CHANGES}"
+echo "GATE_TYPE_DEFINITIONS=${GATE_TYPE_DEFINITIONS}"

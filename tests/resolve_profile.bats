@@ -7,6 +7,7 @@ setup() {
   load test_helper
   PROFILE_SCRIPT="${SCRIPTS_DIR}/resolve-profile.sh"
   OVERLAY_SCRIPT="${SCRIPTS_DIR}/apply-roster-overlays.sh"
+  GATES_SCRIPT="${SCRIPTS_DIR}/evaluate-gates.sh"
   WORK=$(mktemp -d)
 }
 
@@ -344,4 +345,122 @@ EOF
   eval "$_out"
   [[ "$SKIP_REASONS" == *"blind-hunter (DOCS_ONLY)"* ]]
   [[ "$SKIP_REASONS" != *"TIER=tiny"* ]]
+}
+
+# bash 3.2 ignores a failing mid-test [[ ]]; a failing function call still aborts the test.
+contains() { [[ "$1" == *"$2"* ]]; }
+lacks() { [[ "$1" != *"$2"* ]]; }
+
+@test "overlay: silent-failure-hunter is true or false from GATE_ERROR_PATTERNS, never conditional" {
+  eval "$(GATE_ERROR_PATTERNS=true bash "$OVERLAY_SCRIPT" --profile full)"
+  [ "$RUN_SILENT_FAILURE_HUNTER" = "true" ]
+  [ -z "$SKIP_REASONS" ]
+  eval "$(GATE_ERROR_PATTERNS=false bash "$OVERLAY_SCRIPT" --profile full)"
+  [ "$RUN_SILENT_FAILURE_HUNTER" = "false" ]
+  [ "$SKIP_REASONS" = "silent-failure-hunter (GATE_ERROR_PATTERNS=false)" ]
+}
+
+@test "overlay: pr-test-analyzer is true or false from GATE_TEST_PATHS, never conditional" {
+  eval "$(GATE_TEST_PATHS=true bash "$OVERLAY_SCRIPT" --profile quick)"
+  [ "$RUN_PR_TEST_ANALYZER" = "true" ]
+  [ -z "$SKIP_REASONS" ]
+  eval "$(GATE_TEST_PATHS=false bash "$OVERLAY_SCRIPT" --profile quick)"
+  [ "$RUN_PR_TEST_ANALYZER" = "false" ]
+  [ "$SKIP_REASONS" = "pr-test-analyzer (GATE_TEST_PATHS=false)" ]
+}
+
+@test "overlay: comment-analyzer is true or false from GATE_COMMENT_CHANGES, never conditional" {
+  eval "$(GATE_COMMENT_CHANGES=true bash "$OVERLAY_SCRIPT" --profile full)"
+  [ "$RUN_COMMENT_ANALYZER" = "true" ]
+  [ -z "$SKIP_REASONS" ]
+  eval "$(GATE_COMMENT_CHANGES=false bash "$OVERLAY_SCRIPT" --profile full)"
+  [ "$RUN_COMMENT_ANALYZER" = "false" ]
+  [ "$SKIP_REASONS" = "comment-analyzer (GATE_COMMENT_CHANGES=false)" ]
+}
+
+@test "overlay: type-design-analyzer is true or false from GATE_TYPE_DEFINITIONS, never conditional" {
+  eval "$(GATE_TYPE_DEFINITIONS=true bash "$OVERLAY_SCRIPT" --profile deep)"
+  [ "$RUN_TYPE_DESIGN_ANALYZER" = "true" ]
+  [ -z "$SKIP_REASONS" ]
+  eval "$(GATE_TYPE_DEFINITIONS=false bash "$OVERLAY_SCRIPT" --profile deep)"
+  [ "$RUN_TYPE_DESIGN_ANALYZER" = "false" ]
+  [ "$SKIP_REASONS" = "type-design-analyzer (GATE_TYPE_DEFINITIONS=false)" ]
+}
+
+@test "overlay: a true gate does not schedule a conditional agent the profile leaves off" {
+  eval "$(GATE_COMMENT_CHANGES=true GATE_TYPE_DEFINITIONS=true GATE_ERROR_PATTERNS=true \
+    bash "$OVERLAY_SCRIPT" --profile quick)"
+  [ "$RUN_COMMENT_ANALYZER" = "false" ]
+  [ "$RUN_TYPE_DESIGN_ANALYZER" = "false" ]
+  [ "$RUN_SILENT_FAILURE_HUNTER" = "true" ]
+}
+
+@test "overlay: no profile or gate setting leaves a conditional agent as conditional" {
+  for profile in quick security full deep; do
+    for gates in true false unset; do
+      unset GATE_ERROR_PATTERNS GATE_TEST_PATHS GATE_COMMENT_CHANGES GATE_TYPE_DEFINITIONS
+      if [[ "$gates" != "unset" ]]; then
+        export GATE_ERROR_PATTERNS="$gates" GATE_TEST_PATHS="$gates" \
+          GATE_COMMENT_CHANGES="$gates" GATE_TYPE_DEFINITIONS="$gates"
+      fi
+      _out=$(bash "$OVERLAY_SCRIPT" --profile "$profile")
+      if echo "$_out" | grep -q '=conditional$'; then
+        echo "REGRESSION: conditional left for --profile $profile with gates $gates" >&2
+        return 1
+      fi
+    done
+  done
+}
+
+@test "overlay: a gate adds no second reason for an agent an earlier overlay skipped" {
+  eval "$(TIER=tiny GATE_TEST_PATHS=false GATE_COMMENT_CHANGES=false GATE_TYPE_DEFINITIONS=false \
+    bash "$OVERLAY_SCRIPT" --profile full)"
+  contains "$SKIP_REASONS" "comment-analyzer (TIER=tiny)"
+  contains "$SKIP_REASONS" "type-design-analyzer (TIER=tiny)"
+  lacks "$SKIP_REASONS" "GATE_COMMENT_CHANGES"
+  lacks "$SKIP_REASONS" "GATE_TYPE_DEFINITIONS"
+  contains "$SKIP_REASONS" "pr-test-analyzer (GATE_TEST_PATHS=false)"
+}
+
+# Run evaluate-gates.sh on a diff and feed its GATE_* output to the overlay.
+overlay_for_diff() {
+  local diff_content="$1" diff_paths="$2" profile="$3"
+  printf '%s\n' "$diff_content" > "$WORK/gate.diff"
+  _gates=$(DIFF_FILE="$WORK/gate.diff" DIFF_PATHS="$diff_paths" bash "$GATES_SCRIPT")
+  eval "$_gates"
+  export GATE_ERROR_PATTERNS GATE_CONTROL_FLOW GATE_TEST_PATHS GATE_COMMENT_CHANGES GATE_TYPE_DEFINITIONS
+  _out=$(bash "$OVERLAY_SCRIPT" --profile "$profile")
+  eval "$_out"
+}
+
+@test "gates + overlay: a diff that trips every trigger schedules all four conditional agents" {
+  overlay_for_diff $'+// Reader reads.\n+type Reader interface {\n+  if err != nil { return err }' \
+    $'pkg/reader.go\npkg/reader_test.go' full
+  [ "$RUN_SILENT_FAILURE_HUNTER" = "true" ]
+  [ "$RUN_PR_TEST_ANALYZER" = "true" ]
+  [ "$RUN_COMMENT_ANALYZER" = "true" ]
+  [ "$RUN_TYPE_DESIGN_ANALYZER" = "true" ]
+  [ -z "$SKIP_REASONS" ]
+}
+
+@test "gates + overlay: a diff that trips no trigger skips the conditional agents and says why" {
+  overlay_for_diff "+total := 1" "pkg/reader.go" full
+  [ "$RUN_SILENT_FAILURE_HUNTER" = "false" ]
+  [ "$RUN_PR_TEST_ANALYZER" = "false" ]
+  [ "$RUN_COMMENT_ANALYZER" = "false" ]
+  [ "$RUN_TYPE_DESIGN_ANALYZER" = "false" ]
+  contains "$SKIP_REASONS" "silent-failure-hunter (GATE_ERROR_PATTERNS=false)"
+  contains "$SKIP_REASONS" "pr-test-analyzer (GATE_TEST_PATHS=false)"
+  contains "$SKIP_REASONS" "comment-analyzer (GATE_COMMENT_CHANGES=false)"
+  contains "$SKIP_REASONS" "type-design-analyzer (GATE_TYPE_DEFINITIONS=false)"
+}
+
+@test "gates + overlay: a quick review resolves silent-failure-hunter and pr-test-analyzer from the diff" {
+  overlay_for_diff $'+  } catch (Exception e) {\n+  throw e;' $'src/Service.java\nsrc/ServiceTest.java' quick
+  [ "$RUN_SILENT_FAILURE_HUNTER" = "true" ]
+  [ "$RUN_PR_TEST_ANALYZER" = "true" ]
+  [ "$RUN_COMMENT_ANALYZER" = "false" ]
+  overlay_for_diff "+total := 1" "src/Service.java" quick
+  [ "$RUN_SILENT_FAILURE_HUNTER" = "false" ]
+  [ "$RUN_PR_TEST_ANALYZER" = "false" ]
 }

@@ -16,9 +16,14 @@
 #   SECURITY_PROMOTED=false
 #   GATE_CONTROL_FLOW=true
 #   GATE_ERROR_PATTERNS=true
+#   GATE_TEST_PATHS=true
+#   GATE_COMMENT_CHANGES=true
+#   GATE_TYPE_DEFINITIONS=true
 #   PROVIDER=          (empty keeps issue-linker; any non-github value skips it)
 #
-# Output: the same KEY=value roster, after overlays. Safe to eval.
+# Output: the same KEY=value roster, after overlays. Safe to eval. The conditional
+# agents (silent-failure-hunter, pr-test-analyzer, comment-analyzer,
+# type-design-analyzer) leave as true or false, never conditional.
 
 set -euo pipefail
 
@@ -61,6 +66,9 @@ ARCH_PROMOTED="${ARCH_PROMOTED:-false}"
 SECURITY_PROMOTED="${SECURITY_PROMOTED:-false}"
 GATE_CONTROL_FLOW="${GATE_CONTROL_FLOW:-true}"
 GATE_ERROR_PATTERNS="${GATE_ERROR_PATTERNS:-true}"
+GATE_TEST_PATHS="${GATE_TEST_PATHS:-true}"
+GATE_COMMENT_CHANGES="${GATE_COMMENT_CHANGES:-true}"
+GATE_TYPE_DEFINITIONS="${GATE_TYPE_DEFINITIONS:-true}"
 PROVIDER="${PROVIDER:-}"
 
 SKIP_REASONS=()
@@ -71,6 +79,17 @@ skip() {
   [[ "${!var}" == "false" ]] && return 0
   printf -v "$var" '%s' "false"
   SKIP_REASONS+=("$reason")
+}
+
+resolve_conditional() {
+  local var="$1"
+  local gate="$2"
+  local agent="$3"
+  if [[ "${!gate}" == "false" ]]; then
+    skip "$var" "$agent ($gate=false)"
+  elif [[ "${!var}" == "conditional" ]]; then
+    printf -v "$var" '%s' "true"
+  fi
 }
 
 # Auto-cheap overlays apply only to the default full profile. Explicit
@@ -120,13 +139,15 @@ if [[ "$TIER" == "tiny" ]]; then
   RUN_ENRICH_CONTEXT=false
 fi
 
-# Gate overlays (only turn scheduled agents off).
+# Gate overlays: a false gate turns a scheduled agent off; a conditional agent
+# becomes true or false here.
 if [[ "$RUN_EDGE_CASE_HUNTER" == "true" && "$GATE_CONTROL_FLOW" == "false" ]]; then
   skip RUN_EDGE_CASE_HUNTER "edge-case-hunter (GATE_CONTROL_FLOW=false)"
 fi
-if [[ "$RUN_SILENT_FAILURE_HUNTER" != "false" && "$GATE_ERROR_PATTERNS" == "false" ]]; then
-  skip RUN_SILENT_FAILURE_HUNTER "silent-failure-hunter (GATE_ERROR_PATTERNS=false)"
-fi
+resolve_conditional RUN_SILENT_FAILURE_HUNTER GATE_ERROR_PATTERNS silent-failure-hunter
+resolve_conditional RUN_PR_TEST_ANALYZER GATE_TEST_PATHS pr-test-analyzer
+resolve_conditional RUN_COMMENT_ANALYZER GATE_COMMENT_CHANGES comment-analyzer
+resolve_conditional RUN_TYPE_DESIGN_ANALYZER GATE_TYPE_DEFINITIONS type-design-analyzer
 
 # issue-linker is GitHub-only.
 if [[ "$RUN_ISSUE_LINKER" == "true" && -n "$PROVIDER" && "$PROVIDER" != "github" ]]; then

@@ -841,3 +841,14 @@ JS
   out=$(run_claude_wf "$prelude" '""')
   jq -e '.prompts[2].prompt | split("Everything after this line")[1] | contains("<classification>\n{\"TIER\":\"tiny\",\"ARCH_PROMOTED\":\"true\"}\n</classification>")' <<<"$out"
 }
+
+@test "wrappers take conditional agents from the overlay's resolved RUN_* values" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q -F 'The overlay has already resolved every conditional agent to true or false from GATE_*; do not evaluate a trigger yourself.' "$f"
+    grep -q -F 'plus GATE_ERROR_PATTERNS GATE_CONTROL_FLOW GATE_TEST_PATHS GATE_COMMENT_CHANGES GATE_TYPE_DEFINITIONS PROVIDER bash' "$f"
+    if grep -q -F 'conditional+triggered' "$f"; then
+      echo "REGRESSION: $f lets the prelude judge conditional triggers" >&2
+      return 1
+    fi
+  done
+}

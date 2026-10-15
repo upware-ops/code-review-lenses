@@ -98,6 +98,9 @@ Before launching agents, Phase 1 evaluates grep-based bash gates against the dif
 | `GATE_CONTROL_FLOW=false` | Skip `edge-case-hunter` (added `+` lines only) |
 | `GATE_SECURITY_PATTERNS=false` | May set `LOW_RISK_CONFIG` on `PROFILE=full` (config extensions; deployment/CI paths never count as low-risk). `LOW_RISK_CONFIG` then skips `security-reviewer` unless `SECURITY_PROMOTED`. Tiny-tier security uses `SECURITY_PROMOTED`. |
 | `GATE_CODE_OR_INFRA=false` | Sets `DOCS_ONLY`. On `PROFILE=full` only, `DOCS_ONLY` skips `architecture-reviewer`, even when `ARCH_PROMOTED`. `--profile deep` keeps architecture. |
+| `GATE_TEST_PATHS=false` | Skip `pr-test-analyzer` (no changed path matches the test-path globs) |
+| `GATE_COMMENT_CHANGES=false` | Skip `comment-analyzer` (no added or removed line starts with a comment marker) |
+| `GATE_TYPE_DEFINITIONS=false` | Skip `type-design-analyzer` (no changed line contains `type ... struct`, `interface `, `class `, or `enum `) |
 
 ## Contributing
 
