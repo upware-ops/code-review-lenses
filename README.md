@@ -106,7 +106,7 @@ It does not search `~/.claude` plugin caches.
 | `--base <branch>` | Override compare base. PR/MR URL: fetched target branch. Local: `HEAD@{upstream}` only. Never `main`/`master`/`dev`. |
 | `--no-enrich-context` | Disable symbol-context enrichment |
 | `--no-suppress` | Disable suppression rules |
-| `--min-confidence N` | Drop findings below N (0–100, default 75) |
+| `--min-confidence N` | Drop findings below N (0–100, default 75; code-reviewer itself reports only 80+) |
 | `--output-file <path>` | Write the report to a file (Block A only with `--summary-only`) |
 | PR/MR URL | External review. Host and number come from the URL. A bare number is not enough. |
 | free-form text | Remaining leftover (`GUIDANCE`) is review focus |
@@ -129,6 +129,13 @@ They do not fork roster or flag logic. A prelude agent runs the shipped
 parsers (`resolve-skill-root.sh`, `resolve-profile.sh`, `parse-pr-url.sh`,
 `detect-provider.sh`, `fetch-pr-metadata.sh`, `evaluate-gates.sh`, `apply-roster-overlays.sh`) and fans out the existing
 `agents/*.md` stems.
+
+The prelude finds the skill in this checkout (`skills/code-review-lenses`) or
+where it is installed or symlinked (Claude: `.claude/skills/`,
+`~/.claude/skills/`; Grok: `.grok/skills/`, `~/.grok/skills/`,
+`~/.agents/skills/`, or Claude's) and hands agents absolute paths, so a
+wrapper copied to another repository or to your personal workflow directory
+reviews the repository it runs in.
 
 | Host | File | Invoke |
 |------|------|--------|

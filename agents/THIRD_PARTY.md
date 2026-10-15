@@ -19,6 +19,9 @@ Pinned commit of `anthropics/claude-plugins-official` is in
 Modifications in this repository (re-applied on every sync):
 
 - Removed host-specific `model:` and `color:` frontmatter.
+- Cut a frontmatter `description` at its inline `Examples:` (upstream
+  `silent-failure-hunter.md` packs literal `\n` and `<example>` text into one
+  YAML line, which hosts show raw).
 - Replaced project-instruction references (`CLAUDE.md`) with `AGENTS.md`.
 - `silent-failure-hunter.md`: dropped the Anthropic-internal error-ID bullets
   (`constants/errorIds.ts`, "Sentry tracking") and the `logError` hint, and

@@ -32,6 +32,22 @@ setup() {
   grep -qxF 'Trace with logForDebugging for Sentry tracking.' <<<"$prose"
 }
 
+@test "transform: cuts a frontmatter description at its inline Examples and leaves the body alone" {
+  out=$(printf '%s\n' '---' 'name: x' 'description: Use it for X. Examples:\n\n<example>\nContext: y\n</example>' '---' 'Body Examples: kept.' | bash "$VENDOR" transform)
+  grep -qxF 'description: Use it for X.' <<<"$out"
+  grep -qxF 'Body Examples: kept.' <<<"$out"
+}
+
+@test "the five shipped toolkit agents are exactly what the transform produces" {
+  for agent in code-reviewer silent-failure-hunter pr-test-analyzer comment-analyzer type-design-analyzer; do
+    f="${REPO_ROOT}/agents/${agent}.md"
+    [ "$(bash "$VENDOR" transform < "$f")" = "$(cat "$f")" ]
+  done
+  line=$(grep '^description:' "${REPO_ROOT}/agents/silent-failure-hunter.md")
+  [[ "$line" == *'could potentially suppress errors.' ]]
+  [[ "$line" != *'\n'* && "$line" != *'<example>'* ]]
+}
+
 @test "transform: is idempotent on a already-vendored agent" {
   first=$(bash "$VENDOR" transform < "$UPSTREAM")
   second=$(printf '%s\n' "$first" | bash "$VENDOR" transform)

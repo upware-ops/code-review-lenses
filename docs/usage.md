@@ -35,7 +35,7 @@ Removed: `--quick`, `--security-only`, `--depth`. The parser rejects them.
 | `--base <branch>` | Override compare base. PR/MR URL: fetched target branch. Local: `HEAD@{upstream}` only. Never `main`/`master`/`dev`. |
 | `--no-enrich-context` | Disable symbol-context enrichment |
 | `--no-suppress` | Disable suppression rules |
-| `--min-confidence N` | Drop findings below N (default 75) |
+| `--min-confidence N` | Drop findings below N (default 75; code-reviewer itself reports only 80+) |
 | `--output-file <path>` | Write Block A + Block B to a file |
 | PR/MR URL | External review. Host and number come from the URL. |
 | free-form text | Remaining leftover is review focus |

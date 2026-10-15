@@ -5,7 +5,7 @@ unified Critical/High/Medium/Low scale.
 
 | Agent | Their Scale | Maps To |
 |-------|-------------|---------|
-| code-reviewer | confidence [91,100] / [80,90] / [60,79] / [0,59] | Critical / High / Medium / Low |
+| code-reviewer | confidence [91,100] / [80,90] / [60,79] / [0,59]; its prompt reports only ≥ 80 | Critical / High / Medium / Low |
 | silent-failure-hunter | CRITICAL/HIGH/MEDIUM | pass through |
 | comment-analyzer | section: Critical Issues / Improvement Opportunities / Recommended Removals | High / Medium / Low |
 | pr-test-analyzer | gap [9,10] / [7,8] / [5,6] / [1,4] | Critical / High / Medium / Low |
@@ -69,6 +69,7 @@ their numeric scores are mapped as follows:
   (gap=8 → confidence=80; gap=3 → confidence=30)
 - `type-design-analyzer` lowest of its four ratings [1,10]: `confidence = (11 - rating) * 10`
   (low rating=2, meaning high concern → confidence=90; high rating=9, meaning low concern → confidence=20)
-- `code-reviewer` already emits confidence [0,100]; no mapping needed.
+- `code-reviewer` already emits confidence [0,100]; no mapping needed. Its prompt reports only
+  confidence ≥ 80, so its findings are Critical or High and a `--min-confidence` below 80 adds none.
 - All other external agents (silent-failure-hunter, comment-analyzer): treat as confidence=80
   (above default threshold; filter does not apply unless `--min-confidence` > 80).

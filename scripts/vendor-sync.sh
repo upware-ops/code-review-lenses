@@ -37,8 +37,9 @@ api_get() {
   curl "${args[@]}" "$url" || die "fetch failed: $url"
 }
 
-# Strip model:/color: from YAML frontmatter; CLAUDE.md → AGENTS.md; genericize
-# Anthropic-internal logging / error-ID references; upsert banner.
+# Strip model:/color: from YAML frontmatter; cut a description's inline
+# Examples:; CLAUDE.md → AGENTS.md; genericize Anthropic-internal logging /
+# error-ID references; upsert banner.
 transform_agent() {
   awk -v banner="$BANNER" '
     BEGIN { fm = 0; banner_done = 0 }
@@ -47,6 +48,7 @@ transform_agent() {
       if (fm == 1) { fm = 2; print; next }
     }
     fm == 1 && /^(model|color):[[:space:]]/ { next }
+    fm == 1 && /^description:/ { sub(/ Examples:.*$/, "") }
     fm == 2 && !banner_done {
       if ($0 ~ /^[[:space:]]*$/) next
       if ($0 ~ /Vendored from pr-review-toolkit/) {
