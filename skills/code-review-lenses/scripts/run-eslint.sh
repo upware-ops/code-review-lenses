@@ -38,7 +38,6 @@ fi
 
 # Resolve eslint binary to an absolute path: prefer local node_modules, fall back to npx
 ESLINT_BIN=()
-ESLINT_SUPPORTS_NO_WARN_IGNORED=false
 if [[ -z "${ESLINT_MOCK_FILE:-}" ]]; then
   if [[ -x "./node_modules/.bin/eslint" ]]; then
     ESLINT_BIN=("$PWD/node_modules/.bin/eslint")
@@ -48,13 +47,6 @@ if [[ -z "${ESLINT_MOCK_FILE:-}" ]]; then
     echo "WARNING: eslint not found (tried node_modules/.bin/eslint and npx); eslint check skipped." >&2
     echo "[]"
     exit 0
-  fi
-
-  # --no-warn-ignored was added in ESLint 8.x; guard against older versions by
-  # inspecting --help output, which is more reliable than probing with --version
-  # (--version short-circuits arg parsing and can return 0 regardless of the flag).
-  if "${ESLINT_BIN[@]}" --help 2>&1 | grep -q -- '--no-warn-ignored'; then
-    ESLINT_SUPPORTS_NO_WARN_IGNORED=true
   fi
 
   # Only run if a config file is present — avoids polluting repos without ESLint.
@@ -102,13 +94,31 @@ else
   # --format json; --no-warn-ignored (ESLint >=8) prevents noise on ignored paths;
   # ESLint exits 0 (clean), 1 (lint issues found), or 2 (fatal config/plugin error).
   ESLINT_EC=0
-  ESLINT_CMD=("${ESLINT_BIN[@]}" --format json)
-  # Without an explicit config, ESLint loads (and executes) configs found next to each linted file.
+  ESLINT_CMD=("${ESLINT_BIN[@]}")
+  ESLINT_HELP=$("${ESLINT_CMD[@]}" --help 2>&1) || true
+  ESLINT_FLAT=true
   case "$ESLINT_CONFIG" in
-    */eslint.config.*) ESLINT_FLAT=true; ESLINT_CMD+=(--config "$ESLINT_CONFIG") ;;
-    *) ESLINT_FLAT=false; ESLINT_CMD+=(--no-eslintrc --config "$ESLINT_CONFIG") ;;
+    */eslint.config.*) ;;
+    *)
+      ESLINT_FLAT=false
+      # ESLint 9 reads .eslintrc configs only with ESLINT_USE_FLAT_CONFIG=false; ESLint 10 removed them.
+      if [[ "$ESLINT_HELP" != *--no-eslintrc* ]]; then
+        ESLINT_CMD=(env ESLINT_USE_FLAT_CONFIG=false "${ESLINT_BIN[@]}")
+        ESLINT_HELP=$("${ESLINT_CMD[@]}" --help 2>&1) || true
+      fi
+      if [[ "$ESLINT_HELP" != *--no-eslintrc* ]]; then
+        echo "WARNING: eslint: this ESLint cannot load the legacy config ${ESLINT_CONFIG##*/} (.eslintrc support was removed); eslint check skipped." >&2
+        echo "[]"
+        exit 0
+      fi
+      ;;
   esac
-  [[ "$ESLINT_SUPPORTS_NO_WARN_IGNORED" == "true" ]] && ESLINT_CMD+=(--no-warn-ignored)
+
+  # Without an explicit config, ESLint loads (and executes) configs found next to each linted file.
+  ESLINT_CMD+=(--format json)
+  [[ "$ESLINT_FLAT" == "false" ]] && ESLINT_CMD+=(--no-eslintrc)
+  ESLINT_CMD+=(--config "$ESLINT_CONFIG")
+  [[ "$ESLINT_HELP" == *--no-warn-ignored* ]] && ESLINT_CMD+=(--no-warn-ignored)
 
   # Flat config patterns are relative to the cwd, so ESLint silently skips files outside it; running from their tree would load that tree's project configs.
   if [[ "$ESLINT_FLAT" == "true" ]]; then

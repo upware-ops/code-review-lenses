@@ -25,7 +25,7 @@ make_eslint_stub() {
   mkdir -p "$(dirname "$1")"
   cat > "$1" << 'EOF'
 #!/bin/sh
-case "$*" in *--help*) echo "--no-warn-ignored"; exit 0 ;; esac
+case "$*" in *--help*) echo "--no-eslintrc --no-warn-ignored"; exit 0 ;; esac
 printf '%s|%s|%s\n' "$PWD" "$0" "$*" >> "$ESLINT_LOG"
 for last; do :; done
 printf '[{"filePath":"%s","messages":[{"ruleId":"no-undef","severity":2,"message":"x","line":1}]}]\n' "$last"
@@ -207,7 +207,7 @@ EOF
   cat > "$WORK/node_modules/.bin/eslint" << 'EOF'
 #!/bin/sh
 if echo "$*" | grep -q -- --help; then
-  echo "eslint"
+  echo "eslint --no-eslintrc"
   exit 0
 fi
 printf '%s\n' '[{"filePath":"x.js","messages":[{"ruleId":"no-undef","severity":2,"message":"x","line":1}]}]'
@@ -228,7 +228,7 @@ EOF
   cat > "$WORK/node_modules/.bin/eslint" <<'EOF'
 #!/bin/sh
 if echo "$*" | grep -q -- --help; then
-  echo "--no-warn-ignored"
+  echo "--no-eslintrc --no-warn-ignored"
   exit 0
 fi
 printf '%s\n' "$@" > "$ARGV_FILE"
@@ -336,4 +336,45 @@ EOF
     "echo '$WORK/Button.tsx' | '$SCRIPT'"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e 'length > 0' >/dev/null
+}
+
+@test "eslint: a legacy config runs ESLint 9 with ESLINT_USE_FLAT_CONFIG=false" {
+  mkdir -p "$WORK/node_modules/.bin"
+  cat > "$WORK/node_modules/.bin/eslint" <<'EOF'
+#!/bin/sh
+if echo "$*" | grep -q -- --help; then
+  if [ "${ESLINT_USE_FLAT_CONFIG-}" = false ]; then echo "--no-eslintrc"; else echo "--no-config-lookup --no-warn-ignored"; fi
+  exit 0
+fi
+{ echo "FLAT=${ESLINT_USE_FLAT_CONFIG-unset}"; printf '%s\n' "$@"; } > "$ARGV_FILE"
+echo '[]'
+EOF
+  chmod +x "$WORK/node_modules/.bin/eslint"
+  echo 'var x' > "$WORK/app.js"
+  unset ESLINT_MOCK_FILE
+  cd "$WORK"
+  ARGV_FILE="$WORK/argv" run --separate-stderr bash "$SCRIPT" app.js
+  [ "$status" -eq 0 ]
+  [ "$(head -1 "$WORK/argv")" = "FLAT=false" ]
+  grep -qx -- '--no-eslintrc' "$WORK/argv"
+  [ "$(grep -c -x -- '--no-warn-ignored' "$WORK/argv")" -eq 0 ]
+}
+
+@test "eslint: a legacy config with an ESLint that dropped .eslintrc support warns and skips" {
+  mkdir -p "$WORK/node_modules/.bin"
+  cat > "$WORK/node_modules/.bin/eslint" <<'EOF'
+#!/bin/sh
+if echo "$*" | grep -q -- --help; then echo "--no-config-lookup --no-warn-ignored"; exit 0; fi
+touch "$RAN_FILE"
+echo '[]'
+EOF
+  chmod +x "$WORK/node_modules/.bin/eslint"
+  echo 'var x' > "$WORK/app.js"
+  unset ESLINT_MOCK_FILE
+  cd "$WORK"
+  RAN_FILE="$WORK/ran" run --separate-stderr bash "$SCRIPT" app.js
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  [[ "$stderr" == *"cannot load the legacy config .eslintrc.json (.eslintrc support was removed)"* ]]
+  [ ! -e "$WORK/ran" ]
 }
