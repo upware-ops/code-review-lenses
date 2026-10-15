@@ -117,7 +117,8 @@ else
 
     : >"$GOLANGCI_JSON"
     GL_EC=0
-    (cd "$MODULE_ROOT" && golangci-lint run --output.json.path="$GOLANGCI_JSON" --path-mode=abs --issues-exit-code=0 "$GL_CONFIG_ARG" "${PKG_PATTERNS[@]}" >/dev/null 2>"$GOLANGCI_STDERR") || GL_EC=$?
+    # golangci-lint loads packages from its cwd, inside the reviewed tree: go would read an ancestor go.work, fetch the toolchain a go.mod names, and run git status there (firing the tree's hooks) to stamp VCS info.
+    (cd "$MODULE_ROOT" && GOWORK=off GOTOOLCHAIN=local GOFLAGS="${GOFLAGS:+$GOFLAGS }-buildvcs=false" golangci-lint run --output.json.path="$GOLANGCI_JSON" --path-mode=abs --issues-exit-code=0 "$GL_CONFIG_ARG" "${PKG_PATTERNS[@]}" >/dev/null 2>"$GOLANGCI_STDERR") || GL_EC=$?
     MODULE_OUTPUT=$(cat "$GOLANGCI_JSON")
     if [[ "$GL_EC" -ne 0 || -z "$MODULE_OUTPUT" ]]; then
       echo "WARNING: golangci-lint failed in '${MODULE_ROOT}' (exit ${GL_EC}). stderr: $(cat "$GOLANGCI_STDERR")" >&2

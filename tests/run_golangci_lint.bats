@@ -177,3 +177,23 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$(cat "$WORK/gl.log")" == "$WORK/pr/mod|run "*" --issues-exit-code=0 --no-config ./a/..." ]]
 }
+
+@test "golangci-lint: a valid module under an invalid parent go.work is still linted, with GOWORK=off, GOTOOLCHAIN=local and no VCS stamping" {
+  unset GOLANGCI_MOCK_FILE
+  mkdir -p "$WORK/bin" "$WORK/pr/mod/a"
+  printf 'go 1.21\n\nuse ./missing\n' > "$WORK/pr/go.work"
+  printf 'module example.com/mod\n\ngo 1.21\n' > "$WORK/pr/mod/go.mod"
+  printf 'package a\n' > "$WORK/pr/mod/a/x.go"
+  cat > "$WORK/bin/golangci-lint" << 'EOF'
+#!/bin/sh
+printf '%s|%s|%s|%s\n' "$PWD" "$GOWORK" "$GOTOOLCHAIN" "$GOFLAGS" >> "$GL_LOG"
+if command -v go >/dev/null 2>&1; then go list ./... >/dev/null || exit 3; fi
+echo '{"Issues":[]}' > "${2#--output.json.path=}"
+EOF
+  chmod +x "$WORK/bin/golangci-lint"
+  export GL_LOG="$WORK/gl.log"
+  GOWORK='' GOTOOLCHAIN=auto GOFLAGS=-mod=mod GITHUB_WORKSPACE="$WORK" PATH="$WORK/bin:$PATH" run --separate-stderr bash "$SCRIPT" "$WORK/pr/mod/a/x.go"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  [ "$(cat "$WORK/gl.log")" = "$WORK/pr/mod|off|local|-mod=mod -buildvcs=false" ]
+}

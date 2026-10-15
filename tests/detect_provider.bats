@@ -669,6 +669,37 @@ EOF
   [ "$(sort -u "$WORK/seen")" = $'gh u u u u\nglab u u u u' ]
 }
 
+@test "detect-provider: local detection takes a stored gh login for github only while no enterprise token for another host is set" {
+  mkdir -p "$WORK/bin"
+  cat > "$WORK/bin/gh" << 'EOF'
+#!/usr/bin/env bash
+[[ "$*" == "auth status --hostname ghe.corp.example --active" ]]
+EOF
+  printf '#!/bin/sh\nexit 1\n' > "$WORK/bin/glab"
+  chmod +x "$WORK/bin/gh" "$WORK/bin/glab"
+  run env PATH="$WORK/bin:$PATH" GH_HOST= GH_ENTERPRISE_TOKEN= GITHUB_ENTERPRISE_TOKEN= GH_TOKEN=t1 GITHUB_TOKEN=t2 GITLAB_HOST= GITLAB_URI= GL_HOST= \
+    bash "$DETECT" --remote-url https://ghe.corp.example/acme/app.git
+  [ "$status" -eq 0 ]
+  grep -qx 'PROVIDER=github' <<<"$output"
+  run env PATH="$WORK/bin:$PATH" GH_HOST=GHE.Corp.Example GH_ENTERPRISE_TOKEN=t3 GITLAB_HOST= GITLAB_URI= GL_HOST= \
+    bash "$DETECT" --remote-url https://ghe.corp.example/acme/app.git
+  [ "$status" -eq 0 ]
+  grep -qx 'PROVIDER=github' <<<"$output"
+  for tok in GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN; do
+    for gh_host in ghe.other.example ""; do
+      run --separate-stderr env PATH="$WORK/bin:$PATH" GH_HOST="$gh_host" GITLAB_HOST= GITLAB_URI= GL_HOST= "$tok=t3" \
+        bash "$DETECT" --fallback unknown --remote-url https://ghe.corp.example/acme/app.git
+      [ "$status" -eq 0 ]
+      [ "${#lines[@]}" -eq 6 ]
+      grep -qx 'PROVIDER=unknown' <<<"$output"
+      [[ "$stderr" == *"Refusing gh for host 'ghe.corp.example': "*"would be sent to it, and GH_HOST is not that host"* ]] || return 1
+      run -2 env PATH="$WORK/bin:$PATH" GH_HOST="$gh_host" GITLAB_HOST= GITLAB_URI= GL_HOST= "$tok=t3" \
+        bash "$DETECT" --remote-url https://ghe.corp.example/acme/app.git
+      [[ "$output" == *"Refusing gh for host 'ghe.corp.example'"* ]] || return 1
+    done
+  done
+}
+
 @test "detect-provider: gitlab --check-url-host accepts CI_SERVER_FQDN under glab's CI auto-login" {
   mkdir -p "$WORK/bin"
   printf '#!/bin/sh\nexit 1\n' > "$WORK/bin/glab"

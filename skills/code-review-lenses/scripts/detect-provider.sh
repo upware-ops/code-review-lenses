@@ -9,7 +9,10 @@
 # If --remote-url is omitted, uses `git remote get-url origin`.
 # If --provider is passed, auto-detection is skipped (host/slug still parsed).
 # --fallback unknown: emit PROVIDER=unknown instead of dying when the remote
-# is missing or the host cannot be classified (local branch review).
+# is missing or the host cannot be classified (local branch review), which
+# includes a host known only by a stored gh login while GH_ENTERPRISE_TOKEN /
+# GITHUB_ENTERPRISE_TOKEN is set and GH_HOST is not that host (gh would send
+# the token to it).
 # --check-url-host: after parse-pr-url only. GitHub: github.com /
 # *.ghe.com, GH_HOST equal to HOST, or `gh auth status --hostname HOST --active`
 # succeeds (origin match is not enough). GitLab: glab's host (first set of
@@ -321,7 +324,14 @@ else
       elif (unset GITLAB_TOKEN GITLAB_ACCESS_TOKEN OAUTH_TOKEN CI_JOB_TOKEN; glab_lists_host "$HOST_LC"); then
         PROVIDER=gitlab
       elif (unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN; gh_lists_host "$HOST_LC"); then
-        PROVIDER=github
+        if [[ -z "${GH_ENTERPRISE_TOKEN:-}${GITHUB_ENTERPRISE_TOKEN:-}" ]]; then
+          PROVIDER=github
+        else
+          _refusal="Refusing gh for host '$HOST': GH_ENTERPRISE_TOKEN / GITHUB_ENTERPRISE_TOKEN would be sent to it, and GH_HOST is not that host. Unset the token or set GH_HOST=$HOST."
+          [[ "$FALLBACK" == "unknown" ]] || die "$_refusal"
+          echo "Warning: $_refusal" >&2
+          PROVIDER=unknown
+        fi
       elif [[ "$FALLBACK" == "unknown" ]]; then
         PROVIDER=unknown
       else
