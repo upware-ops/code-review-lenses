@@ -135,10 +135,14 @@ fi
 
 if [[ "$CHECK_URL_HOST" != true ]]; then
   [[ -n "$REMOTE_URL" ]] || REMOTE_URL=$(git remote get-url origin 2>/dev/null || true)
-  case "$REMOTE_URL" in
-    ''|/*|./*|../*|file://*) _no_host=true ;;
-    *) _no_host=false ;;
-  esac
+  # git reads a scheme-less remote as [user@]host:path only when no slash precedes its first colon.
+  if [[ "$REMOTE_URL" == file://* ]]; then
+    _no_host=true
+  elif [[ "$REMOTE_URL" == *://* || "$REMOTE_URL" =~ ^[^/:]*: ]]; then
+    _no_host=false
+  else
+    _no_host=true
+  fi
   if [[ "$_no_host" == true ]]; then
     if [[ "$FALLBACK" == "unknown" ]]; then
       emit() { printf '%s=%q\n' "$1" "$2"; }

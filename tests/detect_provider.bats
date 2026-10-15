@@ -625,12 +625,14 @@ EOF
 }
 
 @test "detect-provider: a filesystem origin is PROVIDER=unknown with --fallback unknown, an error without it" {
-  for url in /tmp/repo.git ./repo ../repo file:///tmp/repo.git; do
+  for url in /tmp/repo.git ./repo ../repo file:///tmp/repo.git repo.git sub/repo.git sub/dir:repo.git; do
     run bash "$DETECT" --remote-url "$url" --fallback unknown
     [ "$status" -eq 0 ]
     [[ "$output" == *"PROVIDER=unknown"* ]] || { echo "not unknown: $url" >&2; return 1; }
   done
   run -2 bash "$DETECT" --remote-url /tmp/repo.git
+  [[ "$output" == *"Unrecognized remote URL"* ]] || return 1
+  run -2 bash "$DETECT" --remote-url repo.git
   [[ "$output" == *"Unrecognized remote URL"* ]]
 }
 
