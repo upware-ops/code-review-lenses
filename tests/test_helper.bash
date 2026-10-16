@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# test_helper.bash — shared paths and helpers for the comprehensive-review
+# test_helper.bash — shared paths and helpers for the code-review-lenses
 # helper-script test suite.
 #
 # These tests exercise the deterministic helper scripts under
-# skills/comprehensive-review/scripts/ entirely offline, using the *_MOCK_FILE
+# skills/code-review-lenses/scripts/ entirely offline, using the *_MOCK_FILE
 # environment variables each script supports. No network access is required.
 
 # shellcheck disable=SC2034  # consumed by .bats files that load this helper
-SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../skills/comprehensive-review/scripts" && pwd)"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../skills/code-review-lenses/scripts" && pwd)"
 # shellcheck disable=SC2034
 FIXTURES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/fixtures" && pwd)"
 

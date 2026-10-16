@@ -1,0 +1,23 @@
+{
+  "id": "GHSA-cccc-unfixed",
+  "modified": "2025-06-01T00:00:00Z",
+  "summary": "No fix for lib; a different package in the same advisory has one",
+  "aliases": ["CVE-2025-77777"],
+  "severity": [
+    { "type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N" }
+  ],
+  "affected": [
+    {
+      "package": { "name": "lib", "ecosystem": "npm" },
+      "ranges": [
+        { "type": "SEMVER", "events": [ { "introduced": "0" }, { "last_affected": "5.0.0" } ] }
+      ]
+    },
+    {
+      "package": { "name": "other-lib", "ecosystem": "npm" },
+      "ranges": [
+        { "type": "SEMVER", "events": [ { "introduced": "0" }, { "fixed": "9.9.9" } ] }
+      ]
+    }
+  ]
+}

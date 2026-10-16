@@ -11,23 +11,27 @@ In addition to LLM agents, the skill runs deterministic checks when relevant fil
 
 ## Analyzer table
 
-| Check | Trigger | Runs in `--quick`? | Binary required |
+| Check | Trigger | Profiles | Binary required |
 |-------|---------|-------------------|----------------|
-| **dependency-check** — queries [OSV.dev](https://osv.dev/) for known CVEs in declared dependency versions | `go.mod`, `package.json`, `requirements*.txt`, or `composer.json` changed | Yes | `curl` + `jq` (built-in) |
-| **shellcheck** — shell script linting | `.sh` or `.bash` files changed | Yes | `shellcheck` |
-| **semgrep** — polyglot SAST | Any source file changed | Yes | `semgrep` |
-| **trufflehog** — secret scanning | Any file changed | Yes | `trufflehog` |
-| **ruff** — Python linting | `.py` files changed | Yes | `ruff` |
-| **golangci-lint** — Go static analysis | `.go` files changed | Yes | `golangci-lint` |
-| **checkov** — IaC security scanning | `*.tf`, `*.tfvars`, `Dockerfile`, k8s YAML, CloudFormation, Azure ARM changed | Yes | `checkov` |
-| **eslint** — JavaScript/TypeScript linting | `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` files changed; only runs when an ESLint config is present | No | `eslint` (via `npx` or `node_modules/.bin`) |
-| **hadolint** — Dockerfile linting | `Dockerfile`, `Dockerfile.*`, or `*.dockerfile` changed | No | `hadolint` |
-| **kube-linter** — Kubernetes manifest linting | `.yaml`, `.yml`, or `.json` files containing `apiVersion` and `kind` fields | No | `kube-linter` |
-| **phpcs** — PHP CodeSniffer | `.php` files changed; uses Drupal/DrupalPractice standard when available, falls back to PSR-12 | No | `phpcs` |
-| **phpstan** — PHP static analysis | `.php`, `.module`, `.inc`, `.install`, `.theme` files changed | No | `phpstan` |
-| **tflint** — Terraform linting | `.tf` or `.tfvars` files changed; runs per-directory | No | `tflint` |
+| **dependency-check** — queries [OSV.dev](https://osv.dev/) for known CVEs in declared dependency versions | `go.mod`, `package.json` / `package-lock.json`, `requirements*.txt`, or `composer.json` / `composer.lock` changed | quick, security, full, deep | `curl` + `jq` (built-in) |
+| **shellcheck** — shell script linting | `.sh` or `.bash` files changed | quick, security, full, deep | `shellcheck` |
+| **semgrep** — polyglot SAST | Any source file changed | quick, security, full, deep | `semgrep` |
+| **trufflehog** — secret scanning | Any file changed | quick, security, full, deep | `trufflehog` |
+| **ruff** — Python linting | `.py` or `.pyw` files changed | quick, security, full, deep | `ruff` |
+| **golangci-lint** — Go static analysis | `.go` files changed; runs once per Go module | quick, security, full, deep | `golangci-lint` v2.1+ |
+| **checkov** — IaC security scanning | `*.tf`, `*.tfvars`, `Dockerfile`, k8s YAML, CloudFormation, Azure ARM changed | quick, security, full, deep | `checkov` |
+| **eslint** — JavaScript/TypeScript linting | `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs` files changed; only runs when an ESLint config is present; parse errors are findings | quick, security, full, deep | `eslint` (the checkout's `node_modules/.bin/eslint`, else the one `npx --no` finds; never downloaded) |
+| **hadolint** — Dockerfile linting | `Dockerfile`, `Dockerfile.*`, or `*.dockerfile` changed | quick, security, full, deep | `hadolint` |
+| **kube-linter** — Kubernetes manifest linting | `.yaml`, `.yml`, or `.json` files containing `apiVersion` and `kind` fields (Helm chart templates under a chart's `templates/` are skipped with a stderr note; undecodable manifests are findings) | quick, security, full, deep | `kube-linter` |
+| **phpcs** — PHP CodeSniffer | `.php` files changed; uses Drupal/DrupalPractice standard when available, falls back to PSR-12 | quick, security, full, deep | `phpcs` |
+| **phpstan** — PHP static analysis | `.php`, `.module`, `.inc`, `.install`, `.theme` files changed | quick, security, full, deep | `phpstan` |
+| **tflint** — Terraform linting | `.tf` or `.tfvars` files changed; runs per-directory | quick, security, full, deep | `tflint` |
 
 Findings appear in Block B with the tool name as source (e.g., `[shellcheck]`, `[eslint]`).
+
+ESLint, tflint, and golangci-lint load configuration and plugins only from the reviewer checkout (`$GITHUB_WORKSPACE`, else the current directory) or your home directory (or from `TFLINT_CONFIG_FILE` / `TFLINT_PLUGIN_DIR` when you set them; relative values resolve against the reviewer checkout), so a PR/MR-URL review never runs configs or plugins from the reviewed PR/MR. A local review runs the checkout's own configs: do not run one on an untrusted checkout in an environment that holds secrets.
+
+ESLint always runs from the reviewer checkout. With a flat config (`eslint.config.*`), files outside it, such as a PR/MR-URL worktree, are not linted: flat config resolves patterns against the working directory, and running ESLint from the reviewed tree would load that tree's project configs (for example a `babel.config.js` that a parser loads). One `WARNING:` line names them, and the review lists it as a note. Legacy `.eslintrc*` configs still lint such files from the reviewer checkout.
 
 ## Installing analyzers
 
@@ -41,7 +45,7 @@ brew install shellcheck hadolint kube-linter tflint
 pip install semgrep ruff checkov
 
 # Go-based
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
 # TruffleHog — see https://github.com/trufflesecurity/trufflehog/releases
 # or: brew install trufflehog
@@ -55,21 +59,23 @@ composer global require squizlabs/php_codesniffer phpstan/phpstan
 
 ## CVE check details
 
-The `dependency-check` script queries [OSV.dev](https://osv.dev/)'s batch API for known vulnerabilities in dependency versions declared in changed manifests. No API key required. Network failures are non-blocking.
+The `dependency-check` script queries [OSV.dev](https://osv.dev/)'s batch API for known vulnerabilities in dependency versions declared in changed manifests, then fetches each reported advisory's full record from `/v1/vulns/{id}` (the batch response carries only ids). No API key required. Network failures are non-blocking.
+
+Only exact versions are queried. Ranged npm and Composer dependencies are checked at the version the adjacent `package-lock.json` / `composer.lock` resolves, and a changed lockfile checks its manifest. Ranges no lockfile resolves are skipped with one stderr note.
 
 Supported manifest files:
 - `go.mod` — Go modules (handles `replace` directives)
-- `package.json` — npm/Node.js
-- `requirements*.txt` — Python pip
-- `composer.json` — PHP Composer
+- `package.json` — npm/Node.js (ranges resolved from `package-lock.json`; `npm:` aliases are queried under the package they point to; non-optional `peerDependencies` are checked as production dependencies)
+- `requirements*.txt` — Python pip (`==` / `===` pins only; `-r` / `--requirement` includes are followed while they stay inside the review root, other includes get one stderr note)
+- `composer.json` — PHP Composer (ranges resolved from `composer.lock`; `require-dev`-only packages are reported as dev dependencies)
 
-CVE findings include severity (CVSS-mapped to Critical/High/Medium/Low), CVE ID, affected package and version, and a remediation note with the fixed version. Findings below CVSS threshold are emitted as `"High"` as a conservative fallback.
+CVE findings include severity (CVSS-mapped to Critical/High/Medium/Low), CVE ID, affected package and version, and a remediation note with the smallest fixed version above the installed one. Findings whose CVSS is missing or cannot be parsed (v4, v2, unknown format) are emitted as `"High"` as a conservative fallback.
 
-The `dependency-check` runs in both full and `--quick` mode when manifest files are present. It also runs in `--security-only` mode (CVE checks are security checks).
+The `dependency-check` runs in `quick`, `security`, `full`, and `deep` when manifest files changed. It is skipped only for `--summary-only`.
 
 ## Static analyzer scripts
 
-Each analyzer has a dedicated script in `skills/comprehensive-review/scripts/`:
+Each analyzer has a dedicated script in `skills/code-review-lenses/scripts/`:
 
 | Script | Analyzer |
 |--------|---------|

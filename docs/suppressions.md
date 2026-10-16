@@ -13,8 +13,8 @@ The skill ships a default suppressions file and supports per-repo overrides. Sup
 
 | Path | Scope |
 |------|-------|
-| `skills/comprehensive-review/suppressions.json` (in plugin) | Global defaults — shipped with the plugin |
-| `<repo>/.claude/comprehensive-review/suppressions.json` | Per-repo overrides — merged with the global file |
+| `skills/code-review-lenses/suppressions.json` | Global defaults — shipped with the skill |
+| `<repo>/.code-review-lenses/suppressions.json` | Per-repo overrides — merged with the global file |
 
 Per-repo rules are merged with the global rules using `jq -s 'add'`. Rules in either file are evaluated together.
 
@@ -58,7 +58,7 @@ If the registry returns 2xx, the finding is suppressed. If it returns 404 or err
 
 ## Adding per-repo rules
 
-Create `.claude/comprehensive-review/suppressions.json` in your repo:
+Create `.code-review-lenses/suppressions.json` in your repo:
 
 ```json
 [
@@ -79,7 +79,7 @@ Use `--no-suppress` to disable all suppression rules for a run. Useful for:
 - Debugging whether a rule is incorrectly suppressing a real issue
 
 ```
-/comprehensive-review --no-suppress
+/code-review-lenses --no-suppress
 ```
 
 > Do not add rules specific to a single project into the global suppressions file shipped with the plugin. Only project-neutral rules (e.g., version verification rules for widely-used versions) belong in the global file.

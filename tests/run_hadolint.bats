@@ -48,7 +48,7 @@ teardown() {
 @test "hadolint: malformed output falls through safely" {
   touch "$WORK/Dockerfile"
   HADOLINT_MOCK_FILE="$HAD_FIX/hadolint-malformed.json" run --separate-stderr "$SCRIPT" "$WORK/Dockerfile"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
 

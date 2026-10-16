@@ -27,6 +27,15 @@ teardown() {
   echo "$output" | jq -e '.[0].source == "trufflehog"' >/dev/null
 }
 
+@test "trufflehog: verified secret in a test path stays Critical" {
+  TRUFFLEHOG_MOCK_FILE="$TH_FIX/verified-in-tests.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length == 1' >/dev/null
+  echo "$output" | jq -e '.[0].severity == "Critical"' >/dev/null
+  echo "$output" | jq -e '.[0].confidence == 95' >/dev/null
+  echo "$output" | jq -e '.[0].file == "tests/fixtures/leak.env"' >/dev/null
+}
+
 @test "trufflehog: unverified secret in test fixture demoted to Low" {
   TRUFFLEHOG_MOCK_FILE="$TH_FIX/unverified-test-fixture.ndjson" run --separate-stderr "$SCRIPT" ""
   [ "$status" -eq 0 ]
@@ -50,6 +59,39 @@ teardown() {
   [ "$output" = "[]" ]
 }
 
+@test "trufflehog: unreadable mock file is exit 1 with empty array" {
+  TRUFFLEHOG_MOCK_FILE="$WORK/missing.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}
+
+@test "trufflehog: unparseable mock NDJSON is exit 1 with empty array" {
+  echo 'not json' > "$WORK/garbage.ndjson"
+  TRUFFLEHOG_MOCK_FILE="$WORK/garbage.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}
+
+@test "trufflehog: mixed parseable and unparseable NDJSON is exit 1" {
+  printf '%s\n' '{"Verified":false,"SourceMetadata":{"Data":{"Filesystem":{"file":"x.go"}}},"DetectorName":"generic","Raw":"x"}' 'not json' > "$WORK/mixed.ndjson"
+  TRUFFLEHOG_MOCK_FILE="$WORK/mixed.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 1 ]
+  [ "$output" = "[]" ]
+}
+
+@test "trufflehog: live list-mode without config file does not unbound-abort" {
+  unset TRUFFLEHOG_MOCK_FILE
+  mkdir -p "$WORK/bin"
+  printf '%s\n' '#!/bin/sh' 'exit 0' > "$WORK/bin/trufflehog"
+  chmod +x "$WORK/bin/trufflehog"
+  echo 'package x' > "$WORK/src.go"
+  cd "$WORK"
+  PATH="$WORK/bin:$PATH" run --separate-stderr bash -c "printf '%s\n' src.go | bash '$SCRIPT'"
+  [ "$status" -eq 0 ]
+  [ "$output" = "[]" ]
+  [[ "${stderr:-}" != *"unbound variable"* ]]
+}
+
 @test "trufflehog: no changed files returns empty array" {
   unset TRUFFLEHOG_MOCK_FILE
   run --separate-stderr "$SCRIPT" ""
@@ -66,6 +108,19 @@ teardown() {
   [ "$status" -eq 0 ]
   # The finding at vendor/autoload.php must be suppressed (output is empty array)
   echo "$output" | jq -e 'length == 0' >/dev/null
+}
+
+@test "trufflehog: an allowlisted path in a PR/MR worktree is suppressed, and findings are reported worktree-relative" {
+  cp "$TH_FIX/.trufflehog.yml" "$WORK/.trufflehog.yml"
+  cd "$WORK"
+  sed 's#"file":"vendor/autoload.php"#"file":"/tmp/code-review-lenses.wt/vendor/autoload.php"#' "$TH_FIX/allowlisted-path.ndjson" > "$WORK/abs.ndjson"
+  WORKTREE_PATH=/tmp/code-review-lenses.wt TRUFFLEHOG_MOCK_FILE="$WORK/abs.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length == 0' >/dev/null
+  rm "$WORK/.trufflehog.yml"
+  WORKTREE_PATH=/tmp/code-review-lenses.wt TRUFFLEHOG_MOCK_FILE="$WORK/abs.ndjson" run --separate-stderr "$SCRIPT" ""
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e 'length == 1 and .[0].file == "vendor/autoload.php"' >/dev/null
 }
 
 @test "trufflehog: finding at allowlisted path is NOT suppressed when .trufflehog.yml absent" {

@@ -3,10 +3,7 @@ name: pr-summarizer
 description: |
   Generate a structured PR overview including a high-level summary, file-by-file
   walkthrough table, and a review effort estimate. Called as part of the
-  comprehensive-review skill. Its output is used as the PR description when
-  creating a new PR.
-model: sonnet
-color: blue
+  code-review-lenses skill. Its output is Block A of the local review report.
 ---
 
 You are an expert technical writer and code analyst specializing in generating clear,

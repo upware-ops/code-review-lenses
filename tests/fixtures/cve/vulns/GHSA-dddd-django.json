@@ -1,0 +1,23 @@
+{
+  "id": "GHSA-dddd-django",
+  "modified": "2025-06-01T00:00:00Z",
+  "summary": "Separate affected entries per release line, newest first; OSV lowercases the PyPI name",
+  "aliases": ["CVE-2022-28346", "PYSEC-2022-190"],
+  "severity": [
+    { "type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H" }
+  ],
+  "affected": [
+    {
+      "package": { "name": "django", "ecosystem": "PyPI" },
+      "ranges": [ { "type": "ECOSYSTEM", "events": [ { "introduced": "4.0" }, { "fixed": "4.0.4" } ] } ]
+    },
+    {
+      "package": { "name": "django", "ecosystem": "PyPI" },
+      "ranges": [ { "type": "ECOSYSTEM", "events": [ { "introduced": "3.2" }, { "fixed": "3.2.13" } ] } ]
+    },
+    {
+      "package": { "name": "django", "ecosystem": "PyPI" },
+      "ranges": [ { "type": "ECOSYSTEM", "events": [ { "introduced": "2.2" }, { "fixed": "2.2.28" } ] } ]
+    }
+  ]
+}

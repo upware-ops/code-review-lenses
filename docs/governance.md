@@ -7,7 +7,7 @@ render_with_liquid: false
 
 # Governance
 
-Every spawned agent receives a shared governance block (`skills/comprehensive-review/GOVERNANCE.md`) inlined into its task description. This ensures consistent behavior across all agents without duplicating rules in individual agent prompts.
+Every custom agent receives a shared governance block (`skills/code-review-lenses/GOVERNANCE.md`) inlined into its task description. The five vendored toolkit agents (`code-reviewer`, `silent-failure-hunter`, `pr-test-analyzer`, `comment-analyzer`, `type-design-analyzer`) keep their vendored prompts and receive only the block's `## Untrusted input` and `## Output safety` sections, verbatim. This ensures consistent behavior across agents without duplicating rules in individual agent prompts.
 
 ## Shared agent directives
 
@@ -26,22 +26,22 @@ Every spawned agent receives a shared governance block (`skills/comprehensive-re
 
 ## blind-hunter exception
 
-`blind-hunter` receives the GOVERNANCE block but with one override: "verify before naming" applies only within the diff or file list it was given — never the broader repo. This preserves blind-hunter's zero-context "fresh eyes" purpose while keeping every other directive in force.
+`blind-hunter` receives the GOVERNANCE block but with one override: "verify before naming" applies only within the diff it was given — never the broader repo. This preserves blind-hunter's zero-context "fresh eyes" purpose while keeping every other directive in force.
 
 ## Orchestrator governance
 
 The orchestrator itself follows a separate set of rules (in the "Orchestrator Governance" section of `SKILL.md`):
 
-- **External posting is gated by explicit flags** — each posting flag is the user's authorization checkpoint. The orchestrator does not post without an explicit flag.
-- **`--create-pr` is hard-refused from the default branch** — creating a PR from `main` or `master` is blocked regardless of flags.
-- **User confirmation is required before any external write** — the orchestrator pauses and prompts before posting to GitHub, GitLab, or Bitbucket.
+- **Local only** — the orchestrator never creates, comments on, or posts reviews to a PR/MR.
+- **Profiles, not mode flags** — roster comes from `--profile` / `--summary-only`.
+- **Spawn by agent file name** — no plugin-namespace prefixes; no hardcoded model.
 
 ## Secret redaction defense-in-depth
 
 Secret redaction happens at two layers:
 
 1. **Agent source (GOVERNANCE.md directive)** — agents are instructed to redact secrets in their finding text before emitting findings
-2. **Phase 2 redaction pass** — the orchestrator runs a hardcoded-pattern redaction pass against all collected findings before any external posting, as defense-in-depth against agent failures
+2. **Phase 2 redaction pass** — the orchestrator runs a hardcoded-pattern redaction pass against all collected findings, then once more over the assembled report (Block A + Block B), before display, as defense-in-depth against agent failures
 
 Both layers are always active regardless of flags.
 

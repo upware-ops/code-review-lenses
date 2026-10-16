@@ -1,0 +1,23 @@
+[
+  {
+    "check_type": "terraform",
+    "results": {"failed_checks": []},
+    "summary": {"passed": 0, "failed": 0, "skipped": 0, "parsing_errors": 1, "resource_count": 0, "checkov_version": "3.2.0"}
+  },
+  {
+    "check_type": "secrets",
+    "results": {
+      "failed_checks": [
+        {
+          "check_id": "CKV_SECRET_6",
+          "check_name": "Base64 High Entropy String",
+          "repo_file_path": "/main.tf",
+          "file_line_range": [3, 4],
+          "resource": "b0a8d6f2e1c3",
+          "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/secrets-policies/secrets-policy-index/git-secrets-6"
+        }
+      ]
+    },
+    "summary": {"passed": 0, "failed": 1, "skipped": 0, "parsing_errors": 0, "resource_count": 1, "checkov_version": "3.2.0"}
+  }
+]

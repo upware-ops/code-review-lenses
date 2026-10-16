@@ -1,0 +1,43 @@
+{
+  "version": "1.100.0",
+  "results": [
+    {
+      "check_id": "python.lang.security.audit.eval-detected.eval-detected",
+      "path": "app.py",
+      "start": {
+        "line": 3,
+        "col": 1,
+        "offset": 20
+      },
+      "end": {
+        "line": 3,
+        "col": 11,
+        "offset": 30
+      },
+      "extra": {
+        "message": "Detected the use of eval().",
+        "metadata": {
+          "references": [
+            "https://owasp.org/Top10/A03_2021-Injection"
+          ]
+        },
+        "severity": "WARNING"
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 3,
+      "level": "warn",
+      "type": "Syntax error",
+      "message": "Syntax error at line legacy.py:2: `)` was unexpected",
+      "path": "legacy.py"
+    }
+  ],
+  "paths": {
+    "scanned": [
+      "app.py",
+      "legacy.py"
+    ]
+  }
+}

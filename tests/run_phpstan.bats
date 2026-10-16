@@ -48,7 +48,7 @@ teardown() {
 @test "phpstan: malformed output falls through safely" {
   touch "$WORK/MyService.php"
   PHPSTAN_MOCK_FILE="$PHPSTAN_FIX/phpstan-malformed.json" run --separate-stderr "$SCRIPT" "$WORK/MyService.php"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [ "$output" = "[]" ]
 }
 
@@ -136,4 +136,16 @@ teardown() {
     "echo '$WORK/MyService.php' | '$SCRIPT'"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e 'length > 0' >/dev/null
+}
+
+@test "phpstan: general errors exit 1 but still emit the file findings" {
+  touch "$WORK/MyService.php"
+  cat > "$WORK/mixed.json" <<EOF
+{"totals":{"errors":1,"file_errors":1},"files":{"$WORK/MyService.php":{"errors":1,"messages":[{"message":"Undefined variable \$x","line":7,"ignorable":true}]}},"errors":["Ignored error pattern #foo# was not matched in reported errors."]}
+EOF
+  cd "$WORK"
+  PHPSTAN_MOCK_FILE="$WORK/mixed.json" run --separate-stderr "$SCRIPT" "$WORK/MyService.php"
+  [ "$status" -eq 1 ]
+  echo "$output" | jq -e 'length == 1 and .[0].file == "MyService.php" and .[0].line == 7' >/dev/null
+  [[ "$stderr" == *"phpstan reported non-file errors"* ]]
 }

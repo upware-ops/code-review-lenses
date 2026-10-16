@@ -8,17 +8,19 @@
       "Remediation": "Set readOnlyRootFilesystem to true in the container securityContext.",
       "Object": {
         "Metadata": {
-          "FilePath": "k8s/deployment.yaml",
-          "LineNumber": 22
+          "FilePath": "/repo/k8s/deployment.yaml"
         },
-        "Type": {
-          "Group": "apps",
-          "Version": "v1",
-          "Kind": "Deployment"
-        },
-        "Name": "nginx-deployment"
+        "K8sObject": {
+          "Namespace": "",
+          "Name": "nginx-deployment",
+          "GroupVersionKind": {
+            "Group": "apps",
+            "Version": "v1",
+            "Kind": "Deployment"
+          }
+        }
       }
     }
   ],
-  "Summary": {"ChecksStatus": "FAILED"}
+  "Summary": {"ChecksStatus": "Failed", "CheckEndTime": "2026-03-10T13:17:40Z", "KubeLinterVersion": "v0.8.3"}
 }

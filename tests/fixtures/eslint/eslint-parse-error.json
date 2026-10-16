@@ -1,0 +1,21 @@
+[
+  {
+    "filePath": "/repo/src/broken.js",
+    "messages": [
+      {
+        "ruleId": null,
+        "nodeType": null,
+        "fatal": true,
+        "severity": 2,
+        "message": "Parsing error: Unexpected token ;",
+        "line": 1,
+        "column": 9
+      }
+    ],
+    "errorCount": 1,
+    "fatalErrorCount": 1,
+    "warningCount": 0,
+    "fixableErrorCount": 0,
+    "fixableWarningCount": 0
+  }
+]

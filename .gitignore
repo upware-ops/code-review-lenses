@@ -1,1 +1,9 @@
-.claude/
+# Local host settings stay untracked; ship the workflow and skill link.
+.claude/*
+!.claude/workflows/
+!.claude/skills/
+.grok/*
+!.grok/workflows/
+!.grok/skills/
+
+.idea/

@@ -54,7 +54,7 @@ Profiles are injected at the agent task level — not hardcoded into agent promp
 
 To add a language profile:
 
-1. Create `skills/comprehensive-review/language-profiles/<lang>.md` following the structure of existing profiles
+1. Create `skills/code-review-lenses/language-profiles/<lang>.md` following the structure of existing profiles
 2. The filename (lowercased, without extension) must match the extension-based language detection in `SKILL.md` Phase 0
 3. Do not put language guidance in agent prompts directly — use language profiles so all agents benefit
 

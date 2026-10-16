@@ -1,0 +1,44 @@
+# Provider Operations Reference
+
+Read-only operations used when a PR/MR URL is checked out for local analysis.
+This pipeline never creates, comments on, or reviews a PR/MR. Host and number
+come from the URL (`parse-pr-url.sh`), not from `--pr` / `--provider`.
+
+The following operations are referenced by name from SKILL.md. Use the command
+for the detected `PROVIDER`. GitLab commands go through `glab` and work for
+any host that CLI is authenticated to (`glab auth login --hostname <host>`).
+
+## OP: Fetch PR/MR metadata
+
+`scripts/fetch-pr-metadata.sh` runs this OP (SKILL.md Phase 0b step 1) and emits `baseRefName`, `baseRefOid`, `HEAD_REF_FILE`, `PR_BODY_FILE`. Do not run these commands directly: their output includes author-written text (the description and the source branch name).
+
+Returns JSON mapped to: `baseRefName`, `baseRefOid`, `headRefName`, `state`, `body`. The source branch name goes to `HEAD_REF_FILE` and the description to `PR_BODY_FILE`; neither is printed.
+
+Run `detect-provider.sh --check-url-host --provider "$PROVIDER" --host "$HOST"` before any `gh` / `glab` OP. GitHub: github.com / `*.ghe.com`, `GH_HOST` equal to the host, or `gh auth status --hostname "$HOST"` (origin match is not enough). GitLab: glab's host (first set of `GITLAB_HOST`, `GITLAB_URI`, `GL_HOST`, else gitlab.com) or `glab auth status --hostname "$HOST"` (origin or `glab config get host` match is not enough). An env token the CLI would send to the host but that belongs to another host is a refusal (`GH_ENTERPRISE_TOKEN` / `GITHUB_ENTERPRISE_TOKEN` belong to `GH_HOST`; `GITLAB_TOKEN` / `GITLAB_ACCESS_TOKEN` / `OAUTH_TOKEN` to glab's host), and both `auth status` probes run with the env tokens unset, so the OPs below use the credential the check accepted. Refuse rather than send env tokens to an unknown host.
+
+- **github:** `GH_HOST="$HOST" gh pr view "$PR_NUMBER" --repo "$REPO_SLUG" --json baseRefName,baseRefOid,headRefName,state,body`. Map `body` to canonical `body`. Always pin `GH_HOST` and `--repo` to the URL-parsed host/slug (including GitHub Enterprise).
+- **gitlab:** After `--check-url-host` succeeds: `GITLAB_HOST="$HOST" glab mr view <N> -R "https://$HOST/$REPO_SLUG" --output json` (fields: source_branch, target_branch, diff_refs, state, description). Map: target_branch→baseRefName, diff_refs.base_sha→baseRefOid, source_branch→headRefName, description→body. State values: "opened"→OPEN, "closed"→CLOSED, "merged"→MERGED. If state is unrecognized, warn "Unrecognized MR state '<value>' — proceeding as OPEN." and treat as OPEN. Always pin `GITLAB_HOST` and a full-URL `-R` so a non-default `glab` host is the one invoked; `glab` has no global `--hostname` flag.
+- **bitbucket:** `curl -sf -K - "https://api.bitbucket.org/2.0/repositories/${REPO_SLUG}/pullrequests/<N>"`, with the config line `user = "${BITBUCKET_EMAIL}:${BITBUCKET_TOKEN}"` on stdin (`\`, `"` and newline escaped for curl's config syntax). Never pass the credential as `--user`: command-line arguments are visible to other processes. Map: destination.branch.name→baseRefName, source.branch.name→headRefName, description→body. State values: "OPEN", "DECLINED"→CLOSED, "SUPERSEDED"→CLOSED, "MERGED". Stop with "Bitbucket fork PRs are not supported." when `source.repository.full_name` differs from `destination.repository.full_name`: the checkout below fetches the source branch from the PR repository's remote.
+
+If the provider response has no body/description or the value is null/empty, set `body=""`. Do not error. Likewise set `baseRefOid=""` when absent (Bitbucket, or GitLab without `diff_refs`).
+
+## OP: Checkout PR/MR branch into `$WORKTREE_PATH`
+
+Run every command **inside** the temporary worktree created in Phase 0b. Do not checkout in the parent clone. Discard each command's output (`>/dev/null 2>&1`) and check only its exit status: checkout output can echo author-chosen branch names.
+
+Run every git command with hooks off (`-c core.hooksPath=/dev/null`); every provider checks out with git alone, so no tool spawns a git that lacks the flag. A relative `core.hooksPath` (for example `.githooks`) resolves inside the worktree, so the PR author's own `post-checkout` or `reference-transaction` hook would run as the reviewer.
+
+- **github:** `git -c core.hooksPath=/dev/null -c "credential.https://$HOST.helper=!gh auth git-credential" -C "$WORKTREE_PATH" fetch -q <remote> "refs/pull/$PR_NUMBER/head" && git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" checkout -q FETCH_HEAD`, with `<remote>` chosen as for Bitbucket below. GitHub keeps that ref for every PR, fork PRs included, and the detached checkout leaves no local branch behind. The credential helper (the one `gh auth setup-git` installs) lets git use the `gh` login for `$HOST` when git has no credentials of its own for it.
+- **gitlab:** `git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" fetch -q <remote> "refs/merge-requests/$PR_NUMBER/head" && git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" checkout -q FETCH_HEAD`, with `<remote>` chosen as for Bitbucket below. GitLab keeps that ref for every open MR, fork MRs included, and the detached checkout leaves no local branch behind (`glab mr checkout` would create or reuse the source branch).
+- **bitbucket:** `git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" fetch -q <remote> "refs/heads/$(cat "$HEAD_REF_FILE")" && git -c core.hooksPath=/dev/null -C "$WORKTREE_PATH" checkout -q FETCH_HEAD`, where `<remote>` is the git remote whose URL, HTTPS or SSH, points at `$HOST/$REPO_SLUG` (`origin` first, as `resolve-pr-base.sh` picks it; a remote whose URL is `http://` or `git://` never matches, since nothing authenticates the server and anyone on the path could substitute the fetched commits; stop if none) (`HEAD_REF_FILE` from the metadata step; a `refs/heads/` refspec cannot be read as a git option)
+
+## GitLab host notes
+
+`detect-provider.sh` treats a remote as GitLab when the hostname is `gitlab.com`,
+contains `gitlab`, equals glab's env host (first set of `GITLAB_HOST`,
+`GITLAB_URI`, `GL_HOST`; URL form is stripped to a hostname), equals
+`glab config get host`, or `glab auth status --hostname <host>`
+exits 0 (per host: the bare command exits 1 if any configured host fails).
+Nested groups stay in `REPO_SLUG` (`group/sub/project`).
+The `glab` OP above pins `GITLAB_HOST="$HOST"` and `-R "https://$HOST/$REPO_SLUG"`.
+`glab` must already be logged in to that host; this skill does not run `glab auth login`.

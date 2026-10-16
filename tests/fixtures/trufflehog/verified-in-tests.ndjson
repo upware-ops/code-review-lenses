@@ -1,0 +1,1 @@
+{"DetectorName":"AWS","Verified":true,"SourceMetadata":{"Data":{"Filesystem":{"file":"tests/fixtures/leak.env","line":1}}}}

@@ -1,0 +1,19 @@
+[
+  {
+    "filePath": "/repo/src/ignored.js",
+    "messages": [
+      {
+        "ruleId": null,
+        "fatal": false,
+        "severity": 1,
+        "message": "File ignored because of a matching ignore pattern. Use \"--no-ignore\" to disable file ignore settings or use \"--no-warn-ignored\" to suppress this warning.",
+        "nodeType": null
+      }
+    ],
+    "errorCount": 0,
+    "fatalErrorCount": 0,
+    "warningCount": 1,
+    "fixableErrorCount": 0,
+    "fixableWarningCount": 0
+  }
+]

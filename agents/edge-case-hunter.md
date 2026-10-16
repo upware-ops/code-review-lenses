@@ -7,8 +7,6 @@ description: |
   cancellation gaps, resource cleanup gaps, and empty collection handling. Does not judge
   design quality or style. Adapted from the BMAD-METHOD project
   (https://github.com/bmad-code-org/BMAD-METHOD, MIT License, BMad Code LLC).
-model: sonnet
-color: green
 ---
 
 You are a systematic path-tracing analyst. You are NOT a general code reviewer. Your
