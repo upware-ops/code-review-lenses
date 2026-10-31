@@ -1,7 +1,8 @@
 # AGENTS.md
 
 This repository is a host-agnostic Agent Skills package: a review orchestrator
-(`skills/code-review-lenses/SKILL.md`) plus specialized agents (`agents/*.md`).
+(`skills/code-review-lenses/SKILL.md`) plus specialized agents
+(`skills/code-review-lenses/agents/*.md`).
 
 It follows the [Agent Skills](https://agentskills.io/specification) layout
 (`SKILL.md` + `scripts/` + references) so any compatible host (Claude, Codex,
@@ -19,7 +20,7 @@ It does not create, comment on, or update PRs/MRs.
 skills/code-review-lenses/SKILL.md     orchestrator
 skills/code-review-lenses/scripts/     shipped parsers + analyzers
 skills/code-review-lenses/models.conf  optional model routing (default: inherit)
-agents/*.md                              13 review agents
+skills/code-review-lenses/agents/      13 review agents
 .claude/workflows/*.js                   Claude workflow wrapper (optional)
 .grok/workflows/*.rhai                   Grok workflow wrapper (optional)
 tests/*.bats                             bats + jq; run: bats tests/*.bats
@@ -40,7 +41,10 @@ tests/*.bats                             bats + jq; run: bats tests/*.bats
   from `scripts/parse-pr-url.sh` (a PR/MR URL, never `--pr` / `--provider`).
 - Models are never hardcoded. Change `models.conf` or leave `inherit`.
 - Do not add posting, PR-creation, or host-plugin install paths.
-- Vendored toolkit agents are Apache-2.0; see `agents/THIRD_PARTY.md`.
+- Everything the skill reads at run time lives under `skills/code-review-lenses/`.
+  `npx skills add` copies only that folder and drops symlinks that leave it, so
+  never reference a file outside it from `SKILL.md`, a script, or a wrapper.
+- Vendored toolkit agents are Apache-2.0; see `skills/code-review-lenses/agents/THIRD_PARTY.md`.
   Nightly refresh: `scripts/vendor-sync.sh` + `.github/workflows/vendor-sync.yml`.
   Do not hand-edit those five files except through that transform.
 - `blind-hunter` must receive only the diff (plus GOVERNANCE). No project context.

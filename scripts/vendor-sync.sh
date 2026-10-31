@@ -7,8 +7,8 @@
 #   bash scripts/vendor-sync.sh digest [--since <sha>]
 #   bash scripts/vendor-sync.sh transform <infile >outfile
 #
-# toolkit writes agents/<name>.md after applying the local patches in
-# agents/THIRD_PARTY.md (drop model:/color:, CLAUDE.md → AGENTS.md, generic
+# toolkit writes skills/code-review-lenses/agents/<name>.md after applying the
+# local patches in its THIRD_PARTY.md (drop model:/color:, CLAUDE.md → AGENTS.md, generic
 # logging / error-ID wording, banner).
 # It never adds agents that are not in .github/vendor-pins.json.
 # digest prints markdown for commits on tag1 main after the pin (no file writes).
@@ -143,14 +143,14 @@ cmd_toolkit() {
   done
 
   for agent in "${agents[@]}"; do
-    dest="${REPO_ROOT}/agents/${agent}"
+    dest="${REPO_ROOT}/skills/code-review-lenses/agents/${agent}"
     if ! cmp -s "${tmp}/${agent}" "$dest" 2>/dev/null; then
       changed=1
       if [[ "$dry" == true ]]; then
-        echo "would update agents/${agent}"
+        echo "would update skills/code-review-lenses/agents/${agent}"
       else
         cp "${tmp}/${agent}" "$dest"
-        echo "updated agents/${agent}"
+        echo "updated skills/code-review-lenses/agents/${agent}"
       fi
     fi
   done

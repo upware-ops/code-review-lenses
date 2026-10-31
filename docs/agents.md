@@ -7,8 +7,8 @@ render_with_liquid: false
 
 # Agents
 
-All 13 agents ship in `agents/`. Five were adapted from pr-review-toolkit
-(Apache-2.0; see `agents/THIRD_PARTY.md`). Models default to **inherit**.
+All 13 agents ship in `skills/code-review-lenses/agents/`. Five were adapted from pr-review-toolkit
+(Apache-2.0; see `skills/code-review-lenses/agents/THIRD_PARTY.md`). Models default to **inherit**.
 
 ## Roster
 

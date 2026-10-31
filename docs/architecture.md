@@ -24,6 +24,7 @@ skills/code-review-lenses/SEVERITY.md                      ← severity normaliz
 skills/code-review-lenses/GOVERNANCE.md                    ← shared governance directives (inlined into every custom agent)
 skills/code-review-lenses/suppressions.json                ← global suppression rules
 skills/code-review-lenses/language-profiles/               ← per-language context profiles (19 languages)
+skills/code-review-lenses/agents/*.md                      ← 13 review agents (inside the skill, so an installed copy is complete)
 skills/code-review-lenses/scripts/run-cve-check.sh         ← deterministic CVE check via OSV.dev (Phase 1b)
 skills/code-review-lenses/scripts/run-shellcheck.sh        ← ShellCheck (Phase 1b)
 skills/code-review-lenses/scripts/run-semgrep.sh           ← Semgrep SAST (Phase 1b)
@@ -37,7 +38,6 @@ skills/code-review-lenses/scripts/run-kube-linter.sh       ← kube-linter (Phas
 skills/code-review-lenses/scripts/run-phpcs.sh             ← PHP CodeSniffer (Phase 1b)
 skills/code-review-lenses/scripts/run-phpstan.sh           ← PHPStan (Phase 1b)
 skills/code-review-lenses/scripts/run-tflint.sh            ← tflint (Phase 1b)
-agents/*.md                                                  ← 13 review agents (self-contained)
 .claude/workflows/code-review-lenses-workflow.js             ← Claude dynamic-workflow wrapper (optional)
 .claude/skills/code-review-lenses                            ← symlink → skills/code-review-lenses
 .grok/workflows/code-review-lenses-workflow.rhai             ← Grok workflow wrapper (optional)

@@ -40,10 +40,10 @@ setup() {
 
 @test "the five shipped toolkit agents are exactly what the transform produces" {
   for agent in code-reviewer silent-failure-hunter pr-test-analyzer comment-analyzer type-design-analyzer; do
-    f="${REPO_ROOT}/agents/${agent}.md"
+    f="${REPO_ROOT}/skills/code-review-lenses/agents/${agent}.md"
     [ "$(bash "$VENDOR" transform < "$f")" = "$(cat "$f")" ]
   done
-  line=$(grep '^description:' "${REPO_ROOT}/agents/silent-failure-hunter.md")
+  line=$(grep '^description:' "${REPO_ROOT}/skills/code-review-lenses/agents/silent-failure-hunter.md")
   [[ "$line" == *'could potentially suppress errors.' ]]
   [[ "$line" != *'\n'* && "$line" != *'<example>'* ]]
 }
@@ -60,10 +60,10 @@ setup() {
   for a in comment-analyzer pr-test-analyzer silent-failure-hunter type-design-analyzer; do
     cp "$UPSTREAM" "$work/${a}.md"
   done
-  before=$(cksum "${REPO_ROOT}/agents/code-reviewer.md")
+  before=$(cksum "${REPO_ROOT}/skills/code-review-lenses/agents/code-reviewer.md")
   run --separate-stderr bash "$VENDOR" toolkit --from-dir "$work" --dry-run
   [ "$status" -eq 0 ]
-  after=$(cksum "${REPO_ROOT}/agents/code-reviewer.md")
+  after=$(cksum "${REPO_ROOT}/skills/code-review-lenses/agents/code-reviewer.md")
   [ "$before" = "$after" ]
   rm -rf "$work"
 }
@@ -76,7 +76,7 @@ setup() {
 
 @test "toolkit: missing or non-SHA --sha is a usage error (exit 2)" {
   work=$(mktemp -d)
-  cp "${REPO_ROOT}"/agents/{code-reviewer,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md "$work/"
+  cp "${REPO_ROOT}"/skills/code-review-lenses/agents/{code-reviewer,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md "$work/"
   run --separate-stderr bash "$VENDOR" toolkit --sha
   [ "$status" -eq 2 ]
   run --separate-stderr bash "$VENDOR" toolkit --from-dir "$work" --sha main --dry-run
@@ -95,7 +95,7 @@ setup() {
 
 @test "toolkit: unchanged agents do not bump the pin" {
   work=$(mktemp -d)
-  cp "${REPO_ROOT}"/agents/{code-reviewer,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md "$work/"
+  cp "${REPO_ROOT}"/skills/code-review-lenses/agents/{code-reviewer,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md "$work/"
   run --separate-stderr bash "$VENDOR" toolkit --from-dir "$work" --sha 0123456789abcdef0123456789abcdef01234567 --dry-run
   [ "$status" -eq 0 ]
   [[ "$output" != *"would pin"* ]]

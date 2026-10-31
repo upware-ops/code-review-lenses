@@ -35,13 +35,13 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- agents .github/vendor-pins.json; then
+          if git diff --quiet -- skills/code-review-lenses/agents .github/vendor-pins.json; then
             echo "No toolkit file changes."
             exit 0
           fi
           branch=chore/vendor-pr-review-toolkit
           git checkout -B "$branch"
-          git add -- agents/*.md .github/vendor-pins.json
+          git add -- skills/code-review-lenses/agents/*.md .github/vendor-pins.json
           git commit -m "chore(vendor): refresh pr-review-toolkit agents from upstream;"
           git push -u origin "$branch" --force-with-lease
           if [[ "$(gh pr view "$branch" --repo "$GH_REPO" --json state --jq .state 2>/dev/null)" == "OPEN" ]]; then
@@ -53,7 +53,7 @@ jobs:
             --body "$(cat <<'EOF'
           Nightly vendor sync from `anthropics/claude-plugins-official`.
 
-          Local patches re-applied (see `agents/THIRD_PARTY.md`):
+          Local patches re-applied (see `skills/code-review-lenses/agents/THIRD_PARTY.md`):
 
           - drop `model:` / `color:` frontmatter
           - `CLAUDE.md` → `AGENTS.md`

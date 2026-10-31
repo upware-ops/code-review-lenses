@@ -39,10 +39,10 @@ Run a full local review of all changes on the current branch (or a specified PR/
    # Invoke resolve-skill-root.sh by the path of this skill's scripts/ directory.
    SKILL_ROOT=$(bash "<skill-dir>/scripts/resolve-skill-root.sh")
    SCRIPTS_DIR="$SKILL_ROOT/scripts"
-   AGENTS_DIR="$SKILL_ROOT/../../agents"
+   AGENTS_DIR="$SKILL_ROOT/agents"
    ```
 
-   The resolver follows directory symlinks to the package checkout. All subsequent scripts are `$SCRIPTS_DIR/<name>.sh`; agent prompts are `$AGENTS_DIR/<name>.md`, independent of the repository being reviewed.
+   The resolver follows directory symlinks to the skill's physical directory, which holds everything the review needs, so a copied install works as well as a checkout. All subsequent scripts are `$SCRIPTS_DIR/<name>.sh`; agent prompts are `$AGENTS_DIR/<name>.md`, independent of the repository being reviewed.
 
 2. **Parse arguments** with the shipped parser — do not re-implement flag handling:
 

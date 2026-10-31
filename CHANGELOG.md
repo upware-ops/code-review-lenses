@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`npx skills add` installs a working skill.** The agent prompts moved from the repository root `agents/` into `skills/code-review-lenses/agents/`, the only folder the skills CLI copies. Before, an installed copy had no agent prompts: the workflow wrappers refused to run and the skill could not load its agents. `SKILL.md` and both wrappers now read `$SKILL_ROOT/agents`, and `vendor-sync.sh` and its workflow write there.
+- **Migration:** a host setup that pointed at the old root `agents/` directory must point at `skills/code-review-lenses/agents/`. A checkout or a symlinked skill needs no change.
+
 ## [2.1.0] - 2026-10-31
 
 ### Added

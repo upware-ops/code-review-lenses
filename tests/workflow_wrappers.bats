@@ -88,7 +88,7 @@ setup() {
            spec-reviewer; do
     grep -q "$a" "$CLAUDE_WF"
     grep -q "$a" "$GROK_WF"
-    [[ -f "$REPO_ROOT/agents/${a}.md" ]]
+    [[ -f "$REPO_ROOT/skills/code-review-lenses/agents/${a}.md" ]]
   done
 }
 
@@ -723,7 +723,7 @@ JS
              "analyzer_dir": "/tmp/code-review-lenses.an1", "diff_file": "/tmp/code-review-lenses.d1", "profile": "full" }'
   out=$(run_claude_wf "$prelude" '"--profile full"')
   [ "$(jq -r '[.prompts[].label] | join(",")' <<<"$out")" = "prelude,code-reviewer,pr-test-analyzer,assemble,cleanup" ]
-  jq -e '.prompts[1].prompt | contains("Read /opt/crl/agents/code-reviewer.md and follow it exactly.") and contains("Follow /opt/crl/skills/code-review-lenses/SKILL.md for context-passing rules")' <<<"$out"
+  jq -e '.prompts[1].prompt | contains("Read /opt/crl/skills/code-review-lenses/agents/code-reviewer.md and follow it exactly.") and contains("Follow /opt/crl/skills/code-review-lenses/SKILL.md for context-passing rules")' <<<"$out"
   jq -e '.prompts[2].prompt | contains("SEVERITY.md: /opt/crl/skills/code-review-lenses/SEVERITY.md.")' <<<"$out"
   jq -e '.prompts[3].prompt | contains("Run /opt/crl/skills/code-review-lenses/SKILL.md Phase 2") and contains("ANALYZER_DIR: /tmp/code-review-lenses.an1.") and (contains("<analyzer-json>") | not)' <<<"$out"
   [ "$(jq -r '.result' <<<"$out")" = $'RESULT\nRESULT' ]
@@ -823,7 +823,7 @@ RESULT Not cleaned (not a code-review-lenses temp path): "/home/u/analyzer"' ]
   for f in "$CLAUDE_WF" "$GROK_WF"; do
     line=$(grep -F 'SKILL_ROOT=$(bash' "$f" | sed 's/\\"/"/g')
     [[ "$line" == *'never a copy in the working tree'* ]]
-    [[ "$line" == *'stop unless "$SKILL_ROOT/../../agents" exists'* ]]
+    [[ "$line" == *'stop unless "$SKILL_ROOT/agents" exists'* ]]
     [[ "$line" == *'Return SKILL_ROOT as skill_root.'* ]]
     for candidate in $(grep -o '[^ ";(]*skills/code-review-lenses' <<<"$line"); do
       [[ "$candidate" == '$HOME/'* ]]
@@ -837,8 +837,7 @@ RESULT Not cleaned (not a code-review-lenses temp path): "/home/u/analyzer"' ]
   sed 's/\\"/"/g' "$GROK_WF" | grep -q -F 'for the first d of "$HOME/.grok/skills/code-review-lenses", "$HOME/.agents/skills/code-review-lenses", "$HOME/.claude/skills/code-review-lenses"'
   grep -q -F '"required": ["agents", "skill_root", "diff_file", "cve_check_failed", "analyzer_failed"],' "$GROK_WF"
   grep -q -F 'skill_root = skill_root_path(pre.output.skill_root);' "$GROK_WF"
-  grep -q -F 'let agents_dir = skill_root.sub_string(0, skill_root.len() - 26) + "/agents";' "$GROK_WF"
-  [ "$(printf '%s' '/skills/code-review-lenses' | wc -c | tr -d ' ')" -eq 26 ]
+  grep -q -F 'let agents_dir = skill_root + "/agents";' "$GROK_WF"
   grep -q -F 'p += ". Read " + agents_dir + "/" + name + ".md and follow it exactly. ";' "$GROK_WF"
   grep -q -F 'p += "Follow " + skill_root + "/SKILL.md context-passing rules for this agent. ";' "$GROK_WF"
   grep -q -F 'p += " SEVERITY.md: " + skill_root + "/SEVERITY.md.";' "$GROK_WF"

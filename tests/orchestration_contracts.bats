@@ -245,14 +245,14 @@ teardown() {
 }
 
 @test "agents: no model: or color: frontmatter" {
-  if grep -R --include='*.md' -E '^(model|color):' "$REPO_ROOT/agents"; then
+  if grep -R --include='*.md' -E '^(model|color):' "$REPO_ROOT/skills/code-review-lenses/agents"; then
     echo "REGRESSION: host-specific model/color frontmatter in agents/" >&2
     return 1
   fi
 }
 
 @test "agents: blind-hunter reads only the diff it is given and never runs git" {
-  agent="$REPO_ROOT/agents/blind-hunter.md"
+  agent="$REPO_ROOT/skills/code-review-lenses/agents/blind-hunter.md"
   grep -q -F 'You will receive the full diff, inline or as a `DIFF_FILE` temp path to read.' "$agent"
   grep -q -F 'Do NOT run git' "$agent"
   if grep -q -e 'git diff' -e 'REVIEW_MODE' -e 'list of changed file paths' "$agent"; then
@@ -266,8 +266,24 @@ teardown() {
            blind-hunter edge-case-hunter adversarial-general issue-linker \
            silent-failure-hunter pr-test-analyzer comment-analyzer type-design-analyzer \
            spec-reviewer; do
-    [[ -f "$REPO_ROOT/agents/${a}.md" ]]
+    [[ -f "$REPO_ROOT/skills/code-review-lenses/agents/${a}.md" ]]
   done
+}
+
+@test "packaging: a plain copy of the skill folder finds every agent prompt, as npx skills installs only that folder" {
+  [ ! -e "$REPO_ROOT/agents" ]
+  [ -z "$(find "$REPO_ROOT/skills/code-review-lenses" -type l)" ]
+  cp -R "$REPO_ROOT/skills/code-review-lenses" "$WORK/installed"
+  SKILL_ROOT=$(bash "$WORK/installed/scripts/resolve-skill-root.sh")
+  [ "$SKILL_ROOT" = "$(cd "$WORK/installed" && pwd -P)" ]
+  eval "$(grep -E '^ +AGENTS_DIR=' "$SKILL_MD")"
+  for a in pr-summarizer code-reviewer architecture-reviewer security-reviewer \
+           blind-hunter edge-case-hunter adversarial-general issue-linker \
+           silent-failure-hunter pr-test-analyzer comment-analyzer type-design-analyzer \
+           spec-reviewer; do
+    [[ -f "$AGENTS_DIR/${a}.md" ]]
+  done
+  [[ -f "$AGENTS_DIR/THIRD_PARTY.md" && -f "$AGENTS_DIR/LICENSE-pr-review-toolkit.txt" ]]
 }
 
 @test "PROVIDERS.md: read-only fetch/checkout only, no post/create/draft" {
@@ -348,7 +364,7 @@ teardown() {
 
 @test "SEVERITY.md: toolkit scales follow the vendored rating guidelines" {
   grep -qF 'gap [9,10] / [7,8] / [5,6] / [1,4]' "$SEVERITY_MD"
-  grep -qF '9-10: Critical functionality' "$REPO_ROOT/agents/pr-test-analyzer.md"
+  grep -qF '9-10: Critical functionality' "$REPO_ROOT/skills/code-review-lenses/agents/pr-test-analyzer.md"
   grep -q 'lowest of its four ratings' "$SEVERITY_MD"
 }
 
@@ -595,7 +611,7 @@ JSON
 }
 
 @test "issue-linker: gh calls are pinned to HOST/REPO_SLUG; SKILL.md passes HOST" {
-  linker="$REPO_ROOT/agents/issue-linker.md"
+  linker="$REPO_ROOT/skills/code-review-lenses/agents/issue-linker.md"
   grep -qF 'gh auth status --hostname "$HOST" --active' "$linker"
   spans=$(grep -oE '`gh (issue|pr) [^`]*`' "$linker")
   [ "$(grep -c . <<<"$spans")" -ge 3 ]
@@ -609,7 +625,7 @@ JSON
   entry=$(skill_line '**issue-linker** when')
   has "$entry" 'never in a PR/MR-URL review'
   lacks "$entry" 'PR_NUMBER'
-  lacks "$(<"$REPO_ROOT/agents/issue-linker.md")" 'PR_NUMBER'
+  lacks "$(<"$REPO_ROOT/skills/code-review-lenses/agents/issue-linker.md")" 'PR_NUMBER'
 
   block=$(skill_block 'apply-roster-overlays.sh')
   [ -n "$block" ]
@@ -706,7 +722,7 @@ JSON
   row=$(grep -F '| comment-analyzer |' "$SEVERITY_MD")
   [ -n "$row" ]
   for section in 'Critical Issues' 'Improvement Opportunities' 'Recommended Removals'; do
-    grep -qF "**${section}**" "$REPO_ROOT/agents/comment-analyzer.md"
+    grep -qF "**${section}**" "$REPO_ROOT/skills/code-review-lenses/agents/comment-analyzer.md"
     has "$row" "$section"
   done
   has "$row" '| High / Medium / Low |'
@@ -734,7 +750,7 @@ JSON
   grep -qx '### Spec Conformance' "$SKILL_MD"
   has "$(grep -F '| `category` |' "$SEVERITY_MD")" '`spec`'
   grep -q 'a finding with an empty `file` never clusters' "$REPO_ROOT/docs/architecture.md"
-  agent="$REPO_ROOT/agents/spec-reviewer.md"
+  agent="$REPO_ROOT/skills/code-review-lenses/agents/spec-reviewer.md"
   grep -qF '`category` must be exactly `"spec"`.' "$agent"
   grep -qF '`source` must be exactly `"spec-reviewer"`.' "$agent"
   grep -qF -- '--spec <file>' "$HELP_MD"
@@ -833,7 +849,7 @@ JSON
 
 @test "SKILL.md: a reviewer's brief clean confirmation counts as clean, not as missing results" {
   grep -qF -- '- A reply that only states the agent found no issues (code-reviewer is told to confirm a clean review in a brief summary rather than print `NONE`) → clean, omit from Block B.' "$SKILL_MD"
-  grep -qF 'confirm the code meets standards with a brief summary' "$REPO_ROOT/agents/code-reviewer.md"
+  grep -qF 'confirm the code meets standards with a brief summary' "$REPO_ROOT/skills/code-review-lenses/agents/code-reviewer.md"
   if grep -qF 'Empty / missing headers (and not NONE)' "$SKILL_MD"; then
     echo "REGRESSION: a contract-compliant clean reply is reported as no results" >&2
     return 1

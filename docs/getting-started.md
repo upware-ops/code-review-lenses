@@ -17,9 +17,17 @@ host-specific plugin. A clone of this repo is enough for Codex, Claude, and Grok
 Codex invokes `$code-review-lenses` and loads the Markdown agent prompts into
 native subagents. No custom-agent registration is needed.
 
-For use from other repositories, symlink `skills/code-review-lenses/` into
-the host's user skill directory (`~/.agents/skills/` for Codex). Keep the full
-checkout available so the skill can resolve its sibling `agents/` directory.
+For use from other repositories, install it into your user skill directories:
+
+```bash
+npx skills add upware-ops/code-review-lenses --skill code-review-lenses -g -y -a claude-code -a codex
+```
+
+Name each host you use with `-a`.
+
+Or symlink `skills/code-review-lenses/` into the host's user skill directory
+(`~/.agents/skills/` for Codex). The skill folder is self-contained: its agent
+prompts ship in `skills/code-review-lenses/agents/`.
 
 The orchestrator finds its own files via `scripts/resolve-skill-root.sh`.
 
@@ -70,7 +78,7 @@ Self-hosted and dedicated hosts work as long as `glab auth status` lists them
 
 On Claude or Grok you can run the review as a host workflow instead of
 walking the skill turn-by-turn. The skill remains the source of truth; the
-wrappers launch the shipped parsers and `agents/*.md` (Phase 0–1b, 2, 3, 5).
+wrappers launch the shipped parsers and `skills/code-review-lenses/agents/*.md` (Phase 0–1b, 2, 3, 5).
 Phase 0c and Phase 1c run only on the skill path.
 
 ```

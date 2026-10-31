@@ -33,7 +33,7 @@ hero_tagline: "Host-agnostic PR/MR review using parallel specialized agents. Loc
 
 ## Quick start
 
-Point your Agent Skills host at this repository (or symlink `skills/code-review-lenses` into the host's skill directory and keep the full checkout so the skill can resolve its sibling `agents/` directory). Then:
+Install with `npx skills add upware-ops/code-review-lenses --skill code-review-lenses -g -y -a claude-code -a codex`, point your Agent Skills host at this repository, or symlink `skills/code-review-lenses` into the host's skill directory. Then:
 
 ```
 /code-review-lenses

@@ -39,7 +39,7 @@ at tiny tier.
 
 | Requirement | Notes |
 |-------------|-------|
-| An Agent Skills–compatible host with subagent tools | Loads `skills/code-review-lenses/SKILL.md` and `agents/*.md` |
+| An Agent Skills–compatible host with subagent tools | Loads `skills/code-review-lenses/SKILL.md` and its `agents/*.md` |
 | `git` | Diff analysis |
 | `jq` | Findings pipeline |
 | [gh CLI](https://cli.github.com/) | Only for a GitHub PR URL |
@@ -62,7 +62,20 @@ Detection uses, in order: hostname `gitlab.com` / contains `gitlab`,
 
 ## Install
 
-Clone this repository. A checkout is enough for Codex, Claude, and Grok:
+Install the skill into your user skill directories with the
+[skills CLI](https://github.com/vercel-labs/skills):
+
+```
+npx skills add upware-ops/code-review-lenses --skill code-review-lenses -g -y -a claude-code -a codex
+```
+
+Name each host with `-a`; without it the CLI tries every host it knows and
+reports the ones that cannot take a global install as failures. The skill
+folder is self-contained, agent prompts included, so the installed copy runs on
+its own. The optional workflow wrappers below are not part of the skill; copy
+them from a checkout if you want them.
+
+Or clone this repository. A checkout is enough for Codex, Claude, and Grok:
 relative links at `.agents/skills/code-review-lenses`,
 `.claude/skills/code-review-lenses`, and `.grok/skills/code-review-lenses`
 point at the shipped `skills/code-review-lenses/`. On Windows, clone with
@@ -76,9 +89,7 @@ registration is needed. Claude and Grok use `/code-review-lenses` or the
 optional `/code-review-lenses-workflow` wrapper.
 
 To use the skill from other repositories, symlink `skills/code-review-lenses`
-into the host's user skill directory (`~/.agents/skills/` for Codex). Keep the
-full checkout available: the skill resolves the sibling `agents/` directory
-from its physical location.
+into the host's user skill directory (`~/.agents/skills/` for Codex).
 
 The skill resolves its own directory via `scripts/resolve-skill-root.sh`.
 It does not search `~/.claude` plugin caches.
@@ -130,7 +141,7 @@ architecture-reviewer and security-reviewer.
 They do not fork roster or flag logic. A prelude agent runs the shipped
 parsers (`resolve-skill-root.sh`, `resolve-profile.sh`, `parse-pr-url.sh`,
 `detect-provider.sh`, `fetch-pr-metadata.sh`, `evaluate-gates.sh`, `apply-roster-overlays.sh`) and fans out the existing
-`agents/*.md` stems.
+`skills/code-review-lenses/agents/*.md` stems.
 
 The wrappers run only the skill installed in your user skill directory
 (Claude: `~/.claude/skills/code-review-lenses`; Grok: `~/.grok/skills/`,
@@ -171,8 +182,8 @@ JSON `{ "arguments": "--profile deep https://github.com/acme/app/pull/42" }` is 
 
 ## Agent roster
 
-All 13 agents ship in `agents/`. Five were adapted from `pr-review-toolkit`
-(Apache-2.0; see `agents/THIRD_PARTY.md`). Models default to **inherit**
+All 13 agents ship in `skills/code-review-lenses/agents/`. Five were adapted from `pr-review-toolkit`
+(Apache-2.0; see `skills/code-review-lenses/agents/THIRD_PARTY.md`). Models default to **inherit**
 (the host / orchestrator model). Pin names in
 `skills/code-review-lenses/models.conf` if your host supports per-agent models.
 
@@ -263,6 +274,6 @@ against documentation greps.
 
 ## License
 
-MIT. Vendored toolkit agents: Apache-2.0 (`agents/LICENSE-pr-review-toolkit.txt`).
+MIT. Vendored toolkit agents: Apache-2.0 (`skills/code-review-lenses/agents/LICENSE-pr-review-toolkit.txt`).
 `blind-hunter`, `edge-case-hunter`, and `adversarial-general` were adapted from
 [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD) (MIT, BMad Code LLC).
