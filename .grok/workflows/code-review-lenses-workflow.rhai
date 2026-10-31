@@ -1,7 +1,7 @@
 let meta = #{
     name: "code-review-lenses-workflow",
-    description: "Local review via shipped parsers (Phase 0-1b, 2, 3, 5). Skill-only: Phase 0c symbol context and Phase 1c CVE reachability. Pass skill flags and optional PR/MR URL or focus through to resolve-profile.sh. [--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]",
-    when_to_use: "[--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]",
+    description: "Local review via shipped parsers (Phase 0-1b, 2, 3, 5). Skill-only: Phase 0c symbol context and Phase 1c CVE reachability. Pass skill flags and optional PR/MR URL or focus through to resolve-profile.sh. [--profile quick|security|full|deep] [--summary-only] [--spec <file>] [--base <branch>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]",
+    when_to_use: "[--profile quick|security|full|deep] [--summary-only] [--spec <file>] [--base <branch>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]",
     phases: [
         #{ title: "Prelude", detail: "shipped parsers emit roster" },
         #{ title: "Review", detail: "existing agents in parallel" },
@@ -32,6 +32,7 @@ let roster_schema = #{
         "host": #{ "type": "string" },
         "skill_root": #{ "type": "string" },
         "governance": #{ "type": "string" },
+        "spec_file": #{ "type": "string" },
         "security_policy": #{ "type": "string" },
         "classification": #{ "type": "object" },
         "models": #{ "type": "object", "additionalProperties": #{ "type": "string" } },
@@ -245,14 +246,14 @@ prelude_prompt += "Local: bash \"$SCRIPTS_DIR/review-diff.sh\" --base \"$BASE\" 
 prelude_prompt += "6. DIFF_FILE=... DIFF_PATHS=... bash \"$SCRIPTS_DIR/evaluate-gates.sh\": capture stdout, honor $?, then eval. Non-zero is a hard stop. Then DIFF_FILE DIFF_PATHS GATE_CODE_OR_INFRA GATE_SECURITY_PATTERNS bash \"$SCRIPTS_DIR/classify-diff.sh\": capture then eval. Then those env vars plus GATE_ERROR_PATTERNS GATE_CONTROL_FLOW GATE_TEST_PATHS GATE_COMMENT_CHANGES GATE_TYPE_DEFINITIONS PROVIDER PR_NUMBER bash \"$SCRIPTS_DIR/apply-roster-overlays.sh\" --from-file <same temp file>. Honor RUN_*. Overlay does not emit GUIDANCE — keep GUIDANCE_REST. ";
 prelude_prompt += "7. If RUN_CVE or RUN_STATIC_ANALYZERS is true: ANALYZER_DIR=$(mktemp -d /tmp/code-review-lenses.XXXXXX); build CHECK_PATHS as SKILL.md Phase 1b with that block's stderr, and the removed-symlink count line from step 5, in \"$ANALYZER_DIR/check-paths.err\", then run matching \"$SCRIPTS_DIR/run-*.sh\" with each script's stdout in \"$ANALYZER_DIR/<script>.json\" and its stderr in \"$ANALYZER_DIR/<script>.err\" (CVE check included). Never read, cat, or print those files: analyzer output carries file names and code from the reviewed change. Return ANALYZER_DIR as analyzer_dir. A non-zero exit is ANALYZER_FAILED (CVE check: CVE_CHECK_FAILED). Whether or not step 7 runs, return cve_check_failed and analyzer_failed booleans (false for a check that was not scheduled or had nothing to scan). ";
 prelude_prompt += "8. governance = verbatim text of GOVERNANCE.md in SKILL_ROOT (SKILL.md Phase 0b step 12; empty if missing). security_policy = SKILL.md Phase 0b step 13 (8 KB cap, reviewer checkout, never WORKTREE_PATH; empty if none). ";
-prelude_prompt += "9. provider, repo_slug and host = PROVIDER, REPO_SLUG and HOST from steps 2-3 (from the URL for a URL review, from detect-provider.sh for a local review; empty only when PROVIDER=unknown). classification = { TIER, ARCH_PROMOTED, SECURITY_PROMOTED, DOCS_ONLY, LOW_RISK_CONFIG, LINES_CHANGED, FILES_CHANGED } as classify-diff.sh emitted them in step 6. models = { stem: its MODEL_<STEM> value } for each returned stem whose value is not inherit. ";
+prelude_prompt += "9. provider, repo_slug and host = PROVIDER, REPO_SLUG and HOST from steps 2-3 (from the URL for a URL review, from detect-provider.sh for a local review; empty only when PROVIDER=unknown). classification = { TIER, ARCH_PROMOTED, SECURITY_PROMOTED, DOCS_ONLY, LOW_RISK_CONFIG, LINES_CHANGED, FILES_CHANGED } as classify-diff.sh emitted them in step 6. models = { stem: its MODEL_<STEM> value } for each returned stem whose value is not inherit. spec_file = SPEC_FILE from step 2 (absolute path; empty without --spec). ";
 prelude_prompt += "10. Before returning, rm -f every temp file you created except diff_file and analyzer_dir, and rm -f \"$PR_BODY_FILE\" \"$HEAD_REF_FILE\" if set. ";
 prelude_prompt += "Wrappers do not run Phase 0c or Phase 1c and do not prebuild project context (AGENTS.md, CLAUDE.md, .cursorrules)/FILE_DIGEST/LANGUAGE_PROFILES/PR_NARRATIVE/SYMBOL_CONTEXT (skill path only). Never open, cat or print a file inside WORKTREE_PATH yourself: only the shipped scripts and the git and checkout commands above touch it. When PROFILE=deep, set EXTENDED_THINKING=true on architecture-reviewer and security-reviewer. ";
-prelude_prompt += "Return JSON { profile, agents, skip_reasons, guidance, analyzer_dir, base, review_mode, worktree_path, diff_file, output_file, min_confidence, no_suppress, cve_check_failed, analyzer_failed, classification, skill_root, provider, repo_slug, host, governance, security_policy, models }. ";
+prelude_prompt += "Return JSON { profile, agents, skip_reasons, guidance, analyzer_dir, base, review_mode, worktree_path, diff_file, output_file, min_confidence, no_suppress, cve_check_failed, analyzer_failed, classification, skill_root, provider, repo_slug, host, governance, spec_file, security_policy, models }. ";
 prelude_prompt += "agents = existing agent stems where overlay RUN_* is true. The overlay has already resolved every conditional agent to true or false from GATE_*; do not evaluate a trigger yourself. ";
 prelude_prompt += "Possible stems only: pr-summarizer code-reviewer architecture-reviewer security-reviewer ";
 prelude_prompt += "blind-hunter edge-case-hunter adversarial-general issue-linker silent-failure-hunter ";
-prelude_prompt += "pr-test-analyzer comment-analyzer type-design-analyzer. Omit any stem whose RUN_* is false. ";
+prelude_prompt += "pr-test-analyzer comment-analyzer type-design-analyzer spec-reviewer. Omit any stem whose RUN_* is false. ";
 prelude_prompt += "<invoke-argv>";
 if raw != "" {
     prelude_prompt += raw;
@@ -272,7 +273,7 @@ if pre.output != () && pre.output.output_file != () && pre.output.output_file !=
     complete(#{ summary: "Refused --output-file: the Grok wrapper's read-only assembler cannot write files, so it saves the report as the run artifact instead. Rerun without --output-file." + cleanup_note(pre), profile: "full" });
 }
 
-let allowed = ["pr-summarizer", "code-reviewer", "architecture-reviewer", "security-reviewer", "blind-hunter", "edge-case-hunter", "adversarial-general", "issue-linker", "silent-failure-hunter", "pr-test-analyzer", "comment-analyzer", "type-design-analyzer"];
+let allowed = ["pr-summarizer", "code-reviewer", "architecture-reviewer", "security-reviewer", "blind-hunter", "edge-case-hunter", "adversarial-general", "issue-linker", "silent-failure-hunter", "pr-test-analyzer", "comment-analyzer", "type-design-analyzer", "spec-reviewer"];
 let names = [];
 if pre.output != () && pre.output.agents != () {
     for cand in pre.output.agents {
@@ -325,6 +326,10 @@ let vendored_governance = untrusted_and_output_safety(governance);
 let security_policy = "";
 if pre.output != () && pre.output.security_policy != () {
     security_policy = pre.output.security_policy;
+}
+let spec_file = "";
+if pre.output != () && pre.output.spec_file != () {
+    spec_file = pre.output.spec_file;
 }
 let provider = "";
 if pre.output != () && pre.output.provider != () {
@@ -424,6 +429,11 @@ for name in names {
             p += repo_slug;
             p += ". ";
         }
+    }
+    if name == "spec-reviewer" {
+        p += "SPEC_FILE: ";
+        p += spec_file;
+        p += ". Read the spec from that file. ";
     }
     if profile == "deep" && (name == "architecture-reviewer" || name == "security-reviewer") {
         p += "EXTENDED_THINKING=true ";

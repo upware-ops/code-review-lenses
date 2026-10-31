@@ -1,12 +1,12 @@
 ---
 name: code-review-lenses
-description: "Run a local PR/MR review using specialized agents. Supports GitHub, GitLab (any glab-authenticated host), and Bitbucket. Profiles: quick, security, full, deep. Use --summary-only for Block A only. External review: pass a PR/MR URL (not --pr / --provider). Remaining free-form is focus. Never posts to or creates PRs/MRs."
-argument-hint: "[--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--output-file <path>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]"
+description: "Run a local PR/MR review using specialized agents. Supports GitHub, GitLab (any glab-authenticated host), and Bitbucket. Profiles: quick, security, full, deep. Use --summary-only for Block A only. Add --spec <file> to check the change against a spec or PRD. External review: pass a PR/MR URL (not --pr / --provider). Remaining free-form is focus. Never posts to or creates PRs/MRs."
+argument-hint: "[--profile quick|security|full|deep] [--summary-only] [--spec <file>] [--base <branch>] [--output-file <path>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]"
 license: MIT
 compatibility: "Requires git, jq, and native subagent tools. gh CLI for a GitHub PR URL. glab CLI for a GitLab MR URL (any authenticated host)."
 metadata:
   author: upware
-  version: "2.0.0"
+  version: "2.1.0"
   spec: agent-skills
 allowed-tools: Bash Read Write Grep Glob Agent
 ---
@@ -55,9 +55,9 @@ Run a full local review of all changes on the current branch (or a specified PR/
    unset _profile_out
    ```
 
-   Capture stdout, honor `$?`, then `eval`. Never `eval "$(parser)"` — that swallows exit 2. Never `bash resolve-profile.sh $ARGUMENTS` — unquoted expansion is command injection. On exit 2, print stderr and stop. The parser rejects removed flags (`--quick`, `--security-only`, `--depth`, `--pr`, `--provider`, `--post-findings`, `--post-summary`, `--create-pr`, `--no-post`, `--local`, `--publish`, `--draft`, `--read-back`, `--no-mem`, `--no-findings`) and unknown `--profile` values.
+   Capture stdout, honor `$?`, then `eval`. Never `eval "$(parser)"` — that swallows exit 2. Never `bash resolve-profile.sh $ARGUMENTS` — unquoted expansion is command injection. On exit 2, print stderr and stop. The parser rejects removed flags (`--quick`, `--security-only`, `--depth`, `--pr`, `--provider`, `--post-findings`, `--post-summary`, `--create-pr`, `--no-post`, `--local`, `--publish`, `--draft`, `--read-back`, `--no-mem`, `--no-findings`), unknown `--profile` values, a `--spec` file that does not exist or cannot be read, and `--spec` with `--summary-only`.
 
-   Emitted variables include `PROFILE`, `GUIDANCE`, `BASE`, `OUTPUT_FILE`, `MIN_CONFIDENCE`, `NO_ENRICH_CONTEXT`, `NO_SUPPRESS`, and the pre-overlay `RUN_*` roster. There is no `PR_NUMBER` or `PROVIDER_OVERRIDE` from this parser.
+   Emitted variables include `PROFILE`, `GUIDANCE`, `BASE`, `OUTPUT_FILE`, `MIN_CONFIDENCE`, `NO_ENRICH_CONTEXT`, `NO_SUPPRESS`, `SPEC_FILE` (absolute path, empty without `--spec`), and the pre-overlay `RUN_*` roster. `--spec` adds `RUN_SPEC_REVIEWER=true` to any profile, and no overlay turns it off. There is no `PR_NUMBER` or `PROVIDER_OVERRIDE` from this parser.
 
    Non-flag tokens (and everything after `--`) become `GUIDANCE`. Unknown `--*` flags still fail.
 
@@ -288,7 +288,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
    fi
    ```
 
-   Pass `PR_NARRATIVE` to pr-summarizer, code-reviewer, architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter. Never to blind-hunter. Each part is capped at 4,000 bytes on top of its line cap (8 KB, about 2,000 tokens, combined): a few long author-written lines would otherwise pass the line caps unbounded.
+   Pass `PR_NARRATIVE` to pr-summarizer, code-reviewer, architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter, spec-reviewer. Never to blind-hunter. Each part is capped at 4,000 bytes on top of its line cap (8 KB, about 2,000 tokens, combined): a few long author-written lines would otherwise pass the line caps unbounded.
 
 8. **Diff file:**
 
@@ -422,10 +422,11 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 | `EXTENDED_THINKING=true` | architecture-reviewer, security-reviewer — only when `EXTENDED_THINKING` is true (`--profile deep`) |
 | `RELATED_FILES` | architecture-reviewer, security-reviewer |
 | `LANGUAGE_PROFILES` | architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter, silent-failure-hunter, code-reviewer, pr-test-analyzer |
-| `PR_NARRATIVE` | pr-summarizer, code-reviewer, architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter |
+| `PR_NARRATIVE` | pr-summarizer, code-reviewer, architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter, spec-reviewer |
 | `GUIDANCE` | same agents as `PR_NARRATIVE` when non-empty |
 | `SYMBOL_CONTEXT` | architecture-reviewer, security-reviewer, adversarial-general, edge-case-hunter, code-reviewer |
 | `SECURITY_POLICY` | security-reviewer |
+| `SPEC_FILE` | spec-reviewer |
 
 **GOVERNANCE injection:** when `GOVERNANCE_BLOCK` is non-empty, prepend it under `GOVERNANCE:` to every custom agent. **blind-hunter:** after that block append: `BLIND_HUNTER_NOTE: The "Verification before naming" directive means verify within the diff you were given — do NOT Grep or Read outside it. The "Refuse incoherent input" directive applies only to incoherence visible within the diff itself. The zero-context constraint takes precedence.` If `GOVERNANCE_DEGRADED=true`, omit both. **Vendored toolkit agents** (code-reviewer, silent-failure-hunter, pr-test-analyzer, comment-analyzer, type-design-analyzer): prepend only the `## Untrusted input` and `## Output safety` sections of `GOVERNANCE_BLOCK`, verbatim, under `GOVERNANCE:` (omitted when degraded).
 
@@ -441,6 +442,7 @@ Pass `model:` only when the corresponding `MODEL_*` is not `inherit`. If a sched
 - **adversarial-general** — manifest, commit log, project context.
 - **blind-hunter** — **ONLY** the diff and GOVERNANCE, never the base, a file list, or `WORKTREE_PATH`: it has no repository or worktree knowledge and does not run git. Small: the full diff inline. Medium: the `$DIFF_FILE` path (Phase 0b step 8 writes the complete diff there in every review mode, untracked files of a dirty review included).
 - **edge-case-hunter** — manifest, commit log, project context.
+- **spec-reviewer** — `RUN_SPEC_REVIEWER=true` (`--spec`, any profile). `SPEC_FILE`, manifest, commit log; small diffs: full diff. It reads the spec itself; never inline the spec into the task.
 
 **Conditional agents.** `apply-roster-overlays.sh` resolves each trigger below from its `evaluate-gates.sh` gate: `RUN_*` becomes `true` when the gate is `true` and `false` (listed in `SKIP_REASONS`) when it is `false`. Launch the agent only when `RUN_*=true`. The comment and type gates read added or removed lines only.
 
@@ -509,7 +511,7 @@ Wait for agents.
 - Empty, or neither findings nor such a statement → `WARNING: <agent> returned no results.`
 - Tool error/timeout → `ERROR: <agent> failed. Reason: <error>.`
 
-**2a — extract json-findings** from architecture-reviewer, security-reviewer, blind-hunter, edge-case-hunter, adversarial-general, and pr-test-analyzer, type-design-analyzer, comment-analyzer (prefer their block when present). Salvage truncated arrays. Validate `severity` ∈ Critical|High|Medium|Low. Normalize `category` to `authz|injection|dependency-cve|secret|architecture-coupling|test-gap|edge-case|observability|docs|lint|other`. Merge with `CVE_JSON` and analyzer JSON; in PR/MR-URL mode first make their `file` repo-relative with `jq --arg p "$WORKTREE_PATH/" '(.[].file | strings) |= ltrimstr($p)'`. Toolkit agents without a usable json-findings block: map via [SEVERITY.md](SEVERITY.md).
+**2a — extract json-findings** from architecture-reviewer, security-reviewer, blind-hunter, edge-case-hunter, adversarial-general, spec-reviewer, and pr-test-analyzer, type-design-analyzer, comment-analyzer (prefer their block when present). Salvage truncated arrays. Validate `severity` ∈ Critical|High|Medium|Low. Normalize `category` to `authz|injection|dependency-cve|secret|architecture-coupling|test-gap|edge-case|observability|docs|lint|spec|other`. Merge with `CVE_JSON` and analyzer JSON; in PR/MR-URL mode first make their `file` repo-relative with `jq --arg p "$WORKTREE_PATH/" '(.[].file | strings) |= ltrimstr($p)'`. Toolkit agents without a usable json-findings block: map via [SEVERITY.md](SEVERITY.md).
 
 **2b — severity** per SEVERITY.md. Analyzer findings keep their emitted severity. Unparseable CVSS → High.
 
@@ -517,7 +519,7 @@ Wait for agents.
 
 **2d — suppressions** unless `NO_SUPPRESS=true`. A rule matches only when every predicate it sets matches: `file` and `pattern` together when it sets both, the one it sets otherwise. Verify-gated rules (max 20 calls): `github-release`, `npm`, `pypi`, `go-module`, `cargo`, `docker-hub`, `ruby-org`. 2xx → suppress; 404 or error → keep (fail-open).
 
-**2e — proximity dedup.** Per file and `category` (normalized in 2a), cluster within 3 lines of cluster start; `line` 0 (unknown) is never proximity-compared, so those findings cluster by file + `category` only. Keep highest severity; prefer `dependency-check` in a mixed cluster. Annotate extra sources.
+**2e — proximity dedup.** Per file and `category` (normalized in 2a), cluster within 3 lines of cluster start; `line` 0 (unknown) is never proximity-compared, so those findings cluster by file + `category` only. A finding with an empty `file` (a spec requirement with no code location) never clusters. Keep highest severity; prefer `dependency-check` in a mixed cluster. Annotate extra sources.
 
 **2f — secret redaction.** Execute via Bash (not illustrative). `REDACTION_SENTINEL=$(mktemp)` (a private empty file, never a fixed `/tmp` name), define `redact_secrets`, rebuild `ALL_FINDINGS` and `BLOCK_A`. Halt the run if the pipeline fails or drops rows. If `perl` is missing, the function passes text through and writes to the sentinel; a non-empty sentinel file (`[[ -s "$REDACTION_SENTINEL" ]]`) sets `REDACTION_DEGRADED=true`.
 
@@ -586,7 +588,7 @@ If `GOVERNANCE_DEGRADED=true`, prepend a banner that `GOVERNANCE.md` was missing
 **Profile:** <quick|security|full|deep|summary>
 
 ### Critical (<N>)
-- **[agent]** <finding> — `file:line`
+- **[agent]** <finding> — `file:line` (`spec` when `file` is empty)
 
 ### High / Medium / Low
 (same shape)
@@ -600,7 +602,10 @@ If `GOVERNANCE_DEGRADED=true`, prepend a banner that `GOVERNANCE.md` was missing
 ### Adversarial Analysis
 <adversarial-general Most Critical Gap; omit if skipped/NONE>
 
-These three sections never restate findings: findings appear only in the severity sections above, after Phase 2 filtering, so one dropped by `MIN_CONFIDENCE` or a suppression never resurfaces here.
+### Spec Conformance
+<spec-reviewer Coverage and Not Covered by This Change; omit if skipped/NONE>
+
+These four sections never restate findings: findings appear only in the severity sections above, after Phase 2 filtering, so one dropped by `MIN_CONFIDENCE` or a suppression never resurfaces here.
 
 ### Positive Observations
 

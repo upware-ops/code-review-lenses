@@ -20,6 +20,7 @@ OUTPUT_FILE=""
 MIN_CONFIDENCE=75
 NO_ENRICH_CONTEXT=false
 NO_SUPPRESS=false
+SPEC_FILE=""
 
 REMOVED_FLAGS=(
   --quick
@@ -193,6 +194,16 @@ while [[ $# -gt 0 ]]; do
       NO_SUPPRESS=true
       shift
       ;;
+    --spec)
+      need_value "$arg" "${2-}"
+      SPEC_FILE="$2"
+      shift 2
+      ;;
+    --spec=*)
+      SPEC_FILE="${arg#--spec=}"
+      need_value --spec "$SPEC_FILE"
+      shift
+      ;;
     --)
       shift
       while [[ $# -gt 0 ]]; do
@@ -245,6 +256,12 @@ case "$PROFILE" in
     ;;
 esac
 
+if [[ -n "$SPEC_FILE" ]]; then
+  [[ "$PROFILE" == summary ]] && die "--summary-only and --spec are mutually exclusive."
+  [[ -f "$SPEC_FILE" && -r "$SPEC_FILE" ]] || die "--spec file not found or not readable: $SPEC_FILE"
+  SPEC_FILE="$(CDPATH='' cd -P -- "$(dirname -- "$SPEC_FILE")" >/dev/null && pwd -P)/$(basename -- "$SPEC_FILE")"
+fi
+
 if [[ ! "$MIN_CONFIDENCE" =~ ^[0-9]+$ ]] || (( 10#$MIN_CONFIDENCE < 0 || 10#$MIN_CONFIDENCE > 100 )); then
   die "Invalid --min-confidence value '$MIN_CONFIDENCE'. Must be an integer 0–100."
 fi
@@ -263,6 +280,7 @@ RUN_SILENT_FAILURE_HUNTER=false
 RUN_PR_TEST_ANALYZER=false
 RUN_COMMENT_ANALYZER=false
 RUN_TYPE_DESIGN_ANALYZER=false
+RUN_SPEC_REVIEWER=false
 RUN_CVE=false
 RUN_STATIC_ANALYZERS=false
 EXTENDED_THINKING=false
@@ -322,6 +340,10 @@ if [[ "$NO_ENRICH_CONTEXT" == true ]]; then
   RUN_ENRICH_CONTEXT=false
 fi
 
+if [[ -n "$SPEC_FILE" ]]; then
+  RUN_SPEC_REVIEWER=true
+fi
+
 # shellcheck disable=SC2016
 emit() {
   printf '%s=%q\n' "$1" "$2"
@@ -335,6 +357,7 @@ emit OUTPUT_FILE "$OUTPUT_FILE"
 emit MIN_CONFIDENCE "$MIN_CONFIDENCE"
 emit NO_ENRICH_CONTEXT "$NO_ENRICH_CONTEXT"
 emit NO_SUPPRESS "$NO_SUPPRESS"
+emit SPEC_FILE "$SPEC_FILE"
 emit RUN_PR_SUMMARIZER "$RUN_PR_SUMMARIZER"
 emit RUN_CODE_REVIEWER "$RUN_CODE_REVIEWER"
 emit RUN_ARCHITECTURE_REVIEWER "$RUN_ARCHITECTURE_REVIEWER"
@@ -347,6 +370,7 @@ emit RUN_SILENT_FAILURE_HUNTER "$RUN_SILENT_FAILURE_HUNTER"
 emit RUN_PR_TEST_ANALYZER "$RUN_PR_TEST_ANALYZER"
 emit RUN_COMMENT_ANALYZER "$RUN_COMMENT_ANALYZER"
 emit RUN_TYPE_DESIGN_ANALYZER "$RUN_TYPE_DESIGN_ANALYZER"
+emit RUN_SPEC_REVIEWER "$RUN_SPEC_REVIEWER"
 emit RUN_CVE "$RUN_CVE"
 emit RUN_STATIC_ANALYZERS "$RUN_STATIC_ANALYZERS"
 emit EXTENDED_THINKING "$EXTENDED_THINKING"

@@ -7,7 +7,7 @@ Usage
   /code-review-lenses [flags] [free-form]
 
 argument-hint
-  [--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--output-file <path>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]
+  [--profile quick|security|full|deep] [--summary-only] [--spec <file>] [--base <branch>] [--output-file <path>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]
 
 Profiles (`--profile`, default `full`)
   quick       pr-summarizer + code-reviewer + triggered silent-failure-hunter
@@ -21,7 +21,10 @@ Profiles (`--profile`, default `full`)
 
 Flags
   --profile <name>     quick | security | full | deep (default: full)
-  --summary-only       Run only pr-summarizer (mutually exclusive with --profile)
+  --summary-only       Run only pr-summarizer (mutually exclusive with --profile
+                       and --spec)
+  --spec <file>        Add spec-reviewer: check the change against a spec or
+                       PRD file. Works with every profile; never auto-skipped.
   --base <branch>      Override compare base. On a PR/MR URL: default is the
                        fetched target branch. Local: HEAD@{upstream} only.
                        Never assume main/master/dev.
@@ -44,6 +47,10 @@ Agents — full / deep
                      issue-linker (GitHub only, never on a PR/MR URL)
   Conditional:       silent-failure-hunter, pr-test-analyzer,
                      comment-analyzer, type-design-analyzer
+
+Agents — any profile with --spec
+  spec-reviewer      missing, partial, wrong, and unrequested behavior
+                     against the spec
 
 Agents — quick
   Always:            pr-summarizer, code-reviewer
@@ -94,6 +101,8 @@ Examples
   /code-review-lenses --profile security
   /code-review-lenses --profile deep
   /code-review-lenses --summary-only
+  /code-review-lenses --spec docs/prd/limits.md
+  /code-review-lenses --profile quick --spec docs/prd/limits.md focus on section 2
   /code-review-lenses https://github.com/acme/app/pull/42
   /code-review-lenses review https://gitlab.example/g/p/-/merge_requests/7 focus on auth
   /code-review-lenses-workflow --profile quick focus on tokens

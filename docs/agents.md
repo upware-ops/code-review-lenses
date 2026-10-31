@@ -7,7 +7,7 @@ render_with_liquid: false
 
 # Agents
 
-All 12 agents ship in `agents/`. Five were adapted from pr-review-toolkit
+All 13 agents ship in `agents/`. Five were adapted from pr-review-toolkit
 (Apache-2.0; see `agents/THIRD_PARTY.md`). Models default to **inherit**.
 
 ## Roster
@@ -26,6 +26,7 @@ All 12 agents ship in `agents/`. Five were adapted from pr-review-toolkit
 | **pr-test-analyzer** | Test coverage gaps | quick, full, deep (test-file gate) |
 | **comment-analyzer** | Comment accuracy / rot | full, deep (comment-change gate) |
 | **type-design-analyzer** | Type / struct / interface design | full, deep (type-definition gate) |
+| **spec-reviewer** | Conformance to a spec or PRD | any profile with `--spec <file>` |
 
 `deep` adds `EXTENDED_THINKING` for architecture-reviewer and security-reviewer,
 plus CVE reachability. TIER=tiny still skips hunters and comment/type agents.
@@ -42,6 +43,7 @@ skips it and lists the reason with the other skipped agents.
 - **blind-hunter** receives zero project context. Overlap is expected and later deduplicated
 - **edge-case-hunter** asks whether a handling path exists; **silent-failure-hunter** asks whether existing handling is adequate
 - **adversarial-general** covers completeness and operational gaps that specialists are scoped not to cover
+- **spec-reviewer** judges only whether the change matches the spec, never code quality; a requirement with no code location is reported with an empty `file` and is never deduplicated
 
 ## Symbol context
 

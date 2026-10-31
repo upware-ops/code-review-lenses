@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-10-31
+
+### Added
+
+- **`--spec <file>`** schedules the new `spec-reviewer` agent on any profile (not with `--summary-only`). It reports requirements the change leaves missing or partial, implements wrongly, and behavior the spec did not ask for, each quoting the spec. Findings use the new `spec` category; a requirement with no code location has an empty `file` and is never deduplicated. Block B gains a Spec Conformance section.
+
 ## [2.0.0] - 2026-08-14
 
 ### ⚠ Breaking

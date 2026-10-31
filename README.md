@@ -92,6 +92,7 @@ It does not search `~/.claude` plugin caches.
 /code-review-lenses --profile full
 /code-review-lenses --profile deep
 /code-review-lenses --summary-only
+/code-review-lenses --spec docs/prd/limits.md
 /code-review-lenses --output-file review.md
 /code-review-lenses https://github.com/acme/app/pull/42
 /code-review-lenses review https://gitlab.example/g/p/-/merge_requests/7 focus on auth
@@ -103,6 +104,7 @@ It does not search `~/.claude` plugin caches.
 |------|--------|
 | `--profile <name>` | `quick` \| `security` \| `full` \| `deep` (default `full`) |
 | `--summary-only` | Only `pr-summarizer` |
+| `--spec <file>` | Add `spec-reviewer`: check the change against a spec or PRD file. Works with every profile except `--summary-only`; never auto-skipped. |
 | `--base <branch>` | Override compare base. PR/MR URL: fetched target branch. Local: `HEAD@{upstream}` only. Never `main`/`master`/`dev`. |
 | `--no-enrich-context` | Disable symbol-context enrichment |
 | `--no-suppress` | Disable suppression rules |
@@ -169,7 +171,7 @@ JSON `{ "arguments": "--profile deep https://github.com/acme/app/pull/42" }` is 
 
 ## Agent roster
 
-All 12 agents ship in `agents/`. Five were adapted from `pr-review-toolkit`
+All 13 agents ship in `agents/`. Five were adapted from `pr-review-toolkit`
 (Apache-2.0; see `agents/THIRD_PARTY.md`). Models default to **inherit**
 (the host / orchestrator model). Pin names in
 `skills/code-review-lenses/models.conf` if your host supports per-agent models.
@@ -188,6 +190,7 @@ All 12 agents ship in `agents/`. Five were adapted from `pr-review-toolkit`
 | **pr-test-analyzer** | Test coverage gaps | quick, full, deep (if test files) |
 | **comment-analyzer** | Comment accuracy / rot | full, deep (if comment changes) |
 | **type-design-analyzer** | Type / struct / interface design | full, deep (if type definitions) |
+| **spec-reviewer** | Conformance to a spec or PRD | any profile with `--spec <file>` |
 
 Plus non-agent **dependency-check** (`scripts/run-cve-check.sh` → OSV.dev) and
 opportunistic static analyzers (shellcheck, semgrep, trufflehog, ruff,

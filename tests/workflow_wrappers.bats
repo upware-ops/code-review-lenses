@@ -84,7 +84,8 @@ setup() {
 @test "wrappers name every existing agent stem and those files exist" {
   for a in pr-summarizer code-reviewer architecture-reviewer security-reviewer \
            blind-hunter edge-case-hunter adversarial-general issue-linker \
-           silent-failure-hunter pr-test-analyzer comment-analyzer type-design-analyzer; do
+           silent-failure-hunter pr-test-analyzer comment-analyzer type-design-analyzer \
+           spec-reviewer; do
     grep -q "$a" "$CLAUDE_WF"
     grep -q "$a" "$GROK_WF"
     [[ -f "$REPO_ROOT/agents/${a}.md" ]]
@@ -901,6 +902,27 @@ JS
   jq -e '.prompts[1].prompt | contains("PROVIDER: github. HOST: github.com. REPO_SLUG: acme/app.")' <<<"$out"
   jq -e '.prompts[1].prompt | contains("PR_NUMBER") | not' <<<"$out"
   [ "$(grep -c -F 'pr_number' "$CLAUDE_WF")" -eq 0 ]
+}
+
+@test "wrappers return spec_file from the prelude and hand it to spec-reviewer only" {
+  for f in "$CLAUDE_WF" "$GROK_WF"; do
+    grep -q -F 'spec_file = SPEC_FILE from step 2 (absolute path;' "$f"
+    grep -q -F 'governance, spec_file, security_policy, models }' "$f"
+  done
+  grep -q -F "spec_file: { type: 'string' }," "$CLAUDE_WF"
+  grep -q -F '"spec_file": #{ "type": "string" },' "$GROK_WF"
+  grep -A1 -F 'if name == "spec-reviewer" {' "$GROK_WF" | grep -q -F 'p += "SPEC_FILE: ";'
+}
+
+@test "Claude wrapper run: spec-reviewer gets SPEC_FILE and no other reviewer does" {
+  if ! command -v node >/dev/null 2>&1; then
+    skip "node not installed"
+  fi
+  prelude='{ "agents": ["code-reviewer", "spec-reviewer"], "skill_root": "/opt/crl/skills/code-review-lenses", "diff_file": "/tmp/code-review-lenses.d1", "spec_file": "/home/me/docs/prd.md" }'
+  out=$(run_claude_wf "$prelude" '""')
+  jq -e '[.prompts[] | select(.label == "spec-reviewer")] | length == 1' <<<"$out"
+  jq -e '.prompts[] | select(.label == "spec-reviewer") | .prompt | contains("SPEC_FILE: /home/me/docs/prd.md. Read the spec from that file.")' <<<"$out"
+  jq -e '.prompts[] | select(.label == "code-reviewer") | .prompt | contains("SPEC_FILE") | not' <<<"$out"
 }
 
 @test "Grok assembler gets the validated DIFF_FILE so Block A has a source without pr-summarizer" {

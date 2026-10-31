@@ -32,6 +32,7 @@ Removed: `--quick`, `--security-only`, `--depth`. The parser rejects them.
 |------|--------|
 | `--profile <name>` | `quick` \| `security` \| `full` \| `deep` |
 | `--summary-only` | pr-summarizer only |
+| `--spec <file>` | Add spec-reviewer: check the change against a spec or PRD file. Every profile except `--summary-only`; never auto-skipped. |
 | `--base <branch>` | Override compare base. PR/MR URL: fetched target branch. Local: `HEAD@{upstream}` only. Never `main`/`master`/`dev`. |
 | `--no-enrich-context` | Disable symbol-context enrichment |
 | `--no-suppress` | Disable suppression rules |

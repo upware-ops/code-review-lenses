@@ -1,7 +1,7 @@
 export const meta = {
   name: 'code-review-lenses-workflow',
   description:
-    'Local review via shipped parsers (Phase 0–1b, 2, 3, 5). Skill-only: Phase 0c symbol context and Phase 1c CVE reachability. Pass the skill flags and optional PR/MR URL or focus through to resolve-profile.sh. [--profile quick|security|full|deep] [--summary-only] [--base <branch>] [--output-file <path>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]',
+    'Local review via shipped parsers (Phase 0–1b, 2, 3, 5). Skill-only: Phase 0c symbol context and Phase 1c CVE reachability. Pass the skill flags and optional PR/MR URL or focus through to resolve-profile.sh. [--profile quick|security|full|deep] [--summary-only] [--spec <file>] [--base <branch>] [--output-file <path>] [--min-confidence N] [--no-enrich-context] [--no-suppress] [PR/MR URL] [focus]',
 }
 
 // Thin launcher. SKILL.md is the review source of truth.
@@ -49,6 +49,7 @@ const allowedStems = [
   'pr-test-analyzer',
   'comment-analyzer',
   'type-design-analyzer',
+  'spec-reviewer',
 ]
 
 function safeTempPath(p) {
@@ -140,10 +141,10 @@ const prelude = await agent(
     '7. If RUN_CVE or RUN_STATIC_ANALYZERS is true: ANALYZER_DIR=$(mktemp -d /tmp/code-review-lenses.XXXXXX); build CHECK_PATHS as SKILL.md Phase 1b with that block\'s stderr, and the removed-symlink count line from step 5, in "$ANALYZER_DIR/check-paths.err", then run matching "$SCRIPTS_DIR/run-*.sh" with each script\'s stdout in "$ANALYZER_DIR/<script>.json" and its stderr in "$ANALYZER_DIR/<script>.err" (CVE check included).',
     '   Never read, cat, or print those files: analyzer output carries file names and code from the reviewed change. Return ANALYZER_DIR as analyzer_dir. A non-zero exit is ANALYZER_FAILED (CVE check: CVE_CHECK_FAILED), not a clean scan. Whether or not step 7 runs, return cve_check_failed and analyzer_failed booleans (false for a check that was not scheduled or had nothing to scan).',
     '8. governance = verbatim text of "$SKILL_ROOT/GOVERNANCE.md" (SKILL.md Phase 0b step 12; "" if missing). security_policy = SKILL.md Phase 0b step 13 (8 KB cap, reviewer checkout, never $WORKTREE_PATH; "" if none).',
-    '9. provider, repo_slug and host = PROVIDER, REPO_SLUG and HOST from steps 2–3 (from the URL for a URL review, from detect-provider.sh for a local review; empty only when PROVIDER=unknown). classification = { TIER, ARCH_PROMOTED, SECURITY_PROMOTED, DOCS_ONLY, LOW_RISK_CONFIG, LINES_CHANGED, FILES_CHANGED } as classify-diff.sh emitted them in step 6. models = { stem: its MODEL_<STEM> value } for each returned stem whose value is not inherit.',
+    '9. provider, repo_slug and host = PROVIDER, REPO_SLUG and HOST from steps 2–3 (from the URL for a URL review, from detect-provider.sh for a local review; empty only when PROVIDER=unknown). classification = { TIER, ARCH_PROMOTED, SECURITY_PROMOTED, DOCS_ONLY, LOW_RISK_CONFIG, LINES_CHANGED, FILES_CHANGED } as classify-diff.sh emitted them in step 6. models = { stem: its MODEL_<STEM> value } for each returned stem whose value is not inherit. spec_file = SPEC_FILE from step 2 (absolute path; "" without --spec).',
     '10. Before returning, rm -f every temp file you created except diff_file and analyzer_dir, and rm -f "$PR_BODY_FILE" "$HEAD_REF_FILE" if set.',
     'Wrappers do not run Phase 0c or Phase 1c and do not prebuild project context (AGENTS.md, CLAUDE.md, .cursorrules)/FILE_DIGEST/LANGUAGE_PROFILES/PR_NARRATIVE/SYMBOL_CONTEXT (skill path only). Never open, cat or print a file inside WORKTREE_PATH yourself: only the shipped scripts and the git and checkout commands above touch it. When PROFILE=deep, set EXTENDED_THINKING=true on architecture-reviewer and security-reviewer.',
-    'Return JSON only: { profile, agents, skip_reasons, guidance, analyzer_dir, base, review_mode, worktree_path, diff_file, output_file, min_confidence, no_suppress, cve_check_failed, analyzer_failed, classification, skill_root, provider, repo_slug, host, governance, security_policy, models }.',
+    'Return JSON only: { profile, agents, skip_reasons, guidance, analyzer_dir, base, review_mode, worktree_path, diff_file, output_file, min_confidence, no_suppress, cve_check_failed, analyzer_failed, classification, skill_root, provider, repo_slug, host, governance, spec_file, security_policy, models }.',
     'agents = existing stems where overlay RUN_* is true. The overlay has already resolved every conditional agent to true or false from GATE_*; do not evaluate a trigger yourself.',
     'Allowed stems only: ' + allowedStems.join(', ') + '.',
     'If a RUN_* is false, omit that stem. Do not hardcode a profile table.',
@@ -176,6 +177,7 @@ const prelude = await agent(
         host: { type: 'string' },
         skill_root: { type: 'string' },
         governance: { type: 'string' },
+        spec_file: { type: 'string' },
         security_policy: { type: 'string' },
         classification: { type: 'object' },
         models: { type: 'object', additionalProperties: { type: 'string' } },
@@ -291,6 +293,7 @@ const reviews = await pipeline(names, function (name) {
           (prelude.host ? ' HOST: ' + prelude.host + '.' : '') +
           (prelude.repo_slug ? ' REPO_SLUG: ' + prelude.repo_slug + '.' : '')
         : '',
+      name === 'spec-reviewer' ? 'SPEC_FILE: ' + (prelude.spec_file || '') + '. Read the spec from that file.' : '',
       (name === 'architecture-reviewer' || name === 'security-reviewer') &&
       prelude.profile === 'deep'
         ? 'EXTENDED_THINKING=true'

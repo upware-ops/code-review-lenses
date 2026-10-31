@@ -247,6 +247,75 @@ EOF
   run -2 bash "$PROFILE_SCRIPT" --min-confidence 0144
 }
 
+@test "resolve-profile: --spec adds spec-reviewer to every profile with an absolute SPEC_FILE" {
+  mkdir "$WORK/my docs"
+  : > "$WORK/my docs/prd.md"
+  for profile in quick security full deep; do
+    out=$(cd "$WORK" && bash "$PROFILE_SCRIPT" --profile "$profile" --spec "my docs/prd.md")
+    eval "$out"
+    [ "$PROFILE" = "$profile" ]
+    [ "$RUN_SPEC_REVIEWER" = "true" ]
+    [ "$SPEC_FILE" = "$(cd "$WORK" && pwd -P)/my docs/prd.md" ]
+  done
+}
+
+@test "resolve-profile: --spec= parses inline, and without --spec spec-reviewer stays off" {
+  : > "$WORK/prd.md"
+  source_profile --spec="$WORK/prd.md"
+  [ "$RUN_SPEC_REVIEWER" = "true" ]
+  source_profile --profile full
+  [ "$RUN_SPEC_REVIEWER" = "false" ]
+  [ -z "$SPEC_FILE" ]
+}
+
+@test "resolve-profile: --spec rejects a missing file, a directory, an empty value, and the summary profile" {
+  run -2 bash "$PROFILE_SCRIPT" --spec "$WORK/missing.md"
+  [[ "$output" == *"--spec file not found or not readable"* ]]
+  run -2 bash "$PROFILE_SCRIPT" --spec "$WORK"
+  run -2 bash "$PROFILE_SCRIPT" --spec=
+  run -2 bash "$PROFILE_SCRIPT" --spec
+  : > "$WORK/prd.md"
+  run -2 bash "$PROFILE_SCRIPT" --summary-only --spec "$WORK/prd.md"
+  [[ "$output" == *"--summary-only and --spec are mutually exclusive"* ]]
+  run -2 bash "$PROFILE_SCRIPT" --profile summary --spec "$WORK/prd.md"
+  [[ "$output" == *"--summary-only and --spec are mutually exclusive"* ]]
+}
+
+@test "resolve-profile: an exported CDPATH does not redirect a relative --spec path" {
+  mkdir -p "$WORK/repo/docs" "$WORK/other/docs"
+  : > "$WORK/repo/docs/prd.md"
+  : > "$WORK/other/docs/prd.md"
+  out=$(cd "$WORK/repo" && CDPATH="$WORK/other" bash "$PROFILE_SCRIPT" --spec docs/prd.md)
+  eval "$out"
+  [ "$SPEC_FILE" = "$(cd "$WORK/repo" && pwd -P)/docs/prd.md" ]
+}
+
+@test "resolve-profile: --from-file keeps a quoted --spec path with spaces whole" {
+  mkdir "$WORK/my docs"
+  : > "$WORK/my docs/prd.md"
+  printf '%s\n' "--spec \"$WORK/my docs/prd.md\" focus on limits" > "$WORK/invoke"
+  eval "$(bash "$PROFILE_SCRIPT" --from-file "$WORK/invoke")"
+  [ "$SPEC_FILE" = "$(cd "$WORK" && pwd -P)/my docs/prd.md" ]
+  [ "$GUIDANCE" = "focus on limits" ]
+}
+
+@test "overlay: no tier, auto-cheap, gate, or provider overlay skips spec-reviewer" {
+  : > "$WORK/prd.md"
+  printf '%s\n' "--spec $WORK/prd.md" > "$WORK/invoke"
+  eval "$(TIER=tiny DOCS_ONLY=true LOW_RISK_CONFIG=true GATE_CONTROL_FLOW=false \
+    GATE_ERROR_PATTERNS=false GATE_TEST_PATHS=false GATE_COMMENT_CHANGES=false \
+    GATE_TYPE_DEFINITIONS=false PROVIDER=gitlab PR_NUMBER=7 \
+    bash "$OVERLAY_SCRIPT" --from-file "$WORK/invoke")"
+  [ "$RUN_SPEC_REVIEWER" = "true" ]
+  [[ "$SKIP_REASONS" != *spec-reviewer* ]]
+  eval "$(DOCS_ONLY=false LOW_RISK_CONFIG=true bash "$OVERLAY_SCRIPT" --from-file "$WORK/invoke")"
+  [ "$RUN_SPEC_REVIEWER" = "true" ]
+  [[ "$SKIP_REASONS" == *"(LOW_RISK_CONFIG)"* ]]
+  [[ "$SKIP_REASONS" != *spec-reviewer* ]]
+  eval "$(bash "$OVERLAY_SCRIPT" --profile quick)"
+  [ "$RUN_SPEC_REVIEWER" = "false" ]
+}
+
 @test "overlay: TIER=tiny skips hunters unless architecture/security promoted" {
   eval "$(TIER=tiny ARCH_PROMOTED=false SECURITY_PROMOTED=false \
     bash "$OVERLAY_SCRIPT" --profile full)"

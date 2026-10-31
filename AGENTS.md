@@ -19,7 +19,7 @@ It does not create, comment on, or update PRs/MRs.
 skills/code-review-lenses/SKILL.md     orchestrator
 skills/code-review-lenses/scripts/     shipped parsers + analyzers
 skills/code-review-lenses/models.conf  optional model routing (default: inherit)
-agents/*.md                              12 review agents
+agents/*.md                              13 review agents
 .claude/workflows/*.js                   Claude workflow wrapper (optional)
 .grok/workflows/*.rhai                   Grok workflow wrapper (optional)
 tests/*.bats                             bats + jq; run: bats tests/*.bats
@@ -69,3 +69,4 @@ Pass `--profile quick|security|full|deep` (default `full`).
 | `full` | all agents (default) |
 | `deep` | full + extended thinking + CVE reachability |
 | `--summary-only` | pr-summarizer only |
+| `--spec <file>` | adds spec-reviewer to any profile above except `--summary-only` |

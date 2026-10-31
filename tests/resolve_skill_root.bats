@@ -33,7 +33,7 @@ teardown() {
 
 @test "resolve-models: shipped models.conf is inherit for every agent" {
   out=$(bash "${SCRIPTS_DIR}/resolve-models.sh")
-  [[ $(grep -cE '^(ROLE|MODEL)_[A-Z_]+=' <<<"$out") -eq 17 ]]
+  [[ $(grep -cE '^(ROLE|MODEL)_[A-Z_]+=' <<<"$out") -eq 18 ]]
   if grep -vE '^(ROLE|MODEL)_[A-Z_]+=inherit$' <<<"$out"; then
     return 1
   fi
@@ -57,6 +57,7 @@ EOF
   [[ "$MODEL_ARCHITECTURE_REVIEWER" == "my-strong" ]]
   [[ "$MODEL_SECURITY_REVIEWER" == "my-sec" ]]
   [[ "$MODEL_ADVERSARIAL_GENERAL" == "my-strong" ]]
+  [[ "$MODEL_SPEC_REVIEWER" == "my-strong" ]]
   [[ "$MODEL_CODE_REVIEWER" == "my-review" ]]
   [[ "$MODEL_PR_SUMMARIZER" == "inherit" ]]
 }

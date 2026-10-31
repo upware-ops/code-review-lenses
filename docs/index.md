@@ -10,7 +10,7 @@ hero_tagline: "Host-agnostic PR/MR review using parallel specialized agents. Loc
 
 <div class="features">
   <div class="feature">
-    <h3><span class="feature-icon">&#9670;</span> 12 Specialized Agents</h3>
+    <h3><span class="feature-icon">&#9670;</span> 13 Specialized Agents</h3>
     <p>Parallel fleet: OWASP security, architecture, blind "fresh eyes" review, edge-case path tracing, and more — coordinated by one skill.</p>
   </div>
   <div class="feature">

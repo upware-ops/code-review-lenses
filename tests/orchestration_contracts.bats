@@ -261,10 +261,11 @@ teardown() {
   fi
 }
 
-@test "agents: all twelve review agents are present" {
+@test "agents: all thirteen review agents are present" {
   for a in pr-summarizer code-reviewer architecture-reviewer security-reviewer \
            blind-hunter edge-case-hunter adversarial-general issue-linker \
-           silent-failure-hunter pr-test-analyzer comment-analyzer type-design-analyzer; do
+           silent-failure-hunter pr-test-analyzer comment-analyzer type-design-analyzer \
+           spec-reviewer; do
     [[ -f "$REPO_ROOT/agents/${a}.md" ]]
   done
 }
@@ -723,6 +724,22 @@ JSON
   grep -q 'per file and `category` that start within 3 lines' "$REPO_ROOT/docs/architecture.md"
 }
 
+@test "SKILL.md: spec-reviewer gets SPEC_FILE, emits spec findings, and an empty file never clusters" {
+  has "$(skill_line '| `SPEC_FILE` |')" 'spec-reviewer'
+  has "$(skill_line '- **spec-reviewer** —')" '`RUN_SPEC_REVIEWER=true`'
+  step=$(skill_line '**2a — extract json-findings**')
+  has "$step" 'adversarial-general, spec-reviewer,'
+  has "$step" '|lint|spec|other`'
+  has "$(skill_line '**2e — proximity dedup.**')" 'A finding with an empty `file` (a spec requirement with no code location) never clusters.'
+  grep -qx '### Spec Conformance' "$SKILL_MD"
+  has "$(grep -F '| `category` |' "$SEVERITY_MD")" '`spec`'
+  grep -q 'a finding with an empty `file` never clusters' "$REPO_ROOT/docs/architecture.md"
+  agent="$REPO_ROOT/agents/spec-reviewer.md"
+  grep -qF '`category` must be exactly `"spec"`.' "$agent"
+  grep -qF '`source` must be exactly `"spec-reviewer"`.' "$agent"
+  grep -qF -- '--spec <file>' "$HELP_MD"
+}
+
 @test "SKILL.md Phase 1b: local CHECK_PATHS starting with - get ./ so analyzers never read them as options" {
   block=$(awk '/^CHECK_PATHS=\$\(while IFS= read -r _p; do$/,/^done <<<"\$DIFF_PATHS"\)$/' "$SKILL_MD")
   [ -n "$block" ]
@@ -805,7 +822,7 @@ JSON
     echo "REGRESSION: a suppression with both file and pattern could match on either alone" >&2
     return 1
   fi
-  grep -qF 'These three sections never restate findings: findings appear only in the severity sections above, after Phase 2 filtering' "$SKILL_MD"
+  grep -qF 'These four sections never restate findings: findings appear only in the severity sections above, after Phase 2 filtering' "$SKILL_MD"
   for f in "$REPO_ROOT/.claude/workflows/code-review-lenses-workflow.js" "$REPO_ROOT/.grok/workflows/code-review-lenses-workflow.rhai"; do
     grep -qF 'Removed %s symlink(s) from the PR/MR worktree' "$f"
     grep -qF -- '-type l -print0 -delete | LC_ALL=C tr -dc ' "$f"

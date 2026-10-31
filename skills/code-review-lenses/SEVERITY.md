@@ -12,6 +12,7 @@ unified Critical/High/Medium/Low scale.
 | type-design-analyzer | lowest of its four ratings: [1,2] / [3,5] / [6,10] | High / Medium / Low |
 | architecture-reviewer, security-reviewer, adversarial-general | Critical/High/Medium/Low via json-findings | pass through |
 | blind-hunter, edge-case-hunter | Critical/High/Medium/Low via json-findings | pass through |
+| spec-reviewer | Critical/High/Medium/Low via json-findings | pass through |
 | dependency-check (parsed CVSS) | Critical/High/Medium/Low | pass through (identity mapping) |
 | dependency-check (CVSS missing / unparsed / v4 / v2) | High | maps to High (conservative) |
 | shellcheck | error/warning (info and style are not emitted) | High / Medium (emitted; pass through) |
@@ -34,15 +35,15 @@ pr-test-analyzer, type-design-analyzer, and comment-analyzer end their reply wit
 ## json-findings field contract
 
 All custom agents (architecture-reviewer, security-reviewer, blind-hunter, edge-case-hunter,
-adversarial-general) and deterministic scripts (dependency-check) emit a `json-findings`
-block. Required fields:
+adversarial-general, spec-reviewer) and deterministic scripts (dependency-check) emit a
+`json-findings` block. Required fields:
 
 | Field | Type | Values |
 |-------|------|--------|
 | `severity` | string | `Critical`, `High`, `Medium`, `Low` |
 | `confidence` | integer | 0–100 (see scale below) |
-| `category` | string | `authz`, `injection`, `dependency-cve`, `secret`, `architecture-coupling`, `test-gap`, `edge-case`, `observability`, `docs`, `lint`, `other` |
-| `file` | string | repo-relative path |
+| `category` | string | `authz`, `injection`, `dependency-cve`, `secret`, `architecture-coupling`, `test-gap`, `edge-case`, `observability`, `docs`, `lint`, `spec`, `other` |
+| `file` | string | repo-relative path; `""` only for a spec-reviewer requirement with no code location |
 | `line` | integer | 1-based; 0 when unknown |
 | `finding` | string | description of the issue |
 | `remediation` | string | concrete fix |
@@ -53,7 +54,8 @@ Phase 2 step 2a normalizes missing or unrecognized `category` values to `"other"
 ## Confidence Scale (0–100)
 
 Custom agents (architecture-reviewer, security-reviewer, blind-hunter, edge-case-hunter,
-adversarial-general) emit a `confidence` integer per finding in their `json-findings` block.
+adversarial-general, spec-reviewer) emit a `confidence` integer per finding in their
+`json-findings` block.
 
 | Range | Label | Meaning |
 |-------|-------|---------|

@@ -37,7 +37,7 @@ skills/code-review-lenses/scripts/run-kube-linter.sh       ← kube-linter (Phas
 skills/code-review-lenses/scripts/run-phpcs.sh             ← PHP CodeSniffer (Phase 1b)
 skills/code-review-lenses/scripts/run-phpstan.sh           ← PHPStan (Phase 1b)
 skills/code-review-lenses/scripts/run-tflint.sh            ← tflint (Phase 1b)
-agents/*.md                                                  ← 12 review agents (self-contained)
+agents/*.md                                                  ← 13 review agents (self-contained)
 .claude/workflows/code-review-lenses-workflow.js             ← Claude dynamic-workflow wrapper (optional)
 .claude/skills/code-review-lenses                            ← symlink → skills/code-review-lenses
 .grok/workflows/code-review-lenses-workflow.rhai             ← Grok workflow wrapper (optional)
@@ -84,7 +84,7 @@ Both blocks are always shown locally in the terminal (and optionally `--output-f
 
 ## Severity normalization
 
-Each agent uses its own severity scale. The skill normalizes all findings to a unified Critical/High/Medium/Low scale via the normalization table in `SEVERITY.md`, and clusters findings per file and `category` that start within 3 lines of the cluster's first finding (findings with unknown line 0 cluster by file and `category` alone), keeping the highest severity.
+Each agent uses its own severity scale. The skill normalizes all findings to a unified Critical/High/Medium/Low scale via the normalization table in `SEVERITY.md`, and clusters findings per file and `category` that start within 3 lines of the cluster's first finding (findings with unknown line 0 cluster by file and `category` alone; a finding with an empty `file` never clusters), keeping the highest severity.
 
 CVE findings whose CVSS vector cannot be parsed (CVSS v4.0/v2 vectors, or no severity entry) are emitted as `"High"` as a conservative fallback.
 
