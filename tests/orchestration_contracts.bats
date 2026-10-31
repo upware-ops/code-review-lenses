@@ -296,6 +296,34 @@ teardown() {
   grep -qF ".md and follow it exactly." "$REPO_ROOT/.claude/workflows/code-review-lenses-workflow.js"
 }
 
+@test "SKILL.md: Claude Code finds nothing to substitute or run when it loads the skill" {
+  if grep -nE '\$ARGUMENTS|\$[0-9]|\$\{CLAUDE_|(^|[[:space:]])!`' "$SKILL_MD"; then
+    echo "REGRESSION: SKILL.md holds text Claude Code substitutes or runs when it loads the skill" >&2
+    return 1
+  fi
+  grep -qF 'Claude Code appends the invocation after this file as an `ARGUMENTS:` line.' "$SKILL_MD"
+  grep -qF 'in Claude Code, from the `ARGUMENTS:` line after this file.' "$SKILL_MD"
+}
+
+@test "SKILL.md: run state written in one shell is restored in the next, as Claude Code keeps no variables" {
+  block=$(awk '/^   RUN_DIR=\$\(mktemp -d\)$/,/^   printf .RUN_DIR=%s\\n. "\$RUN_DIR"$/' "$SKILL_MD")
+  [ "$(grep -c . <<<"$block")" -eq 3 ]
+  grep -qF 'Start every later block with `RUN_DIR=<the printed path>; for _f in "$RUN_DIR"/*.env; do source "$_f"; done`' "$SKILL_MD"
+  out=$(SKILL_ROOT="$WORK/skill dir" SCRIPTS_DIR="$WORK/skill dir/scripts" AGENTS_DIR="$WORK/skill dir/agents" bash -c "$block")
+  run_dir=${out#RUN_DIR=}
+  [ -d "$run_dir" ]
+  restored=$(env -i /bin/bash -c 'RUN_DIR="$1"; for _f in "$RUN_DIR"/*.env; do source "$_f"; done; printf "%s|%s" "$SCRIPTS_DIR" "$AGENTS_DIR"' _ "$run_dir")
+  rm -rf "$run_dir"
+  [ "$restored" = "$WORK/skill dir/scripts|$WORK/skill dir/agents" ]
+  grep -qF '`$REDACTION_SENTINEL`, and `$RUN_DIR`.' "$SKILL_MD"
+}
+
+@test "SKILL.md and models.conf: Claude Code command time limit and model names are documented" {
+  grep -qF 'Claude Code stops a shell command after 2 minutes unless the call raises its timeout (up to 10 minutes) or runs in the background.' "$SKILL_MD"
+  grep -qF 'Search the app or package directories that hold the changed files, not the whole tree' "$SKILL_MD"
+  grep -qF '`sonnet`, `opus`, `haiku`, or `fable`' "${SCRIPTS_DIR}/../models.conf"
+}
+
 @test "PROVIDERS.md: read-only fetch/checkout only, no post/create/draft" {
   grep -q "OP: Fetch PR/MR metadata" "$PROVIDERS_MD"
   grep -q "OP: Checkout PR/MR branch" "$PROVIDERS_MD"
@@ -801,7 +829,7 @@ JSON
 @test "SKILL.md 2f: the redaction-degraded sentinel is a private mktemp file, never a fixed /tmp path" {
   [ "$(grep -c '/tmp/cr-redaction' "$SKILL_MD")" -eq 0 ]
   grep -qF '`REDACTION_SENTINEL=$(mktemp)` (a private empty file, never a fixed `/tmp` name)' "$SKILL_MD"
-  grep -qF 'and `$REDACTION_SENTINEL`.' "$SKILL_MD"
+  grep -qF 'the report temp file, `$REDACTION_SENTINEL`, and `$RUN_DIR`.' "$SKILL_MD"
   grep -qF 'a non-empty sentinel file (`[[ -s "$REDACTION_SENTINEL" ]]`) sets `REDACTION_DEGRADED=true`' "$SKILL_MD"
   load_function "$SKILL_MD" redact_secrets
   mkdir -p "$BATS_TEST_TMPDIR/bin"

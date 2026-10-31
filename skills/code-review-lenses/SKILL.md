@@ -6,7 +6,7 @@ license: MIT
 compatibility: "Requires git, jq, and native subagent tools. gh CLI for a GitHub PR URL. glab CLI for a GitLab MR URL (any authenticated host)."
 metadata:
   author: upware
-  version: "2.1.1"
+  version: "2.1.2"
   spec: agent-skills
 allowed-tools: Bash Read Write Grep Glob Agent
 ---
@@ -15,7 +15,7 @@ allowed-tools: Bash Read Write Grep Glob Agent
 
 Run a full local review of all changes on the current branch (or a specified PR/MR). Produce Block A (summary) and Block B (findings) in the terminal. **Do not create, comment on, or update any PR/MR.**
 
-**Arguments:** The flags, PR/MR URL, and focus after the skill name in the user's invocation (`$code-review-lenses` in Codex). Hosts that expand `$ARGUMENTS` may supply that text directly.
+**Arguments:** The flags, PR/MR URL, and focus after the skill name in the user's invocation (`$code-review-lenses` in Codex). This file never names an arguments placeholder, so a host that substitutes one cannot rewrite these instructions; Claude Code appends the invocation after this file as an `ARGUMENTS:` line.
 
 `Bash`, `Read`, `Write`, `Grep`, and `Glob` below mean the host's native shell, file, and search tools.
 
@@ -44,9 +44,21 @@ Run a full local review of all changes on the current branch (or a specified PR/
 
    The resolver follows directory symlinks to the skill's physical directory, which holds everything the review needs, so a copied install works as well as a checkout. All subsequent scripts are `$SCRIPTS_DIR/<name>.sh`; agent prompts are `$AGENTS_DIR/<name>.md`, independent of the repository being reviewed.
 
+   **Run state.** On a host whose shell tool keeps no variables between commands, such as Claude Code, every block below starts empty. Create one private run directory now and keep every value a later block needs in it:
+
+   ```bash
+   RUN_DIR=$(mktemp -d)
+   printf 'SKILL_ROOT=%q\nSCRIPTS_DIR=%q\nAGENTS_DIR=%q\n' "$SKILL_ROOT" "$SCRIPTS_DIR" "$AGENTS_DIR" > "$RUN_DIR/00-root.env"
+   printf 'RUN_DIR=%s\n' "$RUN_DIR"
+   ```
+
+   Save the stdout of every script whose output you `eval` or `source` below to the next `$RUN_DIR/<NN>-<name>.env`, and each value you set yourself (`BASE`, `REVIEW_MODE`, `DIFF_FILE`, `DIFF_PATHS`, …) with `printf '%s=%q\n'`. Start every later block with `RUN_DIR=<the printed path>; for _f in "$RUN_DIR"/*.env; do source "$_f"; done`, so a later file overrides an earlier one. Phase 5 removes `$RUN_DIR`.
+
+   **Command time limits.** Claude Code stops a shell command after 2 minutes unless the call raises its timeout (up to 10 minutes) or runs in the background. Raise it for the PR/MR fetch and checkout and for Phase 1b.
+
 2. **Parse arguments** with the shipped parser — do not re-implement flag handling:
 
-   Write the actual argument text as **data** into a temp file using a native file-writing tool. In Codex, take it from the user's invocation; do not assume `$ARGUMENTS` substitution or write that literal placeholder. No arguments means an empty file. Preserve quoting and pass the file to the parser; never interpolate invocation text into shell code.
+   Write the actual argument text as **data** into a temp file using a native file-writing tool. In Codex, take it from the user's invocation; in Claude Code, from the `ARGUMENTS:` line after this file. Never write a placeholder literally. No arguments means an empty file. Preserve quoting and pass the file to the parser; never interpolate invocation text into shell code.
 
    ```bash
    # _args_file is the temp path you just wrote (the invoke line is data).
@@ -55,7 +67,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
    unset _profile_out
    ```
 
-   Capture stdout, honor `$?`, then `eval`. Never `eval "$(parser)"` — that swallows exit 2. Never `bash resolve-profile.sh $ARGUMENTS` — unquoted expansion is command injection. On exit 2, print stderr and stop. The parser rejects removed flags (`--quick`, `--security-only`, `--depth`, `--pr`, `--provider`, `--post-findings`, `--post-summary`, `--create-pr`, `--no-post`, `--local`, `--publish`, `--draft`, `--read-back`, `--no-mem`, `--no-findings`), unknown `--profile` values, a `--spec` file that does not exist or cannot be read, and `--spec` with `--summary-only`.
+   Capture stdout, honor `$?`, then `eval`. Never `eval "$(parser)"` — that swallows exit 2. Never put the invocation text on the parser's command line — unquoted expansion is command injection. On exit 2, print stderr and stop. The parser rejects removed flags (`--quick`, `--security-only`, `--depth`, `--pr`, `--provider`, `--post-findings`, `--post-summary`, `--create-pr`, `--no-post`, `--local`, `--publish`, `--draft`, `--read-back`, `--no-mem`, `--no-findings`), unknown `--profile` values, a `--spec` file that does not exist or cannot be read, and `--spec` with `--summary-only`.
 
    Emitted variables include `PROFILE`, `GUIDANCE`, `BASE`, `OUTPUT_FILE`, `MIN_CONFIDENCE`, `NO_ENRICH_CONTEXT`, `NO_SUPPRESS`, `SPEC_FILE` (absolute path, empty without `--spec`), and the pre-overlay `RUN_*` roster. `--spec` adds `RUN_SPEC_REVIEWER=true` to any profile, and no overlay turns it off. There is no `PR_NUMBER` or `PROVIDER_OVERRIDE` from this parser.
 
@@ -395,7 +407,7 @@ Run a full local review of all changes on the current branch (or a specified PR/
 Skip when `RUN_ENRICH_CONTEXT` is false (tiny tier, `--no-enrich-context`, or profiles `quick` / `security` / `summary`). Never inject into blind-hunter or pr-summarizer.
 
 1. Extract added-line identifiers from `$DIFF_FILE`, drop stop-words and symbols defined in the diff, cap at 50 by frequency.
-2. Grep the repo for definitions (`def|func|function|class|struct|interface|type|enum|const|var`). Cap 50 Grep calls.
+2. Grep the repo for definitions (`def|func|function|class|struct|interface|type|enum|const|var`). Cap 50 Grep calls. Search the app or package directories that hold the changed files, not the whole tree: a full-tree search of a large repository can outlast the host's command time limit.
 3. Read ±5 lines around each match (cap 3 reads per symbol).
 4. Build `<symbol-context>` (8,192-token budget). Store in `SYMBOL_CONTEXT`.
 
@@ -617,7 +629,7 @@ These four sections never restate findings: findings appear only in the severity
 
 There is no Phase 4. Nothing is written to a hosting provider. Block A and Block B below are the report redacted in 2f.
 
-**Cleanup:** remove temp diff files, `PR_BODY_FILE`, `HEAD_REF_FILE`, the report temp file, and `$REDACTION_SENTINEL`. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
+**Cleanup:** remove temp diff files, `PR_BODY_FILE`, `HEAD_REF_FILE`, the report temp file, `$REDACTION_SENTINEL`, and `$RUN_DIR`. If a PR/MR URL worktree was created, `git worktree remove "$WORKTREE_PATH" --force` and verify the path is gone (`WORKTREE_REMOVED`).
 
 **`--output-file`:** write Block A, `---`, Block B via the Write tool (Block A only when `PROFILE=summary`).
 

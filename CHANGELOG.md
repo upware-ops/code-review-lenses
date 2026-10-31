@@ -5,10 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.2] - 2026-10-31
 
 ### Fixed
 
+- **Claude Code run state.** Claude Code's shell tool keeps no variables between commands, so every `SKILL.md` block after the first started without `SCRIPTS_DIR`, `BASE`, `DIFF_FILE` and the roster. Phase 0 now creates a private `$RUN_DIR`, saves each parser's output and each value set there, and starts every later block by loading it; Phase 5 removes it.
+- **Arguments on Claude Code.** Claude Code replaces every literal arguments placeholder in a skill file, which rewrote three `SKILL.md` instructions with the user's invocation text. `SKILL.md` no longer contains one; Claude Code appends the invocation as an `ARGUMENTS:` line, and step 2 reads it from there.
+- **Claude Code command time limit.** `SKILL.md` notes the 2-minute default, says to raise it for the PR/MR fetch and checkout and for Phase 1b, and keeps Phase 0c searches to the changed files' app or package directories.
+- **Model names on Claude Code.** `models.conf` lists the values Claude Code's Agent tool accepts: `sonnet`, `opus`, `haiku`, `fable`.
 - **Claude Code agent spawning.** `SKILL.md` Phase 1 now says how to launch the agents on Claude Code, where a skill folder registers no subagents: a general-purpose subagent told to read `$AGENTS_DIR/<name>.md`, read-only, never a same-named plugin agent. Before, a literal reading made the run report itself incomplete, and earlier runs fell back to `comprehensive-review:*` / `pr-review-toolkit:*` plugin agents with older prompts and no `spec-reviewer`.
 
 ### Removed
