@@ -16,7 +16,7 @@ A copy of the Apache 2.0 license is at `agents/LICENSE-pr-review-toolkit.txt`.
 Pinned commit of `anthropics/claude-plugins-official` is in
 `.github/vendor-pins.json` (`pr-review-toolkit.sha`).
 
-Modifications in this repository (re-applied on every sync):
+Modifications in this repository (re-applied by `scripts/vendor-sync.sh`):
 
 - Removed host-specific `model:` and `color:` frontmatter.
 - Cut a frontmatter `description` at its inline `Examples:` (upstream
@@ -27,21 +27,20 @@ Modifications in this repository (re-applied on every sync):
   (`constants/errorIds.ts`, "Sentry tracking") and the `logError` hint, and
   replaced the bullet naming `logForDebugging` / `logError` / `logEvent` with
   the reviewed project's own logging and error-ID conventions. Only list
-  items are rewritten; other upstream wording shows up in the sync PR diff.
+  items are rewritten; other upstream wording shows up in the sync diff.
 - Inserted the vendor banner immediately after frontmatter.
 
-## Nightly updates
+## Updates
 
-`.github/workflows/vendor-sync.yml` runs daily (and on `workflow_dispatch`):
+Nothing syncs on a schedule. To take a newer upstream version, run
+`bash scripts/vendor-sync.sh toolkit [--sha <sha>]` from a checkout: it fetches
+the five allowlisted files from `claude-plugins-official`, applies the patches
+above, writes them here, and updates the pin. Review the diff before
+committing. New upstream agents are ignored until they are added to the pin
+allowlist.
 
-1. **Toolkit agents** — `scripts/vendor-sync.sh toolkit` fetches the five
-   allowlisted files at `origin/main` of `claude-plugins-official`, applies
-   the patches above, and opens or updates `chore/vendor-pr-review-toolkit`
-   on **this** repo. Nothing is auto-merged. New upstream agents are ignored
-   until they are added to the pin allowlist.
-2. **tag1consulting/claude-comprehensive-review** — digest only. 2.0 is a
-   product fork (no plugin, no posting, URL-only `--profile`). New commits
-   become an issue, not a merge.
-
-Do not `git merge` the GitHub fork parent. Port individual script or
+`bash scripts/vendor-sync.sh digest` lists
+`tag1consulting/claude-comprehensive-review` commits since its pin. 2.0 is a
+product fork (no plugin, no posting, URL-only `--profile`), so nothing is
+merged from it. Do not `git merge` the GitHub fork parent. Port individual script or
 analyzer fixes by hand.

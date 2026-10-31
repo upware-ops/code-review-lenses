@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- The nightly `vendor-sync` workflow (toolkit refresh PR and tag1consulting digest issue). `scripts/vendor-sync.sh` stays for refreshing the vendored toolkit agents by hand.
+
 ## [2.1.1] - 2026-10-31
 
 ### Fixed

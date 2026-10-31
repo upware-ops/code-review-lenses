@@ -45,7 +45,7 @@ tests/*.bats                             bats + jq; run: bats tests/*.bats
   `npx skills add` copies only that folder and drops symlinks that leave it, so
   never reference a file outside it from `SKILL.md`, a script, or a wrapper.
 - Vendored toolkit agents are Apache-2.0; see `skills/code-review-lenses/agents/THIRD_PARTY.md`.
-  Nightly refresh: `scripts/vendor-sync.sh` + `.github/workflows/vendor-sync.yml`.
+  Refresh by hand with `scripts/vendor-sync.sh toolkit`; nothing syncs on a schedule.
   Do not hand-edit those five files except through that transform.
 - `blind-hunter` must receive only the diff (plus GOVERNANCE). No project context.
 - Language guidance belongs in `language-profiles/`, not in agent prompts.
