@@ -286,6 +286,16 @@ teardown() {
   [[ -f "$AGENTS_DIR/THIRD_PARTY.md" && -f "$AGENTS_DIR/LICENSE-pr-review-toolkit.txt" ]]
 }
 
+@test "SKILL.md: Claude Code spawns a general-purpose subagent that reads the shipped prompt, never a plugin agent" {
+  rule=$(grep -F -- '- **Claude Code:**' "$SKILL_MD")
+  [ -n "$rule" ]
+  grep -qF 'general-purpose subagent' <<<"$rule"
+  grep -qF 'Read $AGENTS_DIR/<name>.md and follow it exactly.' <<<"$rule"
+  grep -qF 'Stay read-only' <<<"$rule"
+  grep -qF 'Never use a same-named agent from a plugin' <<<"$rule"
+  grep -qF ".md and follow it exactly." "$REPO_ROOT/.claude/workflows/code-review-lenses-workflow.js"
+}
+
 @test "PROVIDERS.md: read-only fetch/checkout only, no post/create/draft" {
   grep -q "OP: Fetch PR/MR metadata" "$PROVIDERS_MD"
   grep -q "OP: Checkout PR/MR branch" "$PROVIDERS_MD"

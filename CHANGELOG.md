@@ -7,6 +7,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+
+- **Claude Code agent spawning.** `SKILL.md` Phase 1 now says how to launch the agents on Claude Code, where a skill folder registers no subagents: a general-purpose subagent told to read `$AGENTS_DIR/<name>.md`, read-only, never a same-named plugin agent. Before, a literal reading made the run report itself incomplete, and earlier runs fell back to `comprehensive-review:*` / `pr-review-toolkit:*` plugin agents with older prompts and no `spec-reviewer`.
+
 ### Removed
 
 - The nightly `vendor-sync` workflow (toolkit refresh PR and tag1consulting digest issue). `scripts/vendor-sync.sh` stays for refreshing the vendored toolkit agents by hand.
