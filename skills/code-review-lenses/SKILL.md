@@ -6,7 +6,7 @@ license: MIT
 compatibility: "Requires git, jq, and native subagent tools. gh CLI for a GitHub PR URL. glab CLI for a GitLab MR URL (any authenticated host)."
 metadata:
   author: upware
-  version: "2.1.0"
+  version: "2.1.1"
   spec: agent-skills
 allowed-tools: Bash Read Write Grep Glob Agent
 ---
